@@ -46,6 +46,56 @@ CustomEffects:
         shaderType: VS
         Variables:
          - { type: mat3x4,   name: mModelMat,    count: 1  }  # 0          
+  PBRModelAttributes:
+    Attributes:
+      - { index: 0, name: ao_position, hint: "position", type: vec3 }
+      - { index: 1, name: ao_normal, hint: "normal",   type: vec3 }
+      - { index: 2, name: ao_tangent, hint: "tangent",  type: vec3, default: [ 0.0, 1.0, 0.0 ], defines: "HAS_BUMP" }
+      - { index: 10, name: ao_binormal, hint: "binormal", type: vec3, default: [ 0.0, 1.0, 0.0 ], defines: "HAS_BUMP"  }
+      - { index: 3, name: ao_boneIndex,  hint: "blendindex", type: uvec4, default: [ 0, 0, 0, 0 ], defines: "HAS_SKELETON" }
+      - { index: 4, name: ao_boneWeight, hint: "blendweight", type: vec4, default: [ 1.0, 0, 0, 0 ], defines: "HAS_SKELETON"  }
+      - { index: 5, name: ao_color, hint: "color", type: vec4, default: [ 1.0, 1.0, 1.0, 1.0 ] }
+      - { index: 6, name: ao_uv0, hint: "uv0", type: vec2, default: [0.0, 0.0] }
+      - { index: 7, name: ao_uv1, hint: "uv1", type: vec2, default: [0.0, 0.0] }
+      - { index: 8, name: ao_uv2, hint: "uv2", type: vec2, default: [0.0, 0.0] }
+      - { index: 9, name: ao_uv3, hint: "uv3", type: vec2, default: [0.0, 0.0] }
+    Samplers:
+      - { index: 0, hint: "BaseColor", default: "Textures/white_default" }
+      - { index: 1, hint: "NormalMap", default: "Textures/normal_default", defines: "HAS_BUMP !SHADOW_PASS" }
+      - { index: 2, hint: "MetallicRoughness", default: "Textures/white_default", defines: "!SHADOW_PASS" }
+      - { index: 3, hint: "EmissiveFactor", default: "Textures/black_default", defines: "!SHADOW_PASS" }
+      - { index: 4, hint: "Occlusion", default: "Textures/white_default", defines: "!SHADOW_PASS" }
+      - { index: 5, hint: "Reflection", type: "samplerCube", default: "Textures/white_cube", defines: "!SHADOW_PASS" }
+    ConstantDefs:
+      - name: uVSMaterial
+        binding: Material
+        shaderType: VS
+        Variables:
+         - { type: mat3x4, name: mTexMatrix, count: 4 }
+         - { type: int,    name: iBoneCount, count: 1, default: 0 }
+         - { type: bool,   name: bBumpMap,   count: 1, default: false }
+      - name: uPBRMaterial
+        binding: Material1
+        shaderType: PS
+        defines: "!SHADOW_PASS"
+        Variables:
+          - { type: vec4,  name: baseColorFactor,  count: 1, default: [ 1.0, 1.0, 1.0, 1.0 ] }
+          - { type: vec4,  name: emissiveFactor,   count: 1, default: [ 0.0, 0.0, 0.0, 0.0 ] }
+          - { type: float, name: metallicFactor,   count: 1, default: 0.0 }
+          - { type: float, name: roughnessFactor,  count: 1, default: 0.5 }
+          - { type: float, name: normalScale,      count: 1, default: 1.0 }
+          - { type: float, name: occlusionStrength, count: 1, default: 1.0 }
+          - { type: float, name: alpha,            count: 1, default: 1.0 }
+          - { type: float, name: alphaCutoff,      count: 1, default: 0.5 }
+          - { type: bool,  name: bBaseColorMap,    default: false }
+          - { type: bool,  name: bBumpMap,         default: false }
+          - { type: bool,  name: bMetallicRoughnessMap, default: false }
+          - { type: bool,  name: bEmissiveMap,     default: false }
+          - { type: bool,  name: bOcclusionMap,    default: false }
+      - binding: Custom0
+        shaderType: VS
+        Variables:
+         - { type: mat3x4, name: mModelMat, count: 1 }
 Effects:
   - name: FBXDefault
     vert: models/fbxdefault
@@ -74,6 +124,36 @@ Effects:
     define_sets:
       - name: omni_depth
         defines: SHADOW_PASS OMNI_DEPTH
-    global_sets:  
+    global_sets:
       - name: skel
-        defines: HAS_SKELETON        
+        defines: HAS_SKELETON
+  - name: PBRDefault
+    vert: models/fbxdefault
+    frag: models/pbrdefault
+    custom_effect: PBRModelAttributes
+    define_sets:
+      - name: deferred
+        defines: DEFERRED_SHADING
+      - name: depth
+        defines: SHADOW_PASS
+      - name: translucent
+        defines: TRANSLUCENT_PASS
+    global_sets:
+      - name: skel
+        defines: HAS_SKELETON
+      - name: bump
+        defines: HAS_BUMP
+      - name: skel.bump
+        defines: HAS_SKELETON HAS_BUMP
+  - name: PBRDefault
+    vert: models/fbxdefault
+    geom: shadows/depthwriteomni
+    frag: shadows/depthwriteomni
+    custom_effect: PBRModelAttributes
+    has_default: false
+    define_sets:
+      - name: omni_depth
+        defines: SHADOW_PASS OMNI_DEPTH
+    global_sets:
+      - name: skel
+        defines: HAS_SKELETON
