@@ -207,6 +207,7 @@ namespace usg
 			}
 #endif
 		}
+		ComponentEntity::FlushDeferredStructureChanges();
 	}
 
 	void SystemCoordinator::TriggerFromRoot(Entity e, Signal& sig)
@@ -238,6 +239,7 @@ namespace usg
 			}
 #endif
 		}
+		ComponentEntity::FlushDeferredStructureChanges();
 	}
 
 	void SystemCoordinator::TriggerRunner(Entity e, Signal& sig, const SignalRunner& runner, uint32 targets)

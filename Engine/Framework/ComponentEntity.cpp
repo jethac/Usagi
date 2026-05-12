@@ -13,6 +13,7 @@
 #include "Engine/Core/stl/vector.h"
 #include "Engine/Core/stl/memory.h"
 #include "Engine/Framework/NewEntities.h"
+#include <mutex>
 
 namespace usg {
 
@@ -27,6 +28,14 @@ namespace usg {
 
 static uint32 s_uEntityNum=1;
 static vector<ComponentEntity*> s_stableEntityLookup;
+static std::mutex s_deferredStructureChangesMutex;
+struct DeferredComponentFree
+{
+	EntityHandle entity;
+	uint32 uComponentTypeId;
+};
+static vector<DeferredComponentFree> s_deferredPendingFreeComponents;
+static vector<EntityHandle> s_deferredChangedEntities;
 uint32 ComponentEntity::g_uNumSystemTypes=0;
 ComponentEntity	*		ComponentEntity::g_hierarchy;
 FastPool< ComponentEntity >* ComponentEntity::g_pPool = nullptr;
@@ -66,6 +75,7 @@ void ComponentEntity::Reset()
 	g_hierarchy = nullptr;
 	s_pNewEntities.reset(nullptr);
 	s_stableEntityLookup.clear();
+	ClearDeferredStructureChanges();
 	ResetSystemExecutionDepth();
 	g_uNumSystemTypes = 0;
 	s_uEntityNum = 1;
@@ -131,6 +141,7 @@ void ComponentEntity::Activate()
     
 	m_bChanged = false;
 	m_bChildrenChanged = false;
+	m_bPendingDeletions = false;
    
     
 	m_bActive = true;
@@ -192,6 +203,12 @@ void ComponentEntity::SetComponentPendingDelete()
 
 void ComponentEntity::SetChanged()
 {
+	if (IsSystemExecutionActive())
+	{
+		QueueDeferredChanged(GetStableID());
+		return;
+	}
+
 	AssertStructureMutationAllowed();
 	m_bChanged = true;
 	ComponentEntity* parent = GetParentEntity();
@@ -240,6 +257,62 @@ void ComponentEntity::Deactivate()
 	UnregisterStableEntity(this);
     
 	ComponentStats::DeactivatedEntity();
+}
+
+void ComponentEntity::QueueDeferredComponentFree(EntityHandle entity, uint32 uComponentTypeId)
+{
+	ASSERT(entity.IsValid());
+	std::lock_guard<std::mutex> lock(s_deferredStructureChangesMutex);
+	DeferredComponentFree componentFree = { entity, uComponentTypeId };
+	s_deferredPendingFreeComponents.push_back(componentFree);
+}
+
+void ComponentEntity::QueueDeferredChanged(EntityHandle entity)
+{
+	ASSERT(entity.IsValid());
+	std::lock_guard<std::mutex> lock(s_deferredStructureChangesMutex);
+	s_deferredChangedEntities.push_back(entity);
+}
+
+void ComponentEntity::FlushDeferredStructureChanges()
+{
+	ASSERT(!IsSystemExecutionActive());
+
+	vector<DeferredComponentFree> pendingFreeComponents;
+	vector<EntityHandle> changedEntities;
+	{
+		std::lock_guard<std::mutex> lock(s_deferredStructureChangesMutex);
+		pendingFreeComponents = s_deferredPendingFreeComponents;
+		changedEntities = s_deferredChangedEntities;
+		s_deferredPendingFreeComponents.clear();
+		s_deferredChangedEntities.clear();
+	}
+
+	for (const DeferredComponentFree& componentFree : pendingFreeComponents)
+	{
+		ComponentEntity* pEntity = GetEntityFromStableID(componentFree.entity);
+		ComponentType* pComponent = pEntity != nullptr ? pEntity->GetComponent(componentFree.uComponentTypeId) : nullptr;
+		if (pComponent != nullptr && pComponent->GetEntity() != nullptr)
+		{
+			pComponent->GetEntity()->SetComponentPendingDelete();
+		}
+	}
+
+	for (const EntityHandle& entity : changedEntities)
+	{
+		ComponentEntity* pEntity = GetEntityFromStableID(entity);
+		if (pEntity != nullptr && pEntity->IsActive())
+		{
+			pEntity->SetChanged();
+		}
+	}
+}
+
+void ComponentEntity::ClearDeferredStructureChanges()
+{
+	std::lock_guard<std::mutex> lock(s_deferredStructureChangesMutex);
+	s_deferredPendingFreeComponents.clear();
+	s_deferredChangedEntities.clear();
 }
 
 ComponentEntity* ComponentEntity::GetChildEntityByName(const UnsafeComponentGetter& getter, uint32 uNameHash, bool bRecursive)

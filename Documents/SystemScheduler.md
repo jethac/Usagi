@@ -49,6 +49,19 @@ structure changes before those operations have an explicit synchronization or
 deferred-queue design. Zero-worker dispatch does not enable this guard, so the
 existing serial behavior remains available by default.
 
+Two worker-time requests are deferred rather than asserted:
+
+- `ComponentType::RequestFree()` records the entity stable handle and component
+  type ID, then marks the pending delete after dispatch returns.
+- `ComponentEntity::SetChanged()` records the entity stable handle, then marks
+  the entity dirty after dispatch returns.
+
+Deferred requests are flushed after each signal dispatch and before
+`ComponentManager::CheckEntities()`. The flush only marks pending work; actual
+component frees and IO membership updates still run in the existing safe entity
+check phase. Deferred requests that point at stale entity handles or missing
+components are ignored.
+
 ## Coverage status
 
 Current verification includes build-level checks: regenerate boilerplate when

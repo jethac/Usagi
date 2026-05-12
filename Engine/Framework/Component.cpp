@@ -37,9 +37,15 @@ uint32 ComponentType::GetNextTypeID()
 
 void ComponentType::RequestFree()
 {
-	if (m_uEntity)
+	if (m_uEntity && !m_bFreeRequested.exchange(true, std::memory_order_acq_rel))
 	{
-		m_uEntity->SetComponentPendingDelete();
-		m_bFreeRequested = true;
+		if (ComponentEntity::IsSystemExecutionActive())
+		{
+			ComponentEntity::QueueDeferredComponentFree(m_uEntity->GetStableID(), GetTypeID());
+		}
+		else
+		{
+			m_uEntity->SetComponentPendingDelete();
+		}
 	}
 }

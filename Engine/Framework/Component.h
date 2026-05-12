@@ -9,6 +9,7 @@
 #include "HierarchyNode.h"
 
 #include <Engine/Core/ProtocolBuffers.h>
+#include <atomic>
 
 namespace usg {
 
@@ -63,14 +64,14 @@ public:
 
 	bool     WasLoaded() const { return m_bDidRunOnLoaded; }
 	void     SetLoaded() { m_bDidRunOnLoaded = true; }
-	bool	 WaitingOnFree() { return m_bFreeRequested; }
+	bool	 WaitingOnFree() { return m_bFreeRequested.load(std::memory_order_acquire); }
 	void	 RequestFree();
 
 	void     Init()
 	{
 		m_uEntity = 0;
 		m_bDidRunOnLoaded = false;
-		m_bFreeRequested = false;
+		m_bFreeRequested.store(false, std::memory_order_release);
 	}
 
 	virtual void Activate(Entity e);
@@ -96,7 +97,7 @@ protected:
 	Entity         m_uEntity;
 	ModifyId       m_modifyId;
 	bool           m_bDidRunOnLoaded;
-	bool		   m_bFreeRequested;
+	std::atomic<bool> m_bFreeRequested;
 
 };
 

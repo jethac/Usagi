@@ -353,6 +353,8 @@ namespace usg
 
 	void ComponentManager::CheckEntities()
 	{
+		ComponentEntity::FlushDeferredStructureChanges();
+
 		static const uint32 uMaxBatchSize = 20;
 		static Entity removedEntitites[uMaxBatchSize];
 		uint32 uRemovedEntities = 0;

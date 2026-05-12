@@ -73,6 +73,9 @@ namespace usg
 		static void EndSystemExecution();
 		static bool IsSystemExecutionActive();
 		static void AssertStructureMutationAllowed();
+		static void QueueDeferredComponentFree(EntityHandle entity, uint32 uComponentTypeId);
+		static void QueueDeferredChanged(EntityHandle entity);
+		static void FlushDeferredStructureChanges();
 
 		class SystemExecutionScope
 		{
@@ -208,6 +211,7 @@ namespace usg
 		static void UnregisterStableEntity(ComponentEntity* entity);
 		static std::atomic<uint32>& SystemExecutionDepth();
 		static void ResetSystemExecutionDepth();
+		static void ClearDeferredStructureChanges();
 		void SetComponentBit(uint32 uBitfieldOffset, uint32 uBitfieldIndex, bool bValue);
 
 		uint32 GetSystemIDFromIndex(uint32 uSysIndex) const { return uSysIndex + 1; }
