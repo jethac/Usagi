@@ -36,3 +36,13 @@ While a signal is being dispatched, `SystemCoordinator` asserts against entity I
 membership mutation through `UpdateEntityIO` and `RemoveEntityIO`. Entity changes
 should be applied in the existing pre-dispatch check phase or deferred until a
 later safe phase.
+
+## Coverage status
+
+Current verification is build-level: regenerate boilerplate when templates
+change, build the Framework target, then sweep dependent engine module targets.
+There is not yet a first-party ECS unit or smoke-test target in the generated
+project set. The only first-party test harness currently identified is under
+`Tools/Tests/ResourcePakExporter`, so scheduler acceptance still needs a small
+engine test target or demo harness that can compare single-worker and
+multi-worker branch results.
