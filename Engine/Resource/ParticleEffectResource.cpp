@@ -34,7 +34,6 @@ namespace usg{
 		m_name = szFileName;
 		str::RemovePath(m_name);
 		str::TruncateExtension(m_name);
-		SetupHash(szFileName);
 		ProtocolBufferFile effectVPB(szFileName);
 		bool bReadSucceeded = effectVPB.Read(&m_definition);	
 		return bReadSucceeded;
@@ -42,7 +41,7 @@ namespace usg{
 
 	bool ParticleEffectResource::FinalizeCPUData(const char* szFileName)
 	{
-		UNUSED_VAR(szFileName);
+		SetupHash(szFileName);
 		SetReady(true);
 		return true;
 	}
