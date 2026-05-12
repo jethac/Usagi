@@ -61,6 +61,16 @@ public:
 		uint32 uWorkerCount;
 	};
 
+	struct SignalExecutionBatchInfo
+	{
+		SignalExecutionBatchInfo();
+
+		uint32 uSignalId;
+		uint32 uBatchIndex;
+		uint32 uRunnerCount;
+		sint32 priority;
+	};
+
 	SystemCoordinator();
 	~SystemCoordinator();
 
@@ -94,6 +104,8 @@ public:
 	const SystemDependencyInfo* GetSystemDependencyInfo(uint32 uSystemId) const;
 	bool SystemsHaveRequiredComponentOverlap(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
 	bool SystemsHaveComponentAccessConflict(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
+	uint32 GetSignalExecutionBatchCount(uint32 uSignalId) const;
+	bool GetSignalExecutionBatchInfo(uint32 uSignalId, uint32 uBatchIndex, SignalExecutionBatchInfo& out) const;
 	void ConfigureSystemScheduler(uint32 uWorkerCount, uint32 uMaxTasks);
 	SystemSchedulerStats GetSystemSchedulerStats() const;
 
@@ -120,6 +132,7 @@ private:
 	}
 
 	void UpdateSystemList();
+	void BuildSignalExecutionBatches();
 
 	struct InternalData;
 	InternalData* m_pInternalData = nullptr;

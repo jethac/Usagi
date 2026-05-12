@@ -27,12 +27,24 @@ namespace usg
 
 	struct SystemCoordinator::InternalData
 	{
+		struct SignalExecutionBatch
+		{
+			SignalExecutionBatch()
+				: priority(0)
+			{
+			}
+
+			sint32 priority;
+			usg::vector<uint32> runnerIndices;
+		};
+
 		usg::vector<SystemHelper> systemHelpers;
 		usg::vector<SystemDependencyInfo> systemDependencies;
 		SystemScheduler scheduler;
 		usg::vector<ComponentHelper> componentHelpers;
 		usg::hash_map<uint32, uint32> componentHashLookUp; // component-hash => id mapping
 		usg::hash_map<uint32, usg::vector<SignalRunner>> signalRunners;
+		usg::hash_map<uint32, usg::vector<SignalExecutionBatch>> signalExecutionBatches;
 		usg::hash_map<uint32, ProtocolBufferReaderData> protocolBufferReaders;
 		uint32 uSignalDispatchDepth = 0;
 
@@ -43,6 +55,7 @@ namespace usg
 			componentHelpers.clear();
 			componentHashLookUp.clear();
 			signalRunners.clear();
+			signalExecutionBatches.clear();
 			uSignalDispatchDepth = 0;
 		}
 	};
@@ -110,6 +123,14 @@ namespace usg
 		, uLastRootBranchTaskCount(0)
 		, uTotalRootBranchTaskCount(0)
 		, uWorkerCount(0)
+	{
+	}
+
+	SystemCoordinator::SignalExecutionBatchInfo::SignalExecutionBatchInfo()
+		: uSignalId(0)
+		, uBatchIndex(0)
+		, uRunnerCount(0)
+		, priority(0)
 	{
 	}
 
@@ -264,6 +285,105 @@ namespace usg
 		}
 
 		return false;
+	}
+
+	static bool DependenciesHaveSchedulingConflict(const usg::vector<SystemCoordinator::SystemDependencyInfo>& dependencies, uint32 uLhsSystemId, uint32 uRhsSystemId)
+	{
+		if (uLhsSystemId >= dependencies.size() || uRhsSystemId >= dependencies.size())
+		{
+			return true;
+		}
+
+		const SystemCoordinator::SystemDependencyInfo& lhs = dependencies[uLhsSystemId];
+		const SystemCoordinator::SystemDependencyInfo& rhs = dependencies[uRhsSystemId];
+		for (uint32 i = 0; i < ARRAY_SIZE(lhs.uReadComponentMask); ++i)
+		{
+			const uint32 uLhsWrites = lhs.uWriteComponentMask[i];
+			const uint32 uRhsWrites = rhs.uWriteComponentMask[i];
+			const uint32 uLhsAccess = lhs.uReadComponentMask[i] | lhs.uParentReadComponentMask[i] | uLhsWrites;
+			const uint32 uRhsAccess = rhs.uReadComponentMask[i] | rhs.uParentReadComponentMask[i] | uRhsWrites;
+			if (((uLhsWrites & uRhsAccess) != 0) || ((uRhsWrites & uLhsAccess) != 0))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void SystemCoordinator::BuildSignalExecutionBatches()
+	{
+		m_pInternalData->signalExecutionBatches.clear();
+		for (auto& signalRunners : m_pInternalData->signalRunners)
+		{
+			const uint32 uSignalId = signalRunners.first;
+			const usg::vector<SignalRunner>& runners = signalRunners.second;
+			usg::vector<InternalData::SignalExecutionBatch>& batches = m_pInternalData->signalExecutionBatches[uSignalId];
+
+			for (uint32 i = 0; i < (uint32)runners.size(); ++i)
+			{
+				const SignalRunner& runner = runners[i];
+				bool bPlaced = false;
+				for (uint32 j = 0; j < (uint32)batches.size(); ++j)
+				{
+					InternalData::SignalExecutionBatch& batch = batches[j];
+					bool bConflicts = runner.systemID == SignalRunner::INVALID_SYSTEM_ID;
+					for (uint32 k = 0; !bConflicts && k < (uint32)batch.runnerIndices.size(); ++k)
+					{
+						const SignalRunner& batchRunner = runners[batch.runnerIndices[k]];
+						bConflicts = batchRunner.systemID == SignalRunner::INVALID_SYSTEM_ID ||
+							DependenciesHaveSchedulingConflict(m_pInternalData->systemDependencies, batchRunner.systemID, runner.systemID);
+					}
+
+					if (batch.priority == runner.priority && !bConflicts)
+					{
+						batch.runnerIndices.push_back(i);
+						bPlaced = true;
+						break;
+					}
+				}
+
+				if (!bPlaced)
+				{
+					InternalData::SignalExecutionBatch batch;
+					batch.priority = runner.priority;
+					batch.runnerIndices.push_back(i);
+					batches.push_back(batch);
+				}
+			}
+		}
+	}
+
+	uint32 SystemCoordinator::GetSignalExecutionBatchCount(uint32 uSignalId) const
+	{
+		if (m_pInternalData == nullptr)
+		{
+			return 0;
+		}
+
+		auto it = m_pInternalData->signalExecutionBatches.find(uSignalId);
+		return it == m_pInternalData->signalExecutionBatches.end() ? 0 : (uint32)it->second.size();
+	}
+
+	bool SystemCoordinator::GetSignalExecutionBatchInfo(uint32 uSignalId, uint32 uBatchIndex, SignalExecutionBatchInfo& out) const
+	{
+		if (m_pInternalData == nullptr)
+		{
+			return false;
+		}
+
+		auto it = m_pInternalData->signalExecutionBatches.find(uSignalId);
+		if (it == m_pInternalData->signalExecutionBatches.end() || uBatchIndex >= it->second.size())
+		{
+			return false;
+		}
+
+		const InternalData::SignalExecutionBatch& batch = it->second[uBatchIndex];
+		out.uSignalId = uSignalId;
+		out.uBatchIndex = uBatchIndex;
+		out.uRunnerCount = (uint32)batch.runnerIndices.size();
+		out.priority = batch.priority;
+		return true;
 	}
 
 	void SystemCoordinator::ConfigureSystemScheduler(uint32 uWorkerCount, uint32 uMaxTasks)
@@ -632,6 +752,8 @@ void SystemCoordinator::LockRegistration()
 			pSystem->uKeyCount = uSystemKeyCount;
 		}
 	}
+
+	BuildSignalExecutionBatches();
 }
 
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
