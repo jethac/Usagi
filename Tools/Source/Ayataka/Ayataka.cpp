@@ -13,6 +13,7 @@
 
 #include "Engine/Memory/Mem.h"
 
+#include <fstream>
 #include <stdlib.h>
 
 struct ConvertSettings
@@ -34,6 +35,28 @@ bool checkArgument(aya::string& target, const aya::string& argument) {
 	else {
 		return false;
 	}
+}
+
+bool FileExists(const aya::string& path)
+{
+	std::ifstream file(path.c_str(), std::ifstream::binary);
+	return file.good();
+}
+
+void PrintUsage()
+{
+	fprintf(stderr, "usage\n");
+	fprintf(stderr, "==========\n");
+	fprintf(stderr, "-a<16|32|64|128>: alignment\n");
+	fprintf(stderr, "-o<path>: output path\n");
+	fprintf(stderr, "-d<path>: dependency path (if blank output file .d is used)\n");
+	fprintf(stderr, "-h<path>: bone hierarchy path (if blank output file .xml is used)\n");
+	fprintf(stderr, "-lh: swap X-axis for LH coordinate\n");
+	fprintf(stderr, "-be: swap endian\n");
+	fprintf(stderr, "--sh-out-dir<path>: shader output dir (optional)\n");
+	fprintf(stderr, "--fx-out-dir<path>: effect output dir (optional)\n");
+	fprintf(stderr, "--instance: output as an instance\n");
+	fprintf(stderr, "--collision: output as a collision mesh\n");
 }
 
 int convertModelData(const aya::string& outputPath, const aya::string& inputPath, const aya::StringVector& argumentsVector, const ConvertSettings& settings)
@@ -78,6 +101,11 @@ int convertModelData(const aya::string& outputPath, const aya::string& inputPath
 	if (endsWith(inputPath, "fbx")) 
 	{
 		pConverter = vnew(usg::ALLOC_OBJECT) FbxConverter;
+	}
+	else
+	{
+		fprintf(stderr, "Ayataka: unsupported model input '%s'; only .fbx model conversion is currently wired\n", inputPath.c_str());
+		return -1;
 	}
 
 	DependencyTracker dependencies;
@@ -168,20 +196,10 @@ int main(int argc, char *argv[])
 	// analyze arguments
 	int size = (int)argumentsVector.size();
 	if( size < 2 ) {
-		printf( "usage\n" );
-		printf( "==========\n" );
-		printf( "-a<16|32|64|128>: alignment\n" );
-		printf( "-o<path>: output path\n" );
-		printf( "-d<path>: dependency path (if blank output file .d is used) \n");
-		printf( "-h<path>: bone hierarchy path (if blank output file .xml is used) \n");
-		printf( "-lh: swap X-axis for LH coordinate\n" );
-		printf( "-be: swap endian\n" );
-		printf( "--sh-out-dir<path>: shader output dir (optional)\n" );
-		printf( "--fx-out-dir<path>: effect output dir (optional)\n" );
-		printf( "--instance: output as an instance\n" );
-		printf( "--collision: output as a collision mesh\n" );
-
-		return 0;
+		PrintUsage();
+		printerTerm();
+		perfTerm();
+		return -1;
 	}
 
 	// first of all, have to specify the input and output paths.
@@ -225,9 +243,35 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (inputPath.empty())
+	{
+		fprintf(stderr, "Ayataka: no input file specified\n");
+		printerTerm();
+		perfTerm();
+		return -1;
+	}
+
+	if (outputPath.empty())
+	{
+		fprintf(stderr, "Ayataka: no output path specified; use -o<path>\n");
+		printerTerm();
+		perfTerm();
+		return -1;
+	}
+
+	if (!FileExists(inputPath))
+	{
+		fprintf(stderr, "Ayataka: input file '%s' does not exist or cannot be opened\n", inputPath.c_str());
+		printerTerm();
+		perfTerm();
+		return -1;
+	}
+
 	size_t found = inputPath.find_last_of( "." );
 	if( found == aya::string::npos ) {
-		// wrong input path
+		fprintf(stderr, "Ayataka: input file '%s' has no extension\n", inputPath.c_str());
+		printerTerm();
+		perfTerm();
 		return -1;
 	}
 	
@@ -250,14 +294,17 @@ int main(int argc, char *argv[])
 		timer.Start();
 		ret = convertModelData( outputPath, inputPath, argumentsVector, settings );
 		timer.Stop();
-		printf("%f\n", timer.GetTotalMilliSeconds()); 
+		if (ret == 0)
+		{
+			printf("%f\n", timer.GetTotalMilliSeconds());
+		}
 	}
 	else if (ext == "yml")
 	{
 		ret = ConvertMaterialDefinition(outputPath, inputPath);
 	}
 	else {
-		printf( "That format is not supported!\n" );
+		fprintf(stderr, "Ayataka: unsupported input format '.%s' for '%s'\n", ext.c_str(), inputPath.c_str());
 		ret = -1;
 	}
 
@@ -265,8 +312,7 @@ int main(int argc, char *argv[])
 	perfTerm();
 
 	if( ret != 0 ) {
-		printf( "ERROR!\n" );
+		fprintf(stderr, "Ayataka: conversion failed for '%s'\n", inputPath.c_str());
 	}
 	return ret;
 }
-
