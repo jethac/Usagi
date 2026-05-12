@@ -241,6 +241,14 @@ namespace usg
 		return false;
 	}
 
+	void SystemCoordinator::ConfigureSystemScheduler(uint32 uWorkerCount, uint32 uMaxTasks)
+	{
+		if (m_pInternalData != nullptr)
+		{
+			m_pInternalData->scheduler.Init(uWorkerCount, uMaxTasks);
+		}
+	}
+
 	SystemCoordinator::SystemSchedulerStats SystemCoordinator::GetSystemSchedulerStats() const
 	{
 		SystemSchedulerStats result;

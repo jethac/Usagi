@@ -90,6 +90,7 @@ public:
 	const SystemDependencyInfo* GetSystemDependencyInfo(uint32 uSystemId) const;
 	bool SystemsHaveRequiredComponentOverlap(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
 	bool SystemsHaveComponentAccessConflict(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
+	void ConfigureSystemScheduler(uint32 uWorkerCount, uint32 uMaxTasks);
 	SystemSchedulerStats GetSystemSchedulerStats() const;
 
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS

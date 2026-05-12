@@ -23,3 +23,6 @@ order, so branch visibility is available without changing traversal behavior.
 worker path is still synchronous: when workers are enabled, the caller also helps
 execute tasks and does not return until all tasks finish. Future scheduler work
 can opt into workers without changing the payload lifetime contract.
+
+Use `SystemCoordinator::ConfigureSystemScheduler` to set the worker count and
+maximum task count. The default configuration remains zero workers.
