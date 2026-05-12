@@ -93,6 +93,7 @@ namespace usg{
 			{
 				EndThread();
 				JoinThread();
+				DiscardCompletedResults();
 				m_bStarted = false;
 			}
 		}
@@ -141,6 +142,18 @@ namespace usg{
 				}
 
 				m_completedQueue.Enqueue(result);
+			}
+		}
+
+		void DiscardCompletedResults()
+		{
+			ResourceCpuLoadResult result;
+			while (m_completedQueue.TryDequeue(result))
+			{
+				if (result.pResource != nullptr)
+				{
+					vdelete result.pResource;
+				}
 			}
 		}
 
@@ -610,11 +623,13 @@ void ResourceMgr::FinishedStaticLoad()
 
 void ResourceMgr::ClearDynamicResources(GFXDevice* pDevice)
 {
+	ProcessCompletedResourceLoads();
 	m_pImpl->resources.FreeResourcesWithTag(pDevice, 1);
 }
 
 void ResourceMgr::ClearAllResources(GFXDevice* pDevice)
 {
+	ProcessCompletedResourceLoads();
 	m_pImpl->resources.FreeAllResources(pDevice);
 }
 
