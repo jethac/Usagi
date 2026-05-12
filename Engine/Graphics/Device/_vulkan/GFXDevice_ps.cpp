@@ -739,6 +739,8 @@ const DisplaySettings* GFXDevice_ps::GetDisplayInfo(uint32 uIndex)
 
 void GFXDevice_ps::Begin()
 {
+	m_frameCommandBuffers.clear();
+
 	static bool bFirst = true;
 	if (!bFirst)
 	{
@@ -763,16 +765,24 @@ void GFXDevice_ps::Begin()
 	// TODO: Update GPU time
 }
 
+void GFXDevice_ps::QueueFrameCommandBuffer(VkCommandBuffer commandBuffer)
+{
+	ASSERT(commandBuffer != VK_NULL_HANDLE);
+	m_frameCommandBuffers.push_back(commandBuffer);
+}
+
 void GFXDevice_ps::End()
 {
-	// For now just submit our immediate context
+	// For now the collector only contains the immediate context. Deferred
+	// contexts can append here once command generation is split.
+	QueueFrameCommandBuffer(m_pParent->GetImmediateCtxt()->GetPlatform().GetVkCmdBuffer());
+
 	VkSubmitInfo submitInfo = {};
-	VkCommandBuffer buffers[] = { m_pParent->GetImmediateCtxt()->GetPlatform().GetVkCmdBuffer() };
 	VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = buffers;
+	submitInfo.commandBufferCount = (uint32)m_frameCommandBuffers.size();
+	submitInfo.pCommandBuffers = &m_frameCommandBuffers[0];
 	// FIXME: Semaphores for all displays
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = &m_pParent->GetDisplay(0)->GetPlatform().GetImageAcquired();

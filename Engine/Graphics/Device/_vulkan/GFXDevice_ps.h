@@ -8,6 +8,7 @@
 #include "Engine/Scene/RenderNode.h"
 #include "Engine/Core/stl/list.h"
 #include "Engine/Core/stl/queue.h"
+#include "Engine/Core/stl/vector.h"
 #include OS_HEADER(Engine/Graphics/Device, VulkanIncludes.h)
 
 #ifdef DEBUG_BUILD
@@ -43,6 +44,7 @@ public:
 
 	void Begin();
 	void End();
+	void QueueFrameCommandBuffer(VkCommandBuffer commandBuffer);
 	float GetGPUTime() const { return m_fGPUTime; }
 	
 	GFXContext* CreateDeferredContext(uint32 uSizeMul) { ASSERT(false); return NULL; }
@@ -182,6 +184,7 @@ private:
 
 	VkPipelineCache						m_pipelineCache;
 	VkAllocationCallbacks				m_allocCallbacks;
+	usg::vector<VkCommandBuffer>		m_frameCommandBuffers;
 
 	DisplaySettings						m_diplayInfo[MAX_DISPLAY_COUNT];
 	uint32								m_uDisplayCount;
