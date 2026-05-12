@@ -3,6 +3,7 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Component.h"
+#include <atomic>
 
 using namespace usg;
 
@@ -28,11 +29,10 @@ void ComponentType::SetPrevComponent(ComponentType* pComp)
 	m_pPrevComponent = pComp;
 }
 
-// TODO: Make this thread-safe
 uint32 ComponentType::GetNextTypeID()
 {
-	static uint32 s_uNextTypeID = 0;
-	return s_uNextTypeID++;
+	static std::atomic<uint32> s_uNextTypeID(0);
+	return s_uNextTypeID.fetch_add(1, std::memory_order_relaxed);
 }
 
 void ComponentType::RequestFree()
