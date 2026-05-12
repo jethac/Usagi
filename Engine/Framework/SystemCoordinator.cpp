@@ -215,10 +215,28 @@ namespace usg
 		{
 			m_pInternalData->scheduler.BeginSignal(sig.uId);
 			SignalDispatchScope dispatchScope(m_pInternalData->uSignalDispatchDepth);
+#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
 			for (auto& runner : runners)
 			{
 				TriggerRunnerFromRoot(e, sig, runner);
 			}
+#else
+			auto batchIt = m_pInternalData->signalExecutionBatches.find(sig.uId);
+			if (batchIt != m_pInternalData->signalExecutionBatches.end())
+			{
+				for (auto& batch : batchIt->second)
+				{
+					m_pInternalData->scheduler.RunSignalTasksFromRoot(e, sig, &runners[0], &batch.runnerIndices[0], (uint32)batch.runnerIndices.size());
+				}
+			}
+			else
+			{
+				for (auto& runner : runners)
+				{
+					TriggerRunnerFromRoot(e, sig, runner);
+				}
+			}
+#endif
 		}
 	}
 

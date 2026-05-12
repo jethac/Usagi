@@ -158,6 +158,44 @@ namespace
 		ok &= Expect(stats.uTotalRootBranchTaskCount == 0, "empty root total branch task count remains zero");
 		return ok;
 	}
+
+	bool TestRootBranchBatchFanOutStats()
+	{
+		TestSignal signal;
+		usg::SignalRunner runners[] =
+		{
+			MakeRootBranchRunner(),
+			MakeRootBranchRunner()
+		};
+		uint32 runnerIndices[] = { 0, 1 };
+		usg::SystemScheduler scheduler;
+
+		usg::GenericInputOutputs root(nullptr, nullptr);
+		usg::GenericInputOutputs branchA(nullptr, nullptr);
+		usg::GenericInputOutputs branchB(nullptr, nullptr);
+		usg::GenericInputOutputs branchC(nullptr, nullptr);
+
+		branchA.AttachToNode(&root);
+		branchB.AttachToNode(&root);
+		branchC.AttachToNode(&root);
+
+		g_pRoot = &root;
+		g_triggeredBranches.clear();
+
+		scheduler.BeginSignal(signal.uId);
+		scheduler.RunSignalTasksFromRoot(nullptr, signal, runners, runnerIndices, ARRAY_SIZE(runnerIndices));
+
+		const usg::SystemScheduler::Stats& stats = scheduler.GetStats();
+		bool ok = true;
+		ok &= Expect(g_triggeredBranches.size() == 6, "batched root runners trigger each direct branch");
+		ok &= Expect(stats.uLastSignalTaskCount == 2, "batched root runners count one signal task per runner");
+		ok &= Expect(stats.uLastRootBranchRunnerCount == 2, "batched root runners count each root branch runner");
+		ok &= Expect(stats.uLastRootBranchTaskCount == 6, "batched root runners count flattened branch tasks");
+		ok &= Expect(stats.uTotalSignalTaskCount == 2, "batched root runners total signal tasks");
+		ok &= Expect(stats.uTotalRootBranchRunnerCount == 2, "batched root runners total branch runners");
+		ok &= Expect(stats.uTotalRootBranchTaskCount == 6, "batched root runners total branch tasks");
+		return ok;
+	}
 }
 
 int main()
@@ -165,6 +203,7 @@ int main()
 	bool ok = true;
 	ok &= TestRootBranchFanOutStats();
 	ok &= TestEmptyRootBranchStats();
+	ok &= TestRootBranchBatchFanOutStats();
 
 	if (ok)
 	{

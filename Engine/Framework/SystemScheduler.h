@@ -39,6 +39,12 @@ public:
 		uint32 uWorkerCount;
 	};
 
+	struct SignalTaskRef
+	{
+		bool bRootBranch;
+		uint32 uDataIndex;
+	};
+
 	void Init(uint32 uWorkerCount, uint32 uMaxTasks)
 	{
 		m_taskRunner.Init(uWorkerCount, uMaxTasks);
@@ -109,6 +115,54 @@ public:
 		m_taskRunner.RunTasks(&task, 1);
 	}
 
+	void RunSignalTasksFromRoot(Entity e, Signal& sig, const SignalRunner* pRunners, const uint32* pRunnerIndices, uint32 uRunnerCount)
+	{
+		if (uRunnerCount == 0)
+		{
+			return;
+		}
+
+		usg::vector<SignalTaskData> signalTaskData;
+		usg::vector<RootBranchTaskData> branchTaskData;
+		usg::vector<SignalTaskRef> taskRefs;
+		usg::vector<TaskRunner::Task> tasks;
+
+		for (uint32 i = 0; i < uRunnerCount; ++i)
+		{
+			const SignalRunner& runner = pRunners[pRunnerIndices[i]];
+			if (runner.TriggerRootBranch != nullptr)
+			{
+				AppendSignalRootBranchTasks(sig, runner, branchTaskData, taskRefs);
+			}
+			else
+			{
+				SignalTaskData data = { e, &sig, &runner, 0 };
+				signalTaskData.push_back(data);
+				SignalTaskRef taskRef = { false, (uint32)signalTaskData.size() - 1 };
+				taskRefs.push_back(taskRef);
+				RecordSignalTask();
+			}
+		}
+
+		tasks.reserve(taskRefs.size());
+		for (uint32 i = 0; i < (uint32)taskRefs.size(); ++i)
+		{
+			if (taskRefs[i].bRootBranch)
+			{
+				tasks.push_back(TaskRunner::Task(RunRootBranchTaskInt, &branchTaskData[taskRefs[i].uDataIndex]));
+			}
+			else
+			{
+				tasks.push_back(TaskRunner::Task(RunSignalTaskFromRootInt, &signalTaskData[taskRefs[i].uDataIndex]));
+			}
+		}
+
+		if (!tasks.empty())
+		{
+			m_taskRunner.RunTasks(&tasks[0], (uint32)tasks.size());
+		}
+	}
+
 	const Stats& GetStats() const { return m_stats; }
 
 private:
@@ -143,6 +197,25 @@ private:
 
 	void RunSignalRootBranchTasks(Signal& sig, const SignalRunner& runner)
 	{
+		usg::vector<RootBranchTaskData> branchData;
+		usg::vector<SignalTaskRef> taskRefs;
+		usg::vector<TaskRunner::Task> tasks;
+		AppendSignalRootBranchTasks(sig, runner, branchData, taskRefs);
+
+		tasks.reserve(taskRefs.size());
+		for (uint32 i = 0; i < (uint32)taskRefs.size(); ++i)
+		{
+			tasks.push_back(TaskRunner::Task(RunRootBranchTaskInt, &branchData[taskRefs[i].uDataIndex]));
+		}
+
+		if (!tasks.empty())
+		{
+			m_taskRunner.RunTasks(&tasks[0], (uint32)tasks.size());
+		}
+	}
+
+	void AppendSignalRootBranchTasks(Signal& sig, const SignalRunner& runner, usg::vector<RootBranchTaskData>& branchData, usg::vector<SignalTaskRef>& taskRefs)
+	{
 		RecordSignalTask();
 		RecordRootBranchRunner();
 
@@ -164,23 +237,15 @@ private:
 			return;
 		}
 
-		usg::vector<RootBranchTaskData> branchData;
-		usg::vector<TaskRunner::Task> tasks;
-		branchData.reserve(uBranchCount);
-		tasks.reserve(uBranchCount);
-
+		branchData.reserve(branchData.size() + uBranchCount);
+		taskRefs.reserve(taskRefs.size() + uBranchCount);
 		for (GenericInputOutputs* pBranch = pRoot->GetChildEntity(); pBranch != nullptr; pBranch = pBranch->GetNextSibling())
 		{
 			RootBranchTaskData taskData = { pBranch, &sig, &runner };
 			branchData.push_back(taskData);
+			SignalTaskRef taskRef = { true, (uint32)branchData.size() - 1 };
+			taskRefs.push_back(taskRef);
 		}
-
-		for (uint32 i = 0; i < (uint32)branchData.size(); ++i)
-		{
-			tasks.push_back(TaskRunner::Task(RunRootBranchTaskInt, &branchData[i]));
-		}
-
-		m_taskRunner.RunTasks(&tasks[0], (uint32)tasks.size());
 	}
 
 	static void RunRootBranchTaskInt(void* pData)
