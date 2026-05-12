@@ -54,6 +54,10 @@ public:
 		uint32 uLastSignalId;
 		uint32 uLastSignalTaskCount;
 		uint32 uTotalSignalTaskCount;
+		uint32 uLastRootBranchRunnerCount;
+		uint32 uTotalRootBranchRunnerCount;
+		uint32 uLastRootBranchTaskCount;
+		uint32 uTotalRootBranchTaskCount;
 		uint32 uWorkerCount;
 	};
 

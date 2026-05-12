@@ -21,6 +21,10 @@ public:
 			: uLastSignalId(0)
 			, uLastSignalTaskCount(0)
 			, uTotalSignalTaskCount(0)
+			, uLastRootBranchRunnerCount(0)
+			, uTotalRootBranchRunnerCount(0)
+			, uLastRootBranchTaskCount(0)
+			, uTotalRootBranchTaskCount(0)
 			, uWorkerCount(0)
 		{
 		}
@@ -28,6 +32,10 @@ public:
 		uint32 uLastSignalId;
 		uint32 uLastSignalTaskCount;
 		uint32 uTotalSignalTaskCount;
+		uint32 uLastRootBranchRunnerCount;
+		uint32 uTotalRootBranchRunnerCount;
+		uint32 uLastRootBranchTaskCount;
+		uint32 uTotalRootBranchTaskCount;
 		uint32 uWorkerCount;
 	};
 
@@ -47,6 +55,8 @@ public:
 	{
 		m_stats.uLastSignalId = uSignalId;
 		m_stats.uLastSignalTaskCount = 0;
+		m_stats.uLastRootBranchRunnerCount = 0;
+		m_stats.uLastRootBranchTaskCount = 0;
 	}
 
 	void RunSignalTask(Entity e, Signal& sig, const SignalRunner& runner, uint32 uTargets)
@@ -106,6 +116,7 @@ private:
 	void RunSignalRootBranchTasks(Signal& sig, const SignalRunner& runner)
 	{
 		RecordSignalTask();
+		RecordRootBranchRunner();
 
 		GenericInputOutputs* pRoot = ComponentSystemInputOutputsSharedBase::GetRootSystem(runner.systemID);
 		if (pRoot == nullptr)
@@ -118,6 +129,7 @@ private:
 		{
 			uBranchCount++;
 		}
+		RecordRootBranchTasks(uBranchCount);
 
 		if (uBranchCount == 0)
 		{
@@ -153,6 +165,18 @@ private:
 	{
 		m_stats.uLastSignalTaskCount++;
 		m_stats.uTotalSignalTaskCount++;
+	}
+
+	void RecordRootBranchRunner()
+	{
+		m_stats.uLastRootBranchRunnerCount++;
+		m_stats.uTotalRootBranchRunnerCount++;
+	}
+
+	void RecordRootBranchTasks(uint32 uBranchCount)
+	{
+		m_stats.uLastRootBranchTaskCount += uBranchCount;
+		m_stats.uTotalRootBranchTaskCount += uBranchCount;
 	}
 
 	TaskRunner m_taskRunner;

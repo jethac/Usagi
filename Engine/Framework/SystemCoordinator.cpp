@@ -86,6 +86,10 @@ namespace usg
 		: uLastSignalId(0)
 		, uLastSignalTaskCount(0)
 		, uTotalSignalTaskCount(0)
+		, uLastRootBranchRunnerCount(0)
+		, uTotalRootBranchRunnerCount(0)
+		, uLastRootBranchTaskCount(0)
+		, uTotalRootBranchTaskCount(0)
 		, uWorkerCount(0)
 	{
 	}
@@ -261,6 +265,10 @@ namespace usg
 		result.uLastSignalId = stats.uLastSignalId;
 		result.uLastSignalTaskCount = stats.uLastSignalTaskCount;
 		result.uTotalSignalTaskCount = stats.uTotalSignalTaskCount;
+		result.uLastRootBranchRunnerCount = stats.uLastRootBranchRunnerCount;
+		result.uTotalRootBranchRunnerCount = stats.uTotalRootBranchRunnerCount;
+		result.uLastRootBranchTaskCount = stats.uLastRootBranchTaskCount;
+		result.uTotalRootBranchTaskCount = stats.uTotalRootBranchTaskCount;
 		result.uWorkerCount = stats.uWorkerCount;
 		return result;
 	}

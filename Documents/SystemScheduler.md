@@ -18,6 +18,8 @@ physics/raycast callbacks on the same behavior-preserving path.
 Root signals are split into branch callbacks before execution reaches
 `TaskRunner`. The scheduler still drains each branch immediately in sibling
 order, so branch visibility is available without changing traversal behavior.
+Scheduler stats track both runner dispatch count and root-branch task count, so
+the branch fan-out can be inspected without changing execution policy.
 
 `TaskRunner` currently has zero configured workers, so tasks drain inline. Its
 worker path is still synchronous: when workers are enabled, the caller also helps
