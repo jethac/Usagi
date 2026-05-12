@@ -9,7 +9,6 @@
 #include <yaml-cpp/yaml.h>
 #include <sstream>
 #include <fstream>
-#include <ShaderLang.h>
 #include <pb.h>
 
 FileFactory* g_pFileFactory = nullptr;
