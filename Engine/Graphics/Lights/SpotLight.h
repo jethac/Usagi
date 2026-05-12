@@ -119,10 +119,9 @@ inline void SpotLight::SetInnerCutoff( float fInnerCutoff)
 inline void SpotLight::SetRange(float fNear, float fFar)
 {
 	ASSERT(fFar > fNear);
-	UpdateSpherePosRadius();
 	m_fNear = fNear;
-
 	m_fFar = fFar;
+	UpdateSpherePosRadius();
 	m_bDirty = true;
 }
 
