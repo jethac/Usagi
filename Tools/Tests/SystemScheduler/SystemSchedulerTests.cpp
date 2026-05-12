@@ -54,6 +54,13 @@ namespace
 	std::atomic<uint32> g_workerMaxActive(0);
 	std::atomic<uint32> g_workerSawExecutionActive(0);
 
+	struct StressRunnerData
+	{
+		std::atomic<uint32>* pCount;
+		std::atomic<uint32>* pSum;
+		uint32 uContribution;
+	};
+
 	struct TestSignal : public usg::Signal
 	{
 		TestSignal()
@@ -105,6 +112,13 @@ namespace
 		g_workerActive.fetch_sub(1, std::memory_order_acq_rel);
 	}
 
+	void TriggerStressTarget(usg::Entity, void*, const uint32 uSystemId, uint32 targets, void* pUserData)
+	{
+		StressRunnerData* pData = (StressRunnerData*)pUserData;
+		pData->pCount->fetch_add(1, std::memory_order_acq_rel);
+		pData->pSum->fetch_add(pData->uContribution + uSystemId + targets, std::memory_order_acq_rel);
+	}
+
 	usg::SignalRunner MakeRootBranchRunner()
 	{
 		usg::SignalRunner runner;
@@ -126,6 +140,15 @@ namespace
 		usg::SignalRunner runner;
 		runner.systemID = uSystemId;
 		runner.Trigger = TriggerTargetWorker;
+		return runner;
+	}
+
+	usg::SignalRunner MakeStressTargetRunner(uint32 uSystemId, StressRunnerData* pData)
+	{
+		usg::SignalRunner runner;
+		runner.systemID = uSystemId;
+		runner.Trigger = TriggerStressTarget;
+		runner.userData = pData;
 		return runner;
 	}
 }
@@ -310,6 +333,62 @@ namespace
 		ok &= Expect(stats.uWorkerCount == 0, "worker count resets after shutdown");
 		return ok;
 	}
+
+	bool RunStressBatch(uint32 uWorkerCount, uint32& uOutSum)
+	{
+		static const uint32 RUNNER_COUNT = 16;
+		static const uint32 ITERATION_COUNT = 100;
+
+		TestSignal signal;
+		std::atomic<uint32> counts[RUNNER_COUNT];
+		std::atomic<uint32> sum(0);
+		StressRunnerData data[RUNNER_COUNT];
+		usg::SignalRunner runners[RUNNER_COUNT];
+		uint32 runnerIndices[RUNNER_COUNT];
+
+		uint32 uExpectedPerIteration = 0;
+		for (uint32 i = 0; i < RUNNER_COUNT; ++i)
+		{
+			counts[i].store(0, std::memory_order_release);
+			data[i].pCount = &counts[i];
+			data[i].pSum = &sum;
+			data[i].uContribution = i * 7;
+			runners[i] = MakeStressTargetRunner(TEST_SYSTEM_ID + i, &data[i]);
+			runnerIndices[i] = i;
+			uExpectedPerIteration += data[i].uContribution + runners[i].systemID + usg::ON_ENTITY;
+		}
+
+		usg::SystemScheduler scheduler;
+		scheduler.Init(uWorkerCount, RUNNER_COUNT);
+		for (uint32 i = 0; i < ITERATION_COUNT; ++i)
+		{
+			scheduler.BeginSignal(signal.uId);
+			scheduler.RunSignalTasks(nullptr, signal, runners, runnerIndices, RUNNER_COUNT, usg::ON_ENTITY);
+		}
+		scheduler.Shutdown();
+
+		bool ok = true;
+		for (uint32 i = 0; i < RUNNER_COUNT; ++i)
+		{
+			ok &= Expect(counts[i].load(std::memory_order_acquire) == ITERATION_COUNT, "stress batch runner count");
+		}
+
+		uOutSum = sum.load(std::memory_order_acquire);
+		ok &= Expect(uOutSum == uExpectedPerIteration * ITERATION_COUNT, "stress batch sum");
+		ok &= Expect(scheduler.GetStats().uTotalSignalTaskCount == RUNNER_COUNT * ITERATION_COUNT, "stress batch total signal tasks");
+		return ok;
+	}
+
+	bool TestRepeatedWorkerBatchResults()
+	{
+		uint32 uSerialSum = 0;
+		uint32 uWorkerSum = 0;
+		bool ok = true;
+		ok &= RunStressBatch(0, uSerialSum);
+		ok &= RunStressBatch(3, uWorkerSum);
+		ok &= Expect(uSerialSum == uWorkerSum, "worker stress batch matches serial result");
+		return ok;
+	}
 }
 
 int main()
@@ -320,6 +399,7 @@ int main()
 	ok &= TestRootBranchBatchFanOutStats();
 	ok &= TestTargetedBatchStats();
 	ok &= TestWorkerTargetedBatchOverlap();
+	ok &= TestRepeatedWorkerBatchResults();
 
 	if (ok)
 	{
