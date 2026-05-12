@@ -2,10 +2,10 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <USAGI_STL>$(USAGI_DIR)\Engine\ThirdParty\EASTL</USAGI_STL>
-    <USAGI_STL_INCLUDE>$(USAGI_STL)\include</USAGI_STL_INCLUDE>
-    <USAGI_EABASE_INCLUDE>$(USAGI_STL)\test\packages\EABase\include\Common</USAGI_EABASE_INCLUDE>
-    <USAGI_STL_LIB>$(USAGI_STL)\lib</USAGI_STL_LIB>
+    <USAGI_STL Condition="'$(USAGI_STL)'==''">$(USAGI_DIR)\Engine\ThirdParty\EASTL</USAGI_STL>
+    <USAGI_STL_INCLUDE Condition="'$(USAGI_STL_INCLUDE)'==''">$(USAGI_STL)\include</USAGI_STL_INCLUDE>
+    <USAGI_EABASE_INCLUDE Condition="'$(USAGI_EABASE_INCLUDE)'==''">$(USAGI_STL)\test\packages\EABase\include\Common</USAGI_EABASE_INCLUDE>
+    <USAGI_STL_LIB Condition="'$(USAGI_STL_LIB)'==''">$(USAGI_STL)\lib</USAGI_STL_LIB>
     <USAGI_PHYSICS>$(PHYSX_DIR)</USAGI_PHYSICS>
     <USAGI_PHYSICS_INCLUDE>$(USAGI_PHYSICS)\Include</USAGI_PHYSICS_INCLUDE>
   </PropertyGroup>
