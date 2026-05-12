@@ -35,6 +35,7 @@ public:
 	ModelResHndl				GetModelAsInstance(GFXDevice* pDevice, const char* szModelName);
 	FontHndl					GetFont( GFXDevice* pDevice, const char* szFontName );
 	SkeletalAnimationResHndl	GetSkeletalAnimation( const char* szFileName );
+	bool						RequestSkeletalAnimation(const char* szFileName, uint32 uPriority = 0);
 	MaterialAnimationResHndl	GetMaterialAnimation(const char* szFileName);
 	ParticleEffectResHndl		GetParticleEffect(const char* szFileName);
 	ParticleEmitterResHndl		GetParticleEmitter(GFXDevice* pDevice, const char* szFileName);
@@ -44,6 +45,7 @@ public:
 	CustomEffectResHndl			GetCustomEffectRes(GFXDevice* pDevice, const char* szFileName);
 
 	void LoadPackage(usg::GFXDevice* pDevice, const char* szPath, const char* szName);
+	void ProcessCompletedResourceLoads();
 
 	// We can't return this as const as we need to iterate through it
 	ProtocolBufferFile* GetBufferedFile(const char* szFileName);

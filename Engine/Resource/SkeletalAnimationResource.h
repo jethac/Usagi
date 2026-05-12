@@ -23,6 +23,8 @@ public:
 	virtual ~SkeletalAnimationResource();
 
 	bool Load(const char* szName);
+	bool LoadCPUData(const char* szName);
+	bool FinalizeCPUData(const char* szName);
 	
 	// Note reference index is the index of the bones referenced by the animation, not the index within the skeleton
 	void GetTransform(uint32 uReferenceIndex, float fFrame, const exchange::BoneAnimationFrame& bindPose, exchange::BoneAnimationFrame& transform) const;

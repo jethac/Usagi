@@ -24,6 +24,8 @@
 #include "Engine/Resource/ResourceDictionary.h"
 #include "Engine/Core/stl/vector.h"
 #include "Engine/Core/String/String_Util.h"
+#include "Engine/Core/Thread/Thread.h"
+#include "Engine/Core/Thread/MessageQueue.h"
 #include "Engine/Resource/PakFile.h"
 #include <cstring>
 
@@ -36,10 +38,132 @@
 
 namespace usg{
 
+	struct ResourceCpuLoadJob
+	{
+		ResourceCpuLoadJob()
+			: eType(ResourceType::UNDEFINED)
+			, uPriority(0)
+		{
+		}
+
+		usg::string		name;
+		ResourceType	eType;
+		uint32			uPriority;
+	};
+
+	struct ResourceCpuLoadResult
+	{
+		ResourceCpuLoadResult()
+			: eType(ResourceType::UNDEFINED)
+			, pResource(nullptr)
+			, bSucceeded(false)
+		{
+		}
+
+		usg::string		name;
+		ResourceType	eType;
+		ResourceBase*	pResource;
+		bool			bSucceeded;
+	};
+
+	class ResourceCpuLoadWorker : public Thread
+	{
+	public:
+		ResourceCpuLoadWorker()
+			: m_bStarted(false)
+		{
+		}
+
+		~ResourceCpuLoadWorker()
+		{
+			Stop();
+		}
+
+		void Init(uint32 uQueueSize)
+		{
+			m_requestQueue.Init(uQueueSize);
+			m_completedQueue.Init(uQueueSize);
+			StartThread();
+			m_bStarted = true;
+		}
+
+		void Stop()
+		{
+			if (m_bStarted)
+			{
+				EndThread();
+				JoinThread();
+				m_bStarted = false;
+			}
+		}
+
+		bool Queue(const ResourceCpuLoadJob& job)
+		{
+			ResourceCpuLoadJob queuedJob = job;
+			return m_requestQueue.TryEnqueue(queuedJob);
+		}
+
+		bool TryGetCompleted(ResourceCpuLoadResult& result)
+		{
+			return m_completedQueue.TryDequeue(result);
+		}
+
+	private:
+		virtual void Exec() override
+		{
+			ResourceCpuLoadJob job;
+			while (m_requestQueue.TryDequeue(job))
+			{
+				ResourceCpuLoadResult result;
+				result.name = job.name;
+				result.eType = job.eType;
+
+				switch (job.eType)
+				{
+				case ResourceType::SKEL_ANIM:
+				{
+					SkeletalAnimationResource* pAnim = vnew(ALLOC_RESOURCE_MGR) SkeletalAnimationResource;
+					result.bSucceeded = pAnim->LoadCPUData(job.name.c_str());
+					if (result.bSucceeded)
+					{
+						result.pResource = pAnim;
+					}
+					else
+					{
+						pAnim->SetState(ResourceState::FAILED);
+						vdelete pAnim;
+					}
+					break;
+				}
+				default:
+					ASSERT(false);
+					break;
+				}
+
+				m_completedQueue.Enqueue(result);
+			}
+		}
+
+		MessageQueue<ResourceCpuLoadJob>		m_requestQueue;
+		MessageQueue<ResourceCpuLoadResult>	m_completedQueue;
+		bool								m_bStarted;
+	};
+
 
 	struct ResourceMgr::PIMPL
 	{
+		PIMPL()
+		{
+			cpuLoadWorker.Init(32);
+		}
+
+		~PIMPL()
+		{
+			cpuLoadWorker.Stop();
+		}
+
 		ResourceData					resources;
+		ResourceCpuLoadWorker			cpuLoadWorker;
 	};
 
 ResourceMgr* ResourceMgr::m_pResource = nullptr;
@@ -80,6 +204,8 @@ void ResourceMgr::Cleanup(usg::GFXDevice* pDevice)
 
 void ResourceMgr::LoadPackage(usg::GFXDevice* pDevice, const char* szPath, const char* szName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string name = szPath;
 	name += szName;
 	name += ".pak";
@@ -115,9 +241,60 @@ void ResourceMgr::LoadPackage(usg::GFXDevice* pDevice, const char* szPath, const
 	// Nothing on PC yet so no assert
 }
 
+void ResourceMgr::ProcessCompletedResourceLoads()
+{
+	ResourceCpuLoadResult result;
+	while (m_pImpl->cpuLoadWorker.TryGetCompleted(result))
+	{
+		ResourceData::ResourceRequest* pRequest = m_pImpl->resources.FindRequest(result.name, result.eType);
+		if (!result.bSucceeded || result.pResource == nullptr)
+		{
+			if (pRequest != nullptr)
+			{
+				m_pImpl->resources.SetRequestState(*pRequest, ResourceState::FAILED);
+			}
+			continue;
+		}
+
+		BaseResHandle existing = m_pImpl->resources.GetResourceHndl(result.name, result.eType);
+		if (existing)
+		{
+			vdelete result.pResource;
+			if (pRequest != nullptr)
+			{
+				m_pImpl->resources.CompleteRequest(*pRequest, existing);
+			}
+			continue;
+		}
+
+		switch (result.eType)
+		{
+		case ResourceType::SKEL_ANIM:
+			static_cast<SkeletalAnimationResource*>(result.pResource)->FinalizeCPUData(result.name.c_str());
+			break;
+		default:
+			ASSERT(false);
+			vdelete result.pResource;
+			if (pRequest != nullptr)
+			{
+				m_pImpl->resources.SetRequestState(*pRequest, ResourceState::FAILED);
+			}
+			continue;
+		}
+
+		BaseResHandle handle = m_pImpl->resources.AddResource(result.pResource);
+		if (pRequest != nullptr)
+		{
+			m_pImpl->resources.CompleteRequest(*pRequest, handle);
+		}
+	}
+}
+
 
 EffectHndl ResourceMgr::GetEffect(GFXDevice* pDevice, const char* szEffectName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string stringName = szEffectName;
 
 	string packageName = stringName.substr(0, stringName.find_first_of("."));
@@ -133,6 +310,8 @@ EffectHndl ResourceMgr::GetEffect(GFXDevice* pDevice, const char* szEffectName)
 
 CollisionModelResHndl ResourceMgr::GetCollisionModel(const char* szFileName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string u8Name = szFileName;
 	CollisionModelResHndl pModel = m_pImpl->resources.GetResourceHndl(u8Name, ResourceType::COLLISION);
 
@@ -151,6 +330,8 @@ CollisionModelResHndl ResourceMgr::GetCollisionModel(const char* szFileName)
 
 CustomEffectResHndl ResourceMgr::GetCustomEffectRes(GFXDevice* pDevice, const char* szFileName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string u8Name = szFileName;
 	CustomEffectResHndl pEffect = m_pImpl->resources.GetResourceHndl(u8Name, ResourceType::CUSTOM_EFFECT);
 
@@ -169,6 +350,8 @@ CustomEffectResHndl ResourceMgr::GetCustomEffectRes(GFXDevice* pDevice, const ch
 
 ProtocolBufferFile* ResourceMgr::GetBufferedFile(const char* szFileName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string u8Name = szFileName;
 	ProtocolBufferFile* pFile = const_cast<ProtocolBufferFile*>(m_pImpl->resources.GetResource<ProtocolBufferFile>(u8Name, ResourceType::PROTOCOL_BUFFER));
 
@@ -190,6 +373,8 @@ ProtocolBufferFile* ResourceMgr::GetBufferedFile(const char* szFileName)
 
 TextureHndl	 ResourceMgr::GetTextureAbsolutePath(GFXDevice* pDevice, const char* szTextureName, bool bReplaceMissingTex, GPULocation eGPULocation)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string u8Name = szTextureName;
 	TextureHndl	pTexture = m_pImpl->resources.GetResourceHndl(u8Name, ResourceType::TEXTURE);
 
@@ -254,6 +439,8 @@ ModelResHndl ResourceMgr::GetModelAsInstance(GFXDevice* pDevice, const char* szM
 
 FontHndl ResourceMgr::GetFont( GFXDevice* pDevice, const char* szFontName )
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string u8Name = m_fontDir + szFontName;
 	FontHndl pFont = m_pImpl->resources.GetResourceHndl(u8Name, ResourceType::FONT);
 	if( !pFont )
@@ -277,6 +464,8 @@ FontHndl ResourceMgr::GetFont( GFXDevice* pDevice, const char* szFontName )
 
 ParticleEmitterResHndl ResourceMgr::GetParticleEmitter(GFXDevice* pDevice, const char* szFileName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string path = "Particle/";
 	path += szFileName;
 	path += ".pem";
@@ -304,6 +493,8 @@ ParticleEmitterResHndl ResourceMgr::GetParticleEmitter(GFXDevice* pDevice, const
 
 ParticleEffectResHndl ResourceMgr::GetParticleEffect(const char* szFileName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string path = "Particle/";
 	path += szFileName;
 	path += ".pfx";
@@ -329,6 +520,8 @@ ParticleEffectResHndl ResourceMgr::GetParticleEffect(const char* szFileName)
 
 MaterialAnimationResHndl ResourceMgr::GetMaterialAnimation(const char* szFileName)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string path = m_modelDir + szFileName;
 	SkeletalAnimationResHndl p = m_pImpl->resources.GetResourceHndl(path.c_str(), ResourceType::MAT_ANIM);
 	if (!p)
@@ -351,6 +544,8 @@ MaterialAnimationResHndl ResourceMgr::GetMaterialAnimation(const char* szFileNam
 
 SkeletalAnimationResHndl ResourceMgr::GetSkeletalAnimation( const char* szFileName )
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string path = m_modelDir + szFileName;
 	SkeletalAnimationResHndl p = m_pImpl->resources.GetResourceHndl(path.c_str(), ResourceType::SKEL_ANIM);
 	if( !p )
@@ -371,6 +566,43 @@ SkeletalAnimationResHndl ResourceMgr::GetSkeletalAnimation( const char* szFileNa
 	return p;
 }
 
+bool ResourceMgr::RequestSkeletalAnimation(const char* szFileName, uint32 uPriority)
+{
+	ProcessCompletedResourceLoads();
+
+	usg::string path = m_modelDir + szFileName;
+	if (m_pImpl->resources.GetResourceHndl(path.c_str(), ResourceType::SKEL_ANIM))
+	{
+		return true;
+	}
+
+	ResourceData::ResourceRequest& request = m_pImpl->resources.QueueRequest(path, ResourceType::SKEL_ANIM, uPriority);
+	if (request.eState == ResourceState::CPU_LOADING || request.eState == ResourceState::READY)
+	{
+		return true;
+	}
+
+	if (File::FileStatus(path.c_str()) != FILE_STATUS_VALID)
+	{
+		DEBUG_PRINT("!!!Skeletal animation not found!!! %s\n", path.c_str());
+		m_pImpl->resources.SetRequestState(request, ResourceState::FAILED);
+		return false;
+	}
+
+	ResourceCpuLoadJob job;
+	job.name = path;
+	job.eType = ResourceType::SKEL_ANIM;
+	job.uPriority = uPriority;
+	if (!m_pImpl->cpuLoadWorker.Queue(job))
+	{
+		m_pImpl->resources.SetRequestState(request, ResourceState::FAILED);
+		return false;
+	}
+
+	m_pImpl->resources.SetRequestState(request, ResourceState::CPU_LOADING);
+	return true;
+}
+
 void ResourceMgr::FinishedStaticLoad()
 {
 	m_pImpl->resources.SetTag(1);
@@ -388,6 +620,8 @@ void ResourceMgr::ClearAllResources(GFXDevice* pDevice)
 
 ModelResHndl ResourceMgr::_GetModel(GFXDevice* pDevice, const char* szModelName, bool bInstance, bool bFastMem)
 {
+	ProcessCompletedResourceLoads();
+
 	usg::string u8Name = m_modelDir + szModelName;
 	ModelResHndl pModel = m_pImpl->resources.GetResourceHndl(u8Name.c_str(), ResourceType::MODEL);
 	if(!pModel)

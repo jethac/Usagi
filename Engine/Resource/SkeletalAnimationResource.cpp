@@ -12,7 +12,9 @@ namespace usg
 	SkeletalAnimationResource::SkeletalAnimationResource() :
 		ResourceBase(StaticResType)
 	{
-
+		MemSet(&m_header, 0, sizeof(m_header));
+		m_pBoneDescriptions = nullptr;
+		m_pBoneAnimFrames = nullptr;
 	}
 	
 	SkeletalAnimationResource::~SkeletalAnimationResource()
@@ -22,6 +24,20 @@ namespace usg
 	}
 
 	bool SkeletalAnimationResource::Load(const char* szName)
+	{
+		bool bLoaded = LoadCPUData(szName);
+		if (bLoaded)
+		{
+			FinalizeCPUData(szName);
+		}
+		else
+		{
+			SetState(ResourceState::FAILED);
+		}
+		return bLoaded;
+	}
+
+	bool SkeletalAnimationResource::LoadCPUData(const char* szName)
 	{
 		File file(szName);
 
@@ -37,6 +53,13 @@ namespace usg
 		file.Read(m_header.referencedBones * m_header.frameCount * sizeof(m_pBoneAnimFrames[0]), m_pBoneAnimFrames);
 
 
+		return true;
+	}
+
+	bool SkeletalAnimationResource::FinalizeCPUData(const char* szName)
+	{
+		SetupHash(szName);
+		SetReady(true);
 		return true;
 	}
 
