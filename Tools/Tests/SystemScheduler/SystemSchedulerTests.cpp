@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <process.h>
+#include <atomic>
 #include <vector>
 
 namespace usg
@@ -48,6 +49,10 @@ namespace
 	std::vector<usg::GenericInputOutputs*> g_triggeredBranches;
 	std::vector<uint32> g_triggeredSystems;
 	std::vector<uint32> g_triggeredTargets;
+	std::atomic<uint32> g_workerStarted(0);
+	std::atomic<uint32> g_workerActive(0);
+	std::atomic<uint32> g_workerMaxActive(0);
+	std::atomic<uint32> g_workerSawExecutionActive(0);
 
 	struct TestSignal : public usg::Signal
 	{
@@ -78,6 +83,28 @@ namespace
 		g_triggeredTargets.push_back(targets);
 	}
 
+	void TriggerTargetWorker(usg::Entity, void*, const uint32, uint32, void*)
+	{
+		if (usg::ComponentEntity::IsSystemExecutionActive())
+		{
+			g_workerSawExecutionActive.fetch_add(1, std::memory_order_acq_rel);
+		}
+
+		const uint32 active = g_workerActive.fetch_add(1, std::memory_order_acq_rel) + 1;
+		uint32 maxActive = g_workerMaxActive.load(std::memory_order_acquire);
+		while (active > maxActive && !g_workerMaxActive.compare_exchange_weak(maxActive, active, std::memory_order_acq_rel))
+		{
+		}
+
+		g_workerStarted.fetch_add(1, std::memory_order_acq_rel);
+		while (g_workerStarted.load(std::memory_order_acquire) < 3)
+		{
+			usg::Thread::Sleep(0);
+		}
+
+		g_workerActive.fetch_sub(1, std::memory_order_acq_rel);
+	}
+
 	usg::SignalRunner MakeRootBranchRunner()
 	{
 		usg::SignalRunner runner;
@@ -91,6 +118,14 @@ namespace
 		usg::SignalRunner runner;
 		runner.systemID = uSystemId;
 		runner.Trigger = TriggerTarget;
+		return runner;
+	}
+
+	usg::SignalRunner MakeWorkerTargetRunner(uint32 uSystemId)
+	{
+		usg::SignalRunner runner;
+		runner.systemID = uSystemId;
+		runner.Trigger = TriggerTargetWorker;
 		return runner;
 	}
 }
@@ -242,6 +277,39 @@ namespace
 		ok &= Expect(stats.uLastRootBranchTaskCount == 0, "targeted batch does not count branch tasks");
 		return ok;
 	}
+
+	bool TestWorkerTargetedBatchOverlap()
+	{
+		TestSignal signal;
+		usg::SignalRunner runners[] =
+		{
+			MakeWorkerTargetRunner(TEST_SYSTEM_ID),
+			MakeWorkerTargetRunner(TEST_SYSTEM_ID + 1),
+			MakeWorkerTargetRunner(TEST_SYSTEM_ID + 2)
+		};
+		uint32 runnerIndices[] = { 0, 1, 2 };
+		usg::SystemScheduler scheduler;
+
+		g_workerStarted.store(0, std::memory_order_release);
+		g_workerActive.store(0, std::memory_order_release);
+		g_workerMaxActive.store(0, std::memory_order_release);
+		g_workerSawExecutionActive.store(0, std::memory_order_release);
+
+		scheduler.Init(2, 8);
+		scheduler.BeginSignal(signal.uId);
+		scheduler.RunSignalTasks(nullptr, signal, runners, runnerIndices, ARRAY_SIZE(runnerIndices), usg::ON_ENTITY);
+		scheduler.Shutdown();
+
+		const usg::SystemScheduler::Stats& stats = scheduler.GetStats();
+		bool ok = true;
+		ok &= Expect(g_workerStarted.load(std::memory_order_acquire) == 3, "worker batch runs each target runner");
+		ok &= Expect(g_workerMaxActive.load(std::memory_order_acquire) > 1, "worker batch overlaps target runners");
+		ok &= Expect(g_workerSawExecutionActive.load(std::memory_order_acquire) == 3, "worker batch marks system execution active");
+		ok &= Expect(stats.uLastSignalTaskCount == 3, "worker batch counts signal tasks");
+		ok &= Expect(stats.uTotalSignalTaskCount == 3, "worker batch total signal tasks");
+		ok &= Expect(stats.uWorkerCount == 0, "worker count resets after shutdown");
+		return ok;
+	}
 }
 
 int main()
@@ -251,6 +319,7 @@ int main()
 	ok &= TestEmptyRootBranchStats();
 	ok &= TestRootBranchBatchFanOutStats();
 	ok &= TestTargetedBatchStats();
+	ok &= TestWorkerTargetedBatchOverlap();
 
 	if (ok)
 	{

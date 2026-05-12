@@ -17,6 +17,7 @@ $BuildDir = Join-Path $ToolsRoot 'test-build\SystemScheduler'
 New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 
 $Source = Join-Path $TestDir 'SystemSchedulerTests.cpp'
+$ThreadSource = Join-Path $UsagiRoot 'Engine\Core\Thread\_win\Thread_ps.cpp'
 $Exe = Join-Path $BuildDir 'SystemSchedulerTests.exe'
 $VcVars = 'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat'
 
@@ -56,7 +57,8 @@ $CommandParts = @(
 ) + $Defines + $Includes + @(
     "/Fo$BuildDir\",
     "/Fe$Exe",
-    $Source
+    $Source,
+    $ThreadSource
 )
 
 $Command = $CommandParts -join ' '
