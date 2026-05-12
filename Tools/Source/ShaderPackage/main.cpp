@@ -103,6 +103,48 @@ bool CheckArgument(std::string& target, const std::string& argument)
 	}
 }
 
+enum ArgumentReadResult
+{
+	ARGUMENT_NO_MATCH,
+	ARGUMENT_MATCH,
+	ARGUMENT_ERROR
+};
+
+ArgumentReadResult ReadArgumentValue(std::string& value, std::string& arg, const char* option, int& index, int argc, char *argv[])
+{
+	if (arg == option)
+	{
+		if (index + 1 >= argc)
+		{
+			fprintf(stderr, "Missing value for %s\n", option);
+			return ARGUMENT_ERROR;
+		}
+
+		value = argv[++index];
+		if (value.empty() || value.at(0) == '-')
+		{
+			fprintf(stderr, "Missing value for %s\n", option);
+			return ARGUMENT_ERROR;
+		}
+
+		return ARGUMENT_MATCH;
+	}
+
+	if (CheckArgument(arg, option))
+	{
+		if (arg.empty())
+		{
+			fprintf(stderr, "Missing value for %s\n", option);
+			return ARGUMENT_ERROR;
+		}
+
+		value = arg;
+		return ARGUMENT_MATCH;
+	}
+
+	return ARGUMENT_NO_MATCH;
+}
+
 IShaderCompiler* pCompiler = nullptr;
 
 int main(int argc, char *argv[])
@@ -119,37 +161,91 @@ int main(int argc, char *argv[])
 	std::string packageName;
 	std::string includeDirs;
 	std::string arg;
+	ArgumentReadResult readResult;
 
 	for (int i = 1; i < argc; i++)
 	{
 		arg = argv[i];
+		if (arg.empty())
+		{
+			continue;
+		}
 
 		if (arg.at(0) != '-')
 		{
+			if (!inputFile.empty())
+			{
+				fprintf(stderr, "Unexpected positional argument '%s' after input file '%s'\n", arg.c_str(), inputFile.c_str());
+				return -1;
+			}
 			inputFile = arg;
 		}
-		else if (CheckArgument(arg, "-a"))
+		else if ((readResult = ReadArgumentValue(api, arg, "-a", i, argc, argv)) != ARGUMENT_NO_MATCH)
 		{
-			api = arg;
+			if (readResult == ARGUMENT_ERROR) return -1;
 		}
-		else if (CheckArgument(arg, "-o"))
+		else if ((readResult = ReadArgumentValue(outBinary, arg, "-o", i, argc, argv)) != ARGUMENT_NO_MATCH)
 		{
-			outBinary = arg;
+			if (readResult == ARGUMENT_ERROR) return -1;
 		}
-		else if (CheckArgument(arg, "-t"))
+		else if ((readResult = ReadArgumentValue(tempDir, arg, "-t", i, argc, argv)) != ARGUMENT_NO_MATCH)
 		{
-			tempDir = arg;
+			if (readResult == ARGUMENT_ERROR) return -1;
 		}
-		else if (CheckArgument(arg, "-s"))
+		else if ((readResult = ReadArgumentValue(shaderDir, arg, "-s", i, argc, argv)) != ARGUMENT_NO_MATCH)
 		{
-			shaderDir = arg;
+			if (readResult == ARGUMENT_ERROR) return -1;
+		}
+		else if (arg == "-i")
+		{
+			if (i + 1 >= argc || argv[i + 1][0] == '\0' || argv[i + 1][0] == '-')
+			{
+				fprintf(stderr, "Missing value for -i\n");
+				return -1;
+			}
+
+			if (!includeDirs.empty())
+				includeDirs += " ";
+			includeDirs += "-I" + std::string(argv[++i]);
 		}
 		else if (CheckArgument(arg, "-i"))
 		{
+			if (arg.empty())
+			{
+				fprintf(stderr, "Missing value for -i\n");
+				return -1;
+			}
+
 			if (!includeDirs.empty())
 				includeDirs += " ";
 			includeDirs += "-I" + arg;
 		}
+		else
+		{
+			fprintf(stderr, "Unknown argument '%s'\n", arg.c_str());
+			return -1;
+		}
+	}
+
+	if (inputFile.empty())
+	{
+		fprintf(stderr, "No shader package input file specified\n");
+		return -1;
+	}
+	if (outBinary.empty())
+	{
+		fprintf(stderr, "No output package specified; use -o<file> or -o <file>\n");
+		return -1;
+	}
+	if (tempDir.empty())
+	{
+		fprintf(stderr, "No temporary shader output directory specified; use -t<dir> or -t <dir>\n");
+		return -1;
+	}
+	if (shaderDir.empty())
+	{
+		fprintf(stderr, "No shader source directory specified; use -s<dir> or -s <dir>\n");
+		return -1;
 	}
 
 	if (api == "vulkan")
@@ -174,8 +270,16 @@ int main(int argc, char *argv[])
 	intFileName = intFileName.substr(0, intFileName.find_last_of("."));
 
 	printf("Converting %s\n", inputFile.c_str());
+	fflush(stdout);
 
-	
+	std::ifstream inputFileCheck(inputFile.c_str());
+	if (!inputFileCheck.good())
+	{
+		fprintf(stderr, "Failed to load shader package '%s': file does not exist or cannot be opened\n", inputFile.c_str());
+		return -1;
+	}
+	inputFileCheck.close();
+
 	YAML::Node mainNode = YAML::LoadFile(inputFile.c_str());
 	YAML::Node yamlEffect = mainNode["Effects"];
 	YAML::Node customFX = mainNode["CustomEffects"];
