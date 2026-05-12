@@ -12,6 +12,7 @@
 #endif
 
 #include "tchar.h"
+#include <stdio.h>
 
 static HRESULT	g_hResult;
 
@@ -55,8 +56,26 @@ inline void ASSERT(bool condition)
 
 
 // For file loading only, will quit the game on failure, even in release mode
+inline bool HasStdErr()
+{
+	if (GetEnvironmentVariable(TEXT("USAGI_FATAL_STDERR"), nullptr, 0) > 0)
+	{
+		return true;
+	}
+
+	HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+	return hErr != NULL && hErr != INVALID_HANDLE_VALUE && GetFileType(hErr) != FILE_TYPE_UNKNOWN;
+}
+
 inline void FATAL_RELEASE_INT( const TCHAR* msg )
 {
+	if (HasStdErr())
+	{
+		_ftprintf(stderr, TEXT("%s\n"), msg);
+		fflush(stderr);
+		exit(-1);
+	}
+
 	MessageBox(0, msg, TEXT("FATAL"), 0);
 	ASSERT(false);
 	exit(-1);

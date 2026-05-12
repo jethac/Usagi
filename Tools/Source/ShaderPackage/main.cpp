@@ -107,6 +107,8 @@ IShaderCompiler* pCompiler = nullptr;
 
 int main(int argc, char *argv[])
 {
+	SetEnvironmentVariableA("USAGI_FATAL_STDERR", "1");
+
 	std::string inputFile;
 	std::string outBinary;
 	std::string shaderDir;

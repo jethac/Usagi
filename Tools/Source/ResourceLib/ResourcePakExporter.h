@@ -92,7 +92,7 @@ namespace ResourcePakExporter
 			{
 				if (entries[i]->GetNameCRC() == entries[j]->GetNameCRC())
 				{
-					DEBUG_PRINT("Resources %s and %s have duplicate CRCs in pak %s\n", entries[i]->GetName().c_str(), entries[j]->GetName().c_str(), szFileName);
+					RELEASE_WARNING("Resources %s and %s have duplicate CRCs in pak %s\n", entries[i]->GetName().c_str(), entries[j]->GetName().c_str(), szFileName);
 					return false;
 				}
 			}
@@ -108,7 +108,7 @@ namespace ResourcePakExporter
 				const int depId = FindResourceIndex(entries, depItr.fileNameCRC);
 				if (depId < 0)
 				{
-					DEBUG_PRINT("Dependency %s for resource %s was not found in pak %s\n", depItr.fileName.c_str(), entries[i]->GetName().c_str(), szFileName);
+					RELEASE_WARNING("Dependency %s for resource %s was not found in pak %s\n", depItr.fileName.c_str(), entries[i]->GetName().c_str(), szFileName);
 					return false;
 				}
 
@@ -166,7 +166,7 @@ namespace ResourcePakExporter
 			{
 				if (dependencyCounts[i] > 0)
 				{
-					DEBUG_PRINT("Resource %s has cyclic dependencies in pak %s\n", entries[i]->GetName().c_str(), szFileName);
+					RELEASE_WARNING("Resource %s has cyclic dependencies in pak %s\n", entries[i]->GetName().c_str(), szFileName);
 				}
 			}
 			return false;
@@ -213,7 +213,7 @@ namespace ResourcePakExporter
 
 		if (!pFileOut)
 		{
-			DEBUG_PRINT("Unable to open file %s", szFileName);
+			RELEASE_WARNING("Unable to open file %s", szFileName);
 			return false;
 		}
 
@@ -280,7 +280,7 @@ namespace ResourcePakExporter
 					}
 					if (dep.PakIndex == USG_INVALID_ID || dep.PakIndex >= i)
 					{
-						DEBUG_PRINT("Dependency %s for resource %s is not ordered before the resource in pak %s\n", depItr.fileName.c_str(), entries[i]->GetName().c_str(), szFileName);
+						RELEASE_WARNING("Dependency %s for resource %s is not ordered before the resource in pak %s\n", depItr.fileName.c_str(), entries[i]->GetName().c_str(), szFileName);
 						fclose(pFileOut);
 						return false;
 					}
