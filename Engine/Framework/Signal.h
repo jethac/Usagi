@@ -50,12 +50,13 @@ private:
 struct SignalRunner
 {
 	static const uint32 INVALID_SYSTEM_ID = 0xffffffff;
-	SignalRunner() : systemID(INVALID_SYSTEM_ID), priority(0), Trigger(NULL), TriggerFromRoot(NULL) {}
+	SignalRunner() : systemID(INVALID_SYSTEM_ID), priority(0), Trigger(NULL), TriggerFromRoot(NULL), TriggerRootBranch(NULL) {}
 	uint32 systemID;
 	sint32 priority;
 	void* userData; // Store whatever you want into this in FillSignalRunner
 	void (*Trigger)(Entity e, void* signal, const uint32 uSystemId, uint32 targets, void* userData);
 	void (*TriggerFromRoot)(Entity e, void* signal, const uint32 uSystemId, void* userData);
+	void (*TriggerRootBranch)(GenericInputOutputs* pBranchRoot, void* signal, void* userData);
 };
 
 struct RunSignal : public Signal
@@ -73,11 +74,13 @@ struct RunSignal : public Signal
 		runner.userData = (void*) &System::Run;
 		runner.Trigger = Trigger;
 		runner.TriggerFromRoot = TriggerFromRoot;
+		runner.TriggerRootBranch = TriggerRootBranch;
 		return true;
 	}
 
 	static void Trigger(Entity e, void* signal, const uint32 uSystemId, uint32 targets, void* userData);
 	static void TriggerFromRoot(Entity e, void* signal, const uint32 uSystemId, void* userData);
+	static void TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData);
 
 	struct RunClosure;
 };
@@ -90,6 +93,7 @@ struct RunSignal : public Signal
 		runner.priority = (sint32)System::CATEGORY; \
 		runner.Trigger = Trigger<System>; \
 		runner.TriggerFromRoot = TriggerFromRoot<System>; \
+		runner.TriggerRootBranch = TriggerRootBranch<System>; \
 		return true; } \
 	template<typename System> \
 	static void Trigger(Entity e, void* signal, const uint32 uSystemId, uint32 targets, void* userData) { \
@@ -101,7 +105,11 @@ struct RunSignal : public Signal
 	static void TriggerFromRoot(Entity e, void* signal, const uint32 uSystemId, void* userData) { \
 		if(GetRootSystem(uSystemId) != nullptr) { \
 			SIGNAL##Closure<System> closure((SIGNAL##Signal*)signal); \
-			TriggerSignalFromRoot(GetRootSystem(uSystemId), closure); } }
+			TriggerSignalFromRoot(GetRootSystem(uSystemId), closure); } } \
+	template<typename System> \
+	static void TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData) { \
+		SIGNAL##Closure<System> closure((SIGNAL##Signal*)signal); \
+		Signal::TriggerRootBranch(pBranchRoot, closure); }
 
 struct LateUpdateSignal : public Signal
 {
@@ -118,11 +126,13 @@ struct LateUpdateSignal : public Signal
 		runner.userData = (void*)&System::LateUpdate;
 		runner.Trigger = Trigger;
 		runner.TriggerFromRoot = TriggerFromRoot;
+		runner.TriggerRootBranch = TriggerRootBranch;
 		return true;
 	}
 
 	static void Trigger(Entity e, void* signal, const uint32 uSystemId, uint32 targets, void* userData);
 	static void TriggerFromRoot(Entity e, void* signal, const uint32 uSystemId, void* userData);
+	static void TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData);
 
 	struct LateUpdateClosure;
 };

@@ -5,6 +5,7 @@
 #define _SYSTEM_SCHEDULER_H
 
 #include "Engine/Core/Thread/TaskRunner.h"
+#include "Engine/Framework/ComponentSystemInputOutputs.h"
 #include "Engine/Framework/Signal.h"
 
 namespace usg
@@ -51,14 +52,22 @@ public:
 	{
 		SignalTaskData taskData = { e, &sig, &runner, uTargets };
 		TaskRunner::Task task(RunSignalTaskInt, &taskData);
-		RunTasks(&task, 1);
+		RecordSignalTask();
+		m_taskRunner.RunTasks(&task, 1);
 	}
 
 	void RunSignalTaskFromRoot(Entity e, Signal& sig, const SignalRunner& runner)
 	{
+		if (runner.TriggerRootBranch != nullptr)
+		{
+			RunSignalRootBranchTasks(sig, runner);
+			return;
+		}
+
 		SignalTaskData taskData = { e, &sig, &runner, 0 };
 		TaskRunner::Task task(RunSignalTaskFromRootInt, &taskData);
-		RunTasks(&task, 1);
+		RecordSignalTask();
+		m_taskRunner.RunTasks(&task, 1);
 	}
 
 	const Stats& GetStats() const { return m_stats; }
@@ -72,12 +81,12 @@ private:
 		uint32 uTargets;
 	};
 
-	void RunTasks(const TaskRunner::Task* pTasks, uint32 uTaskCount)
+	struct RootBranchTaskData
 	{
-		m_taskRunner.RunTasks(pTasks, uTaskCount);
-		m_stats.uLastSignalTaskCount += uTaskCount;
-		m_stats.uTotalSignalTaskCount += uTaskCount;
-	}
+		GenericInputOutputs* pBranchRoot;
+		Signal* pSignal;
+		const SignalRunner* pRunner;
+	};
 
 	static void RunSignalTaskInt(void* pData)
 	{
@@ -91,6 +100,38 @@ private:
 		SignalTaskData* pTask = (SignalTaskData*)pData;
 		const SignalRunner& runner = *pTask->pRunner;
 		runner.TriggerFromRoot(pTask->e, pTask->pSignal, runner.systemID, runner.userData);
+	}
+
+	void RunSignalRootBranchTasks(Signal& sig, const SignalRunner& runner)
+	{
+		RecordSignalTask();
+
+		GenericInputOutputs* pRoot = ComponentSystemInputOutputsSharedBase::GetRootSystem(runner.systemID);
+		if (pRoot == nullptr)
+		{
+			return;
+		}
+
+		GenericInputOutputs* pBranch = pRoot->GetChildEntity();
+		while (pBranch != nullptr)
+		{
+			RootBranchTaskData taskData = { pBranch, &sig, &runner };
+			TaskRunner::Task task(RunRootBranchTaskInt, &taskData);
+			m_taskRunner.RunTasks(&task, 1);
+			pBranch = pBranch->GetNextSibling();
+		}
+	}
+
+	static void RunRootBranchTaskInt(void* pData)
+	{
+		RootBranchTaskData* pTask = (RootBranchTaskData*)pData;
+		pTask->pRunner->TriggerRootBranch(pTask->pBranchRoot, pTask->pSignal, pTask->pRunner->userData);
+	}
+
+	void RecordSignalTask()
+	{
+		m_stats.uLastSignalTaskCount++;
+		m_stats.uTotalSignalTaskCount++;
 	}
 
 	TaskRunner m_taskRunner;

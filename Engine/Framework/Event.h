@@ -25,6 +25,7 @@ namespace usg
 
 		static void Trigger(Entity e, void* signal, const uint32 uSystemId, uint32 targets, void* userData);
 		static void TriggerFromRoot(Entity e, void* signal, const uint32 uSystemId, void* userData);
+		static void TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData);
 
 		OnEventSignalBase(const uint32 ID, const void* pEventData) : Signal(ID), pEventData(pEventData)
 		{
@@ -47,6 +48,7 @@ namespace usg
 			runner.priority = (sint32)System::CATEGORY;
 			runner.Trigger = Trigger;
 			runner.TriggerFromRoot = TriggerFromRoot;
+			runner.TriggerRootBranch = TriggerRootBranch;
 			runner.userData = (void*)static_cast<void(*)(const typename System::Inputs&, typename System::Outputs&, const EventType&)>(System::OnEvent);
 			return true;
 		}

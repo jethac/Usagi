@@ -32,6 +32,13 @@ namespace usg
 		TriggerSignalFromRoot(ComponentSystemInputOutputsSharedBase::GetRootSystem(uSystemId), closure);
 	}
 
+	void OnEventSignalBase::TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData)
+	{
+		OnEventSignalBase* pSignalBase = (OnEventSignalBase*)signal;
+		OnEventClosure closure(pSignalBase->pEventData, userData);
+		Signal::TriggerRootBranch(pBranchRoot, closure);
+	}
+
 	Entity TriggerableEvent::GetEntityFromNetworkUID(sint64 uid)
 	{
 		for (GameComponents<NetworkUID>::Iterator it = GameComponents<NetworkUID>::GetIterator(); !it.IsEnd(); ++it)

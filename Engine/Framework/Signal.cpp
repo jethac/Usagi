@@ -27,6 +27,12 @@ namespace usg
 		TriggerSignalFromRoot(ComponentSystemInputOutputsSharedBase::GetRootSystem(uSystemId), closure);
 	}
 
+	void RunSignal::TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData)
+	{
+		RunClosure closure((RunSignal*)signal, userData);
+		Signal::TriggerRootBranch(pBranchRoot, closure);
+	}
+
 	RunSignal::RunClosure::RunClosure(RunSignal* sig, void* userData) : signal(sig), pRunFunction(reinterpret_cast<decltype(pRunFunction)>(userData))
 	{
 
@@ -56,6 +62,12 @@ namespace usg
 	{
 		LateUpdateClosure closure((LateUpdateSignal*)signal, userData);
 		TriggerSignalFromRoot(ComponentSystemInputOutputsSharedBase::GetRootSystem(uSystemId), closure);
+	}
+
+	void LateUpdateSignal::TriggerRootBranch(GenericInputOutputs* pBranchRoot, void* signal, void* userData)
+	{
+		LateUpdateClosure closure((LateUpdateSignal*)signal, userData);
+		Signal::TriggerRootBranch(pBranchRoot, closure);
 	}
 
 	LateUpdateSignal::LateUpdateClosure::LateUpdateClosure(LateUpdateSignal* sig, void* userData) : signal(sig), pRunFunction(reinterpret_cast<decltype(pRunFunction)>(userData))
