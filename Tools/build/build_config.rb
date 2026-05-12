@@ -373,7 +373,7 @@ def shader_pack
   end
 
   def resource_packer
-    "#{tools_bin_dir}/ResPak.exe"
+    "#{tools_bin_dir}/PakFileGen.exe"
   end
 
   def vitei_audio_tool

@@ -208,6 +208,9 @@ module GeneratorUtil
     n.rule('shaderpack', "#{config.shader_pack} $in -o$out -t#{config.effect_build_dir} -s$shader_dir -a$api $includes",
            {:dependencies => :gcc, :description => 'shaderpack $in -o$out -s$shader_dir -a$api $includes'})    
 
+    n.rule('resource_packer', "#{config.resource_packer} $in -o$out -d$out.d -t#{config.working_dir} -p#{config.target_platform}",
+           {:dependencies => :gcc, :description => 'RESOURCE_PAK $out'})
+
   end
 
   #####################################################################
