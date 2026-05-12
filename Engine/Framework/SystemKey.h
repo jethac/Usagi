@@ -22,8 +22,10 @@ namespace usg {
 
 static const unsigned int BITFIELD_LENGTH = 32;
 template<typename SYSTEM> uint32 GetSystemKey(uint32 uOffset);
+template<typename SYSTEM> uint32 GetSystemReadKey(uint32 uOffset);
+template<typename SYSTEM> uint32 GetSystemWriteKey(uint32 uOffset);
+template<typename SYSTEM> uint32 GetSystemParentReadKey(uint32 uOffset);
 
 }
 
 #endif //__SYSTEMKEY_H
-

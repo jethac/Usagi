@@ -28,6 +28,25 @@ class ComponentEntity;
 class SystemCoordinator
 {
 public:
+	struct SystemDependencyInfo
+	{
+		SystemDependencyInfo();
+
+		const char* systemName;
+		uint32 systemTypeID;
+		sint32 priority;
+		uint32 uRequiredComponentMask[ComponentEntity::BITFIELD_SIZE];
+		uint32 uReadComponentMask[ComponentEntity::BITFIELD_SIZE];
+		uint32 uWriteComponentMask[ComponentEntity::BITFIELD_SIZE];
+		uint32 uParentReadComponentMask[ComponentEntity::BITFIELD_SIZE];
+		uint32 uRequiredComponentKeyCount;
+		uint32 uReadComponentKeyCount;
+		uint32 uWriteComponentKeyCount;
+		uint32 uParentReadComponentKeyCount;
+		bool bIsCollisionListener;
+		uint32 uOnCollisionMask;
+	};
+
 	SystemCoordinator();
 	~SystemCoordinator();
 
@@ -56,6 +75,11 @@ public:
 
 	void Trigger(Entity e, Signal& sig, uint32 targets);
 	void TriggerFromRoot(Entity e, Signal& sig);
+
+	uint32 GetSystemDependencyCount() const;
+	const SystemDependencyInfo* GetSystemDependencyInfo(uint32 uSystemId) const;
+	bool SystemsHaveRequiredComponentOverlap(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
+	bool SystemsHaveComponentAccessConflict(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
 
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
 	void RegisterTimers();
@@ -121,12 +145,16 @@ private:
 	{
 		const char* systemName;
 		uint32 systemTypeID = 0xffffffff;
+		sint32 priority = 0;
 
 		bool bIsCollisionListener;
 		uint32 uOnCollisionMask;
 
 		void (*Cleanup)() = nullptr;
 		uint32 (*GetSystemKey)(uint32 uOffset) = nullptr;
+		uint32 (*GetSystemReadKey)(uint32 uOffset) = nullptr;
+		uint32 (*GetSystemWriteKey)(uint32 uOffset) = nullptr;
+		uint32 (*GetSystemParentReadKey)(uint32 uOffset) = nullptr;
 		bool (*UpdateInputOutputs)(ComponentGetter& getter, bool bEntityHasRequiredComponents, bool bEntityIsCurrentlyRunning) = nullptr;
 		void (*RemoveInputOutputs)(ComponentEntity* e) = nullptr;
 
@@ -166,10 +194,14 @@ void SystemCoordinator::RegisterSystem()
 	SystemHelper& helper = GetSystemHelper(systemID);
 	helper.systemName = SYSTEM::Name();
 	helper.systemTypeID = systemID;
+	helper.priority = (sint32)SYSTEM::CATEGORY;
 	helper.Cleanup = CleanupSystem<SYSTEM>;
 	helper.bIsCollisionListener = SYSTEM::AUTOGENERATE_GET_COLLIDER_INPUTS == ON;
 	helper.uOnCollisionMask = SYSTEM::OnCollisionMask;
 	helper.GetSystemKey = GetSystemKey<SYSTEM>;
+	helper.GetSystemReadKey = GetSystemReadKey<SYSTEM>;
+	helper.GetSystemWriteKey = GetSystemWriteKey<SYSTEM>;
+	helper.GetSystemParentReadKey = GetSystemParentReadKey<SYSTEM>;
 	helper.UpdateInputOutputs = UpdateInputOutputs<SYSTEM>;
 	helper.RemoveInputOutputs = ComponentSystemInputOutputs<SYSTEM>::RemoveInputOutputs;
 }

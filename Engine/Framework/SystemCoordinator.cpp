@@ -27,6 +27,7 @@ namespace usg
 	struct SystemCoordinator::InternalData
 	{
 		usg::vector<SystemHelper> systemHelpers;
+		usg::vector<SystemDependencyInfo> systemDependencies;
 		usg::vector<ComponentHelper> componentHelpers;
 		usg::hash_map<uint32, uint32> componentHashLookUp; // component-hash => id mapping
 		usg::hash_map<uint32, usg::vector<SignalRunner>> signalRunners;
@@ -35,11 +36,49 @@ namespace usg
 		void Clear()
 		{
 			systemHelpers.clear();
+			systemDependencies.clear();
 			componentHelpers.clear();
 			componentHashLookUp.clear();
 			signalRunners.clear();
 		}
 	};
+
+	SystemCoordinator::SystemDependencyInfo::SystemDependencyInfo()
+		: systemName(nullptr)
+		, systemTypeID(0xffffffff)
+		, priority(0)
+		, uRequiredComponentKeyCount(0)
+		, uReadComponentKeyCount(0)
+		, uWriteComponentKeyCount(0)
+		, uParentReadComponentKeyCount(0)
+		, bIsCollisionListener(false)
+		, uOnCollisionMask(0)
+	{
+		usg::MemSet(uRequiredComponentMask, 0, sizeof(uRequiredComponentMask));
+		usg::MemSet(uReadComponentMask, 0, sizeof(uReadComponentMask));
+		usg::MemSet(uWriteComponentMask, 0, sizeof(uWriteComponentMask));
+		usg::MemSet(uParentReadComponentMask, 0, sizeof(uParentReadComponentMask));
+	}
+
+	static uint32 CopySystemDependencyMask(uint32(*pGetKey)(uint32), uint32* pDst, uint32 uDstCount)
+	{
+		uint32 uKeyCount = 0;
+		if (pGetKey == nullptr)
+		{
+			return uKeyCount;
+		}
+
+		for (uint32 i = 0; i < uDstCount; ++i)
+		{
+			pDst[i] = pGetKey(i);
+			if (pDst[i] != 0)
+			{
+				uKeyCount++;
+			}
+		}
+
+		return uKeyCount;
+	}
 
 	void SystemCoordinator::RegisterProtocolBufferTypeInt(const uint32 uTypeId, memsize uDataSize, void(*pPtrToReader)(ProtocolBufferFile& file, void* data))
 	{
@@ -129,6 +168,65 @@ namespace usg
 #endif
 			}
 		}
+	}
+
+	uint32 SystemCoordinator::GetSystemDependencyCount() const
+	{
+		return m_pInternalData ? (uint32)m_pInternalData->systemDependencies.size() : 0;
+	}
+
+	const SystemCoordinator::SystemDependencyInfo* SystemCoordinator::GetSystemDependencyInfo(uint32 uSystemId) const
+	{
+		if (m_pInternalData == nullptr || uSystemId >= m_pInternalData->systemDependencies.size())
+		{
+			return nullptr;
+		}
+
+		return &m_pInternalData->systemDependencies[uSystemId];
+	}
+
+	bool SystemCoordinator::SystemsHaveRequiredComponentOverlap(uint32 uLhsSystemId, uint32 uRhsSystemId) const
+	{
+		const SystemDependencyInfo* pLhs = GetSystemDependencyInfo(uLhsSystemId);
+		const SystemDependencyInfo* pRhs = GetSystemDependencyInfo(uRhsSystemId);
+		if (pLhs == nullptr || pRhs == nullptr)
+		{
+			return false;
+		}
+
+		for (uint32 i = 0; i < ARRAY_SIZE(pLhs->uRequiredComponentMask); ++i)
+		{
+			if ((pLhs->uRequiredComponentMask[i] & pRhs->uRequiredComponentMask[i]) != 0)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool SystemCoordinator::SystemsHaveComponentAccessConflict(uint32 uLhsSystemId, uint32 uRhsSystemId) const
+	{
+		const SystemDependencyInfo* pLhs = GetSystemDependencyInfo(uLhsSystemId);
+		const SystemDependencyInfo* pRhs = GetSystemDependencyInfo(uRhsSystemId);
+		if (pLhs == nullptr || pRhs == nullptr)
+		{
+			return false;
+		}
+
+		for (uint32 i = 0; i < ARRAY_SIZE(pLhs->uReadComponentMask); ++i)
+		{
+			const uint32 uLhsWrites = pLhs->uWriteComponentMask[i];
+			const uint32 uRhsWrites = pRhs->uWriteComponentMask[i];
+			const uint32 uLhsAccess = pLhs->uReadComponentMask[i] | uLhsWrites;
+			const uint32 uRhsAccess = pRhs->uReadComponentMask[i] | uRhsWrites;
+			if (((uLhsWrites & uRhsAccess) != 0) || ((uRhsWrites & uLhsAccess) != 0))
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	SystemCoordinator::SystemCoordinator()
@@ -314,7 +412,7 @@ SystemCoordinator::SystemHelper& SystemCoordinator::GetSystemHelper(uint32 uSyst
 		helpers.reserve(uSystemId + 64);
 		while (helpers.size() <= uSystemId)
 		{
-			helpers.push_back_uninitialized();
+			helpers.push_back(SystemHelper());
 		}
 	}
 	return helpers[uSystemId];
@@ -387,6 +485,7 @@ void SystemCoordinator::LockRegistration()
 	// Calculate System keys
 	m_uBitfieldsPerKey = ((uint32)m_pInternalData->systemHelpers.size() / BITFIELD_LENGTH) + 1;
 	m_pSystemData = (SystemData*)m_memPool.Allocate(m_pInternalData->systemHelpers.size() * sizeof(SystemData), 4, 0, ALLOC_SYSTEM);
+	m_pInternalData->systemDependencies.resize(m_pInternalData->systemHelpers.size());
 
 	// Sort Signal Runners by priority
 	for (auto& runners : m_pInternalData->signalRunners)
@@ -421,25 +520,45 @@ void SystemCoordinator::LockRegistration()
 	for (uint32 i = 0; i < m_pInternalData->systemHelpers.size(); ++i)
 	{
 		SystemData* pSystem = &m_pSystemData[i];
-		KeyIndex* pKeyBufferOffset = &m_pSystemKeyBuffer[uKeyCount];
+		const SystemHelper& helper = m_pInternalData->systemHelpers[i];
+		SystemDependencyInfo& dependency = m_pInternalData->systemDependencies[i];
+		dependency = SystemDependencyInfo();
+		dependency.systemName = helper.systemName;
+		dependency.systemTypeID = helper.systemTypeID;
+		dependency.priority = helper.priority;
+		dependency.bIsCollisionListener = helper.bIsCollisionListener;
+		dependency.uOnCollisionMask = helper.uOnCollisionMask;
+		dependency.uReadComponentKeyCount = CopySystemDependencyMask(helper.GetSystemReadKey, dependency.uReadComponentMask, ARRAY_SIZE(dependency.uReadComponentMask));
+		dependency.uWriteComponentKeyCount = CopySystemDependencyMask(helper.GetSystemWriteKey, dependency.uWriteComponentMask, ARRAY_SIZE(dependency.uWriteComponentMask));
+		dependency.uParentReadComponentKeyCount = CopySystemDependencyMask(helper.GetSystemParentReadKey, dependency.uParentReadComponentMask, ARRAY_SIZE(dependency.uParentReadComponentMask));
+
+		KeyIndex* pSystemKeys = &m_pSystemKeyBuffer[uKeyCount];
+		KeyIndex* pKeyBufferOffset = pSystemKeys;
 		uint32 uSystemKeyCount = 0;
-		if (m_pInternalData->systemHelpers[i].GetSystemKey != nullptr)
+		pSystem->uKeyCount = 0;
+		pSystem->bSystemActive = false;
+		pSystem->pKeys = pSystemKeys;
+		if (helper.GetSystemKey != nullptr)
 		{
 			for (uint32 j = 0; j < m_uBitfieldsPerKey; ++j)
 			{
 				// Only check against relevant keys
-				if (m_pInternalData->systemHelpers[i].GetSystemKey(j) != 0)
+				const uint32 uSystemKey = helper.GetSystemKey(j);
+				if (uSystemKey != 0)
 				{
-					pKeyBufferOffset->uCmpValue = m_pInternalData->systemHelpers[i].GetSystemKey(j);
+					pKeyBufferOffset->uCmpValue = uSystemKey;
 					pKeyBufferOffset->uIndex = j;
+					if (j < ARRAY_SIZE(dependency.uRequiredComponentMask))
+					{
+						dependency.uRequiredComponentMask[j] = uSystemKey;
+						dependency.uRequiredComponentKeyCount++;
+					}
 					pKeyBufferOffset++;
 					uSystemKeyCount++;
 					uKeyCount++;
 				}
 			}
 			pSystem->uKeyCount = uSystemKeyCount;
-			pSystem->bSystemActive = false;
-			pSystem->pKeys = pKeyBufferOffset;
 		}
 	}
 }

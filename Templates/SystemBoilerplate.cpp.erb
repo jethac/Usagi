@@ -155,6 +155,47 @@ def isRequiredAndMine(c)
 	c["status"] == 1 && c["ownerBitfield"] == 1
 end
 
+def component_types(components)
+	components.map{|c| "::#{c["type"]}"}.uniq
+end
+
+def component_key_function(function_name, system_name, components)
+	if components.empty? then
+		return <<END_EMPTY_COMPONENT_KEY_FUNCTION
+template<>
+uint32 #{function_name}< #{system_name} >(uint32 uOffset)
+{
+	return 0;
+}
+END_EMPTY_COMPONENT_KEY_FUNCTION
+	end
+
+	<<END_COMPONENT_KEY_FUNCTION
+template<>
+uint32 #{function_name}< #{system_name} >(uint32 uOffset)
+{
+	uint32 uSystemKey = 0;
+
+	const uint32 uComponentIds[] =
+	{
+#{components.map { |c| "\t\tComponent<" + c + ">::GetTypeID()," }.join("\n")}
+	};
+
+	for (auto uId : uComponentIds)
+	{
+		const uint32 uBitfieldOffset = uId / BITFIELD_LENGTH;
+		const uint32 uBitfieldIndex = uId % BITFIELD_LENGTH;
+		if (uBitfieldOffset == uOffset)
+		{
+			uSystemKey |= 1 << uBitfieldIndex;
+		}
+	}
+
+	return uSystemKey;
+}
+END_COMPONENT_KEY_FUNCTION
+end
+
 prefix = s["isTemplated"] == true ? "template <>\n" : ""
 allComponents = s["inputs"] + s["outputs"] + s["colliderInputs"]
 allComponentTypes = allComponents.map{ |c| c["type"] }.uniq
@@ -164,6 +205,9 @@ allComponentTypes.each{ |c| registeredComponents[c] = true }
 
 required_components = (s["inputs"].select{|c| isRequiredAndMine c}.map{|c| "::#{c["type"]}"} +
                        s["outputs"].select{|c| isRequiredAndMine c}.map{|c| "::#{c["type"]}"}).uniq
+read_components = component_types(s["inputs"])
+write_components = component_types(s["outputs"])
+parent_read_components = component_types(s["inputs"].select{|c| c["ownerBitfield"] != 1})
 
 <<END_SYSTEM_OUTPUT
 
@@ -198,28 +242,13 @@ END_REGISTERCOMPONENT_CALL
 
 }
 
-template<>
-uint32 GetSystemKey< #{s["name"]} >(uint32 uOffset)
-{
-	uint32 uSystemKey = 0;
+#{component_key_function("GetSystemKey", s["name"], required_components)}
 
-	const uint32 uComponentIds[] =
-	{
-#{required_components.map { |c| "\t\tComponent<" + c + ">::GetTypeID()," }.join("\n")}
-	};
+#{component_key_function("GetSystemReadKey", s["name"], read_components)}
 
-	for (auto uId : uComponentIds)
-	{
-		const uint32 uBitfieldOffset = uId / BITFIELD_LENGTH;
-		const uint32 uBitfieldIndex = uId % BITFIELD_LENGTH;
-		if (uBitfieldOffset == uOffset)
-		{
-			uSystemKey |= 1 << uBitfieldIndex;
-		}
-	}
+#{component_key_function("GetSystemWriteKey", s["name"], write_components)}
 
-	return uSystemKey;
-}
+#{component_key_function("GetSystemParentReadKey", s["name"], parent_read_components)}
 END_SYSTEM_OUTPUT
 }.join("\n\n")
 %>
