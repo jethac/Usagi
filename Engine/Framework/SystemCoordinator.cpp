@@ -34,6 +34,7 @@ namespace usg
 		usg::hash_map<uint32, uint32> componentHashLookUp; // component-hash => id mapping
 		usg::hash_map<uint32, usg::vector<SignalRunner>> signalRunners;
 		usg::hash_map<uint32, ProtocolBufferReaderData> protocolBufferReaders;
+		uint32 uSignalDispatchDepth = 0;
 
 		void Clear()
 		{
@@ -42,7 +43,25 @@ namespace usg
 			componentHelpers.clear();
 			componentHashLookUp.clear();
 			signalRunners.clear();
+			uSignalDispatchDepth = 0;
 		}
+	};
+
+	struct SignalDispatchScope
+	{
+		SignalDispatchScope(uint32& uDepth)
+			: m_uDepth(uDepth)
+		{
+			m_uDepth++;
+		}
+
+		~SignalDispatchScope()
+		{
+			ASSERT(m_uDepth > 0);
+			m_uDepth--;
+		}
+
+		uint32& m_uDepth;
 	};
 
 	SystemCoordinator::SystemDependencyInfo::SystemDependencyInfo()
@@ -143,6 +162,7 @@ namespace usg
 		auto& runners = m_pInternalData->signalRunners[sig.uId];
 		{
 			m_pInternalData->scheduler.BeginSignal(sig.uId);
+			SignalDispatchScope dispatchScope(m_pInternalData->uSignalDispatchDepth);
 			for (auto& runner : runners)
 			{
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
@@ -167,6 +187,7 @@ namespace usg
 		auto& runners = m_pInternalData->signalRunners[sig.uId];
 		{
 			m_pInternalData->scheduler.BeginSignal(sig.uId);
+			SignalDispatchScope dispatchScope(m_pInternalData->uSignalDispatchDepth);
 			for (auto& runner : runners)
 			{
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
@@ -378,6 +399,8 @@ void SystemCoordinator::UpdateSystemList()
 
 void SystemCoordinator::UpdateEntityIO(ComponentEntity* e)
 {
+	ASSERT(m_pInternalData->uSignalDispatchDepth == 0);
+
 	if (ComponentStats::GetFlagsDirty())
 	{
 		// Update our list of potentially active systems
@@ -436,6 +459,8 @@ void SystemCoordinator::UpdateEntityIO(ComponentEntity* e)
 
 void SystemCoordinator::RemoveEntityIO(ComponentEntity* e)
 {
+	ASSERT(m_pInternalData->uSignalDispatchDepth == 0);
+
 	StringPointerHash<GenericInputOutputs*>& systems = e->GetSystems();
 	while (systems.Count())
 	{

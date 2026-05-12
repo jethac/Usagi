@@ -31,3 +31,8 @@ maximum task count. The default configuration remains zero workers.
 `TaskRunner` treats a maximum task count of zero as unlimited; nonzero limits
 are asserted at dispatch time. Worker-backed dispatch also asserts that only one
 batch is active at a time.
+
+While a signal is being dispatched, `SystemCoordinator` asserts against entity IO
+membership mutation through `UpdateEntityIO` and `RemoveEntityIO`. Entity changes
+should be applied in the existing pre-dispatch check phase or deferred until a
+later safe phase.
