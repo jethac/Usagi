@@ -38,11 +38,14 @@ void DebugStats_ps::Draw(DebugRender* pRender)
 	line = str::ParseString("Submitted command buffers: %u", platform.GetLastSubmittedCommandBufferCount());
 	pRender->AddString(line.c_str(), 0.0f, 2.0f, textColor);
 
-	line = str::ParseString("Command record CPU: %.3f ms", platform.GetLastCommandRecordTimeMS());
+	line = str::ParseString("Command record CPU sum: %.3f ms", platform.GetLastCommandRecordTimeMS());
 	pRender->AddString(line.c_str(), 0.0f, 3.0f, textColor);
 
-	line = str::ParseString("vkQueueSubmit CPU: %.3f ms", platform.GetLastQueueSubmitTimeMS());
+	line = str::ParseString("Command record CPU max: %.3f ms", platform.GetLastMaxCommandRecordTimeMS());
 	pRender->AddString(line.c_str(), 0.0f, 4.0f, textColor);
+
+	line = str::ParseString("vkQueueSubmit CPU: %.3f ms", platform.GetLastQueueSubmitTimeMS());
+	pRender->AddString(line.c_str(), 0.0f, 5.0f, textColor);
 }
 
 } // namespace usg

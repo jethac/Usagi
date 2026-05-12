@@ -45,10 +45,11 @@ public:
 
 	void Begin();
 	void End();
-	void QueueFrameCommandBuffer(VkCommandBuffer commandBuffer);
+	void QueueFrameCommandBuffer(VkCommandBuffer commandBuffer, float fRecordTimeMS);
 	float GetGPUTime() const { return m_fGPUTime; }
 	uint32 GetLastSubmittedCommandBufferCount() const { return m_uLastSubmittedCommandBuffers; }
 	float GetLastCommandRecordTimeMS() const { return m_fLastCommandRecordTimeMS; }
+	float GetLastMaxCommandRecordTimeMS() const { return m_fLastMaxCommandRecordTimeMS; }
 	float GetLastQueueSubmitTimeMS() const { return m_queueSubmitTimer.GetTotalMilliSeconds(); }
 	
 	GFXContext* CreateDeferredContext(uint32 uSizeMul);
@@ -199,6 +200,7 @@ private:
 
 	float		m_fGPUTime;
 	float		m_fLastCommandRecordTimeMS;
+	float		m_fLastMaxCommandRecordTimeMS;
 	uint32		m_uLastSubmittedCommandBuffers;
 };
 

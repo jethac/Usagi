@@ -204,6 +204,7 @@ GFXDevice_ps::GFXDevice_ps()
 	m_uDisplayCount = 0;
 	m_fGPUTime = 0.0f;
 	m_fLastCommandRecordTimeMS = 0.0f;
+	m_fLastMaxCommandRecordTimeMS = 0.0f;
 	m_uLastSubmittedCommandBuffers = 0;
 }
 
@@ -751,6 +752,7 @@ void GFXDevice_ps::Begin()
 	m_frameCommandBuffers.clear();
 	m_queueSubmitTimer.Clear();
 	m_fLastCommandRecordTimeMS = 0.0f;
+	m_fLastMaxCommandRecordTimeMS = 0.0f;
 	m_uLastSubmittedCommandBuffers = 0;
 
 	static bool bFirst = true;
@@ -777,10 +779,15 @@ void GFXDevice_ps::Begin()
 	// TODO: Update GPU time
 }
 
-void GFXDevice_ps::QueueFrameCommandBuffer(VkCommandBuffer commandBuffer)
+void GFXDevice_ps::QueueFrameCommandBuffer(VkCommandBuffer commandBuffer, float fRecordTimeMS)
 {
 	ASSERT(commandBuffer != VK_NULL_HANDLE);
 	m_frameCommandBuffers.push_back(commandBuffer);
+	m_fLastCommandRecordTimeMS += fRecordTimeMS;
+	if (fRecordTimeMS > m_fLastMaxCommandRecordTimeMS)
+	{
+		m_fLastMaxCommandRecordTimeMS = fRecordTimeMS;
+	}
 }
 
 GFXContext* GFXDevice_ps::CreateDeferredContext(uint32 uSizeMul)
@@ -795,8 +802,7 @@ void GFXDevice_ps::End()
 {
 	// For now the collector only contains the immediate context. Deferred
 	// contexts can append here once command generation is split.
-	QueueFrameCommandBuffer(m_pParent->GetImmediateCtxt()->GetPlatform().GetVkCmdBuffer());
-	m_fLastCommandRecordTimeMS = m_pParent->GetImmediateCtxt()->GetPlatform().GetRecordTimeMS();
+	QueueFrameCommandBuffer(m_pParent->GetImmediateCtxt()->GetPlatform().GetVkCmdBuffer(), m_pParent->GetImmediateCtxt()->GetPlatform().GetRecordTimeMS());
 	m_uLastSubmittedCommandBuffers = (uint32)m_frameCommandBuffers.size();
 
 	VkSubmitInfo submitInfo = {};
