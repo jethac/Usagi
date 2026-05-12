@@ -361,7 +361,7 @@ namespace usg
 		m_bRequiredCPUUpdate = false;
 		for(uint32 i=0; i<m_emissionDef.textureData_count; i++)
 		{
-			m_bRequiredCPUUpdate |= m_emissionDef.textureData[0].textureAnim.eTexMode != usg::particles::TEX_MODE_NONE;
+			m_bRequiredCPUUpdate |= m_emissionDef.textureData[i].textureAnim.eTexMode != usg::particles::TEX_MODE_NONE;
 		}
 		m_bRequiredCPUUpdate |= m_emissionDef.bCPUPositionUpdate;
 
@@ -583,7 +583,7 @@ namespace usg
 		// Texture animation
 		for(uint32 i=0; i<m_emissionDef.textureData_count; i++)
 		{
-			const usg::particles::TextureData& texData = m_emissionDef.textureData[0];
+			const usg::particles::TextureData& texData = m_emissionDef.textureData[i];
 			const usg::particles::TextureAnimation& texAnim = texData.textureAnim;
 
 			uint32 patternIdx = 0;
@@ -820,5 +820,4 @@ namespace usg
 	}
 
 }
-
 
