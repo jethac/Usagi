@@ -59,6 +59,8 @@ namespace usg
 		TriggerableEvent(double _time) : time(_time) {}
 		virtual void Trigger(SystemCoordinator&, Entity) = 0;
 		virtual Entity GetEntity() { return NULL; }
+		virtual bool HasEntityTarget() const { return false; }
+		virtual bool TargetsEntity(Entity) { return false; }
 	protected:
 		static Entity GetEntityFromNetworkUID(sint64 uid);
 	};
@@ -88,12 +90,16 @@ namespace usg
 		const void* pData;
 		const uint32 uSignalId;
 		Entity e;
+		EntityHandle entityHandle;
 		uint32 uTargets;
 
 		void Trigger(SystemCoordinator& sc, Entity root) override;
-		Entity GetEntity() override { return e; }
+		Entity GetEntity() override;
+		bool HasEntityTarget() const override { return true; }
+		bool TargetsEntity(Entity entity) override;
 
-		EventOnEntityBase(const uint32 uSignalId, const double fTime, const void* pData, Entity e, uint32 uTargets) : TriggerableEvent(fTime), pData(pData), uSignalId(uSignalId), e(e), uTargets(uTargets) {}
+		EventOnEntityBase(const uint32 uSignalId, const double fTime, const void* pData, Entity e, uint32 uTargets);
+		EventOnEntityBase(const uint32 uSignalId, const double fTime, const void* pData, EntityHandle e, uint32 uTargets);
 	};
 
 	template<typename EventType>
@@ -103,6 +109,7 @@ namespace usg
 		typedef void* ExtraData;
 		EventType evt;
 		EventOnEntity(Entity _e, const EventType& _evt, uint32 _targets, double _time, ExtraData) : EventOnEntityBase(Signal::ID, _time, (void*)&evt, _e, _targets), evt(_evt) {}
+		EventOnEntity(EntityHandle _e, const EventType& _evt, uint32 _targets, double _time, ExtraData) : EventOnEntityBase(Signal::ID, _time, (void*)&evt, _e, _targets), evt(_evt) {}
 	};
 
 	struct EventOnNetworkEntityBase : public TriggerableEvent

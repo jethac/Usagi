@@ -63,10 +63,57 @@ namespace usg
 		sc.TriggerFromRoot(root, sig);
 	}
 
+	EventOnEntityBase::EventOnEntityBase(const uint32 uSignalId, const double fTime, const void* pData, Entity e, uint32 uTargets)
+		: TriggerableEvent(fTime)
+		, pData(pData)
+		, uSignalId(uSignalId)
+		, e(e)
+		, entityHandle(e ? e->GetStableID() : EntityHandle())
+		, uTargets(uTargets)
+	{
+	}
+
+	EventOnEntityBase::EventOnEntityBase(const uint32 uSignalId, const double fTime, const void* pData, EntityHandle e, uint32 uTargets)
+		: TriggerableEvent(fTime)
+		, pData(pData)
+		, uSignalId(uSignalId)
+		, e(nullptr)
+		, entityHandle(e)
+		, uTargets(uTargets)
+	{
+	}
+
+	Entity EventOnEntityBase::GetEntity()
+	{
+		if (entityHandle.IsValid())
+		{
+			return ComponentEntity::GetEntityFromStableID(entityHandle);
+		}
+
+		return e;
+	}
+
+	bool EventOnEntityBase::TargetsEntity(Entity entity)
+	{
+		if (!entity)
+		{
+			return false;
+		}
+
+		return e == entity || (entityHandle.IsValid() && entity->GetStableID() == entityHandle);
+	}
+
 	void EventOnEntityBase::Trigger(SystemCoordinator& sc, Entity root)
 	{
+		Entity entity = GetEntity();
+		if (!entity)
+		{
+			DEBUG_PRINT("WARNING: Entity event 0x%08x dropped -- stale entity handle\n", uSignalId);
+			return;
+		}
+
 		OnEventSignalBase sig(uSignalId, pData);
-		sc.Trigger( e, sig, uTargets);
+		sc.Trigger(entity, sig, uTargets);
 	}
 
 

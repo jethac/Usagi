@@ -17,6 +17,7 @@ An all-zero handle is invalid. A handle resolves only when the slot is currently
 - `ComponentEntity::GetEntityFromStableID()` resolves a handle to a live `Entity` pointer or returns `nullptr` for stale IDs.
 - `ComponentEntity::IsStableIDValid()` provides a debug-friendly validity check.
 - `Components::EntityID` still carries the legacy raw pointer in `id`, and now also stores `stableId` for new code.
+- `EventManager` accepts `EntityHandle` for targeted events and resolves queued entity events immediately before dispatch.
 
 ## Migration Rule
 

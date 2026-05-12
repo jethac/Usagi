@@ -58,7 +58,20 @@ public:
 	template<typename EventType>
 	void RegisterEventWithEntity(EntityID e, const EventType& evt, uint32 targets = ON_ENTITY, typename EventOnEntity<EventType>::ExtraData extra = nullptr)
 	{
-		RegisterEventWithEntity(e.id, evt, targets, extra);
+		if (e.stableId.IsValid() && ComponentEntity::GetEntityFromStableID(e.stableId))
+		{
+			RegisterEventWithEntity(e.stableId, evt, targets, extra);
+		}
+		else
+		{
+			RegisterEventWithEntity(e.id, evt, targets, extra);
+		}
+	}
+
+	template<typename EventType>
+	void RegisterEventWithEntity(EntityHandle e, const EventType& evt, uint32 targets = ON_ENTITY, typename EventOnEntity<EventType>::ExtraData extra = nullptr)
+	{
+		RegisterEventWithEntityAtTime(e, evt, targets, 0, extra);
 	}
 
 	template<typename EventType>
@@ -125,7 +138,24 @@ public:
 	template<typename EventType>
 	void RegisterEventWithEntityAtTime(EntityID e, const EventType& evt, uint32 targets, double t, typename EventOnEntity<EventType>::ExtraData extra = nullptr)
 	{
-		RegisterEventWithEntityAtTime(e.id, evt, targets, t, extra);
+		if (e.stableId.IsValid() && ComponentEntity::GetEntityFromStableID(e.stableId))
+		{
+			RegisterEventWithEntityAtTime(e.stableId, evt, targets, t, extra);
+		}
+		else
+		{
+			RegisterEventWithEntityAtTime(e.id, evt, targets, t, extra);
+		}
+	}
+
+	template<typename EventType>
+	void RegisterEventWithEntityAtTime(EntityHandle e, const EventType& evt, uint32 targets, double t, typename EventOnEntity<EventType>::ExtraData extra = nullptr)
+	{
+		void* buffer = m_heap.Allocate(sizeof(EventOnEntity<EventType>), 4, 0, ALLOC_EVENT);
+		ASSERT(buffer != nullptr);
+		ASSERT(e.IsValid());
+		EventOnEntity<EventType>* wrappedEvent = new (buffer) EventOnEntity<EventType>(e, evt, targets, t, extra);
+		AddToEventQueue(wrappedEvent);
 	}
 
 private:

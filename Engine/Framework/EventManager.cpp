@@ -108,8 +108,8 @@ namespace usg
 		{
 			usg::vector<uint8> m_data;
 
-			GenericEventOnEntity(Entity e, const uint32 uEventId, const void* pData, memsize uDataSize, uint32 uTargets, double fTime) :
-				EventOnEntityBase(uEventId, fTime, nullptr, e, uTargets)
+			GenericEventOnEntity(Entity e, const uint32 uEventId, const void* pData, memsize uDataSize, uint32 uTargets, double fTime)
+				: EventOnEntityBase(uEventId, fTime, nullptr, e, uTargets)
 			{
 				m_data.resize(uDataSize);
 				MemCpy(&m_data[0], pData, uDataSize);
@@ -206,9 +206,18 @@ void EventManager::TriggerEvents(SystemCoordinator& systemCoordinator, Entity ro
 		TriggerableEvent* evt = *eventIterator;
 		if(evt->time <= now)
 		{
-			if (!evt->GetEntity() || evt->GetEntity()->GetSpawnFrame() != 0)
+			Entity eventEntity = evt->GetEntity();
+			if (!evt->HasEntityTarget() || (eventEntity && eventEntity->GetSpawnFrame() != 0))
 			{
 				evt->Trigger(systemCoordinator, rootEntity);
+				evt->~TriggerableEvent();
+				m_heap.Deallocate(evt);
+
+				eventIterator = m_eventQueue.erase(eventIterator);
+			}
+			else if (evt->HasEntityTarget() && !eventEntity)
+			{
+				DEBUG_PRINT("WARNING: Dropping stale entity event\n");
 				evt->~TriggerableEvent();
 				m_heap.Deallocate(evt);
 
@@ -242,7 +251,7 @@ void EventManager::RegisterEntitiesRemoved(Entity* pEntities, uint32 uCount)
 		bool bFound = false;
 		for (uint32 i = 0; i < uCount; i++)
 		{
-			if (evtEntity == pEntities[i])
+			if (evtEntity == pEntities[i] || evt->TargetsEntity(pEntities[i]))
 			{
 				eventIterator = m_eventQueue.erase(eventIterator);
 				bFound = true;
