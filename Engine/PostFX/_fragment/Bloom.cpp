@@ -300,42 +300,44 @@ bool Bloom::Draw(GFXContext* pContext, RenderContext& renderContext)
 		return false;
 
 	pContext->BeginGPUTag("Bloom", Color::Green);
-	// Downscale 4x4
-	pContext->SetRenderTarget(&m_scaledSceneRT);
-	pContext->SetPipelineState(m_downscalePipeline);
-	pContext->SetDescriptorSet(&m_descriptors[PASS_4X4], 1);
-	m_pSys->DrawFullScreenQuad(pContext);
+	if (m_fBloomScale > 0.0f)
+	{
+		// Downscale 4x4
+		pContext->SetRenderTarget(&m_scaledSceneRT);
+		pContext->SetPipelineState(m_downscalePipeline);
+		pContext->SetDescriptorSet(&m_descriptors[PASS_4X4], 1);
+		m_pSys->DrawFullScreenQuad(pContext);
 
-	// Bright pass
-	pContext->SetRenderTarget(&m_brightPassRT);
-	pContext->SetPipelineState(m_brightPassEffect);
-	pContext->SetDescriptorSet(&m_descriptors[PASS_BRIGHT_PASS], 1);
-	m_pSys->DrawFullScreenQuad(pContext);
+		// Bright pass
+		pContext->SetRenderTarget(&m_brightPassRT);
+		pContext->SetPipelineState(m_brightPassEffect);
+		pContext->SetDescriptorSet(&m_descriptors[PASS_BRIGHT_PASS], 1);
+		m_pSys->DrawFullScreenQuad(pContext);
 
-	// Gauss blur to the bloom source
-	pContext->SetRenderTarget(&m_bloomSourceRT);
-	pContext->SetPipelineState(m_gaussBlurPipeline);
-	pContext->SetDescriptorSet(&m_descriptors[PASS_GUASS_BRIGHT_PASS], 1);
-	m_pSys->DrawFullScreenQuad(pContext);
-	
+		// Gauss blur to the bloom source
+		pContext->SetRenderTarget(&m_bloomSourceRT);
+		pContext->SetPipelineState(m_gaussBlurPipeline);
+		pContext->SetDescriptorSet(&m_descriptors[PASS_GUASS_BRIGHT_PASS], 1);
+		m_pSys->DrawFullScreenQuad(pContext);
 
-	// Perform another gaussian blur
-	pContext->SetRenderTarget(&m_bloomRT[2]);
-	pContext->SetPipelineState(m_gaussBlurPipeline);
-	pContext->SetDescriptorSet(&m_descriptors[PASS_GUASS_BLOOM_SRC], 1);
-	m_pSys->DrawFullScreenQuad(pContext);
-	
-	// Perform the horizontal bloom
-	pContext->SetRenderTarget(&m_bloomRT[1]);
-	pContext->SetPipelineState(m_bloomEffect);
-	pContext->SetDescriptorSet(&m_descriptors[PASS_HOR_BLOOM], 1);
-	m_pSys->DrawFullScreenQuad(pContext);
+		// Perform another gaussian blur
+		pContext->SetRenderTarget(&m_bloomRT[2]);
+		pContext->SetPipelineState(m_gaussBlurPipeline);
+		pContext->SetDescriptorSet(&m_descriptors[PASS_GUASS_BLOOM_SRC], 1);
+		m_pSys->DrawFullScreenQuad(pContext);
 
-	// Perform the vertical bloom
-	pContext->SetRenderTarget(&m_bloomRT[0]);
-	pContext->SetPipelineState(m_bloomEffect);
-	pContext->SetDescriptorSet(&m_descriptors[PASS_VER_BLOOM], 1);
-	m_pSys->DrawFullScreenQuad(pContext);
+		// Perform the horizontal bloom
+		pContext->SetRenderTarget(&m_bloomRT[1]);
+		pContext->SetPipelineState(m_bloomEffect);
+		pContext->SetDescriptorSet(&m_descriptors[PASS_HOR_BLOOM], 1);
+		m_pSys->DrawFullScreenQuad(pContext);
+
+		// Perform the vertical bloom
+		pContext->SetRenderTarget(&m_bloomRT[0]);
+		pContext->SetPipelineState(m_bloomEffect);
+		pContext->SetDescriptorSet(&m_descriptors[PASS_VER_BLOOM], 1);
+		m_pSys->DrawFullScreenQuad(pContext);
+	}
 
 	// Perform the vertical bloom, transferring into a non HDR destination RT
 	pContext->SetRenderTarget(m_pDestTarget);

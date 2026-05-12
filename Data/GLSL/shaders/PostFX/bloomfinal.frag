@@ -15,9 +15,12 @@ layout(location = 0) out vec4 colorOut;
 void main(void)
 {
     vec4 vSample = texture(sampler0, vo_vTexCoord);    
-    vec4 vBloom = texture(sampler1, vo_vTexCoord);
 
-	vSample += fBloomScale * vBloom;
+	if (fBloomScale > 0.0)
+	{
+		vec4 vBloom = texture(sampler1, vo_vTexCoord);
+		vSample += fBloomScale * vBloom;
+	}
  	
  	// Compute the luma for use by FXAA
  	// The sqrt is only needed if we are in linear colour space
@@ -25,4 +28,3 @@ void main(void)
 
     colorOut = vSample;
 }
-
