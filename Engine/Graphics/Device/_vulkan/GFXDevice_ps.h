@@ -47,7 +47,7 @@ public:
 	void QueueFrameCommandBuffer(VkCommandBuffer commandBuffer);
 	float GetGPUTime() const { return m_fGPUTime; }
 	
-	GFXContext* CreateDeferredContext(uint32 uSizeMul) { ASSERT(false); return NULL; }
+	GFXContext* CreateDeferredContext(uint32 uSizeMul);
 
 	VkCommandPool& GetCommandPool() { return m_cmdPool;  }
 	VkCommandPool CreateCommandPool();
@@ -185,6 +185,7 @@ private:
 	VkPipelineCache						m_pipelineCache;
 	VkAllocationCallbacks				m_allocCallbacks;
 	usg::vector<VkCommandBuffer>		m_frameCommandBuffers;
+	usg::vector<GFXContext*>			m_deferredContexts;
 
 	DisplaySettings						m_diplayInfo[MAX_DISPLAY_COUNT];
 	uint32								m_uDisplayCount;

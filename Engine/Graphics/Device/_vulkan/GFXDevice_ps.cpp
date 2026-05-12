@@ -207,6 +207,13 @@ GFXDevice_ps::GFXDevice_ps()
 
 void GFXDevice_ps::Cleanup(GFXDevice* pParent)
 {
+	for (auto pContext : m_deferredContexts)
+	{
+		pContext->Cleanup(pParent);
+		vdelete pContext;
+	}
+	m_deferredContexts.clear();
+
 	vkDestroyCommandPool(m_vkDevice, m_cmdPool, NULL);
 	vkDeviceWaitIdle(m_vkDevice);
 	// Cleanup any requested destroys before destroying the device
@@ -769,6 +776,14 @@ void GFXDevice_ps::QueueFrameCommandBuffer(VkCommandBuffer commandBuffer)
 {
 	ASSERT(commandBuffer != VK_NULL_HANDLE);
 	m_frameCommandBuffers.push_back(commandBuffer);
+}
+
+GFXContext* GFXDevice_ps::CreateDeferredContext(uint32 uSizeMul)
+{
+	GFXContext* pContext = vnew(ALLOC_OBJECT) GFXContext;
+	pContext->Init(m_pParent, true, uSizeMul);
+	m_deferredContexts.push_back(pContext);
+	return pContext;
 }
 
 void GFXDevice_ps::End()
