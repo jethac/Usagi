@@ -84,6 +84,16 @@ namespace usg{
 		{
 			m_requestQueue.Init(uQueueSize);
 			m_completedQueue.Init(uQueueSize);
+			Start();
+		}
+
+		void Start()
+		{
+			if (m_bStarted)
+			{
+				return;
+			}
+
 			m_bAcceptingRequests = true;
 			StartThread();
 			m_bStarted = true;
@@ -201,6 +211,16 @@ namespace usg{
 		{
 			cpuLoadWorker.Stop();
 			resources.ClearRequests();
+		}
+
+		void CancelPendingResourceLoads(bool bRestartWorker)
+		{
+			cpuLoadWorker.Stop();
+			resources.ClearRequests();
+			if (bRestartWorker)
+			{
+				cpuLoadWorker.Start();
+			}
 		}
 
 		ResourceData					resources;
@@ -658,12 +678,14 @@ void ResourceMgr::FinishedStaticLoad()
 void ResourceMgr::ClearDynamicResources(GFXDevice* pDevice)
 {
 	ProcessCompletedResourceLoads();
+	m_pImpl->CancelPendingResourceLoads(true);
 	m_pImpl->resources.FreeResourcesWithTag(pDevice, 1);
 }
 
 void ResourceMgr::ClearAllResources(GFXDevice* pDevice)
 {
 	ProcessCompletedResourceLoads();
+	m_pImpl->CancelPendingResourceLoads(true);
 	m_pImpl->resources.FreeAllResources(pDevice);
 }
 
