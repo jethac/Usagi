@@ -79,9 +79,14 @@ void Signal::TriggerSignalFromRoot(GenericInputOutputs* root, SignalClosure& Sig
 	GenericInputOutputs* child = root->GetChildEntity();
 	while(child)
 	{
-		TriggerSystemOnEntityAndChildren(child, Signal);
+		TriggerRootBranch(child, Signal);
 		child = child->GetNextSibling();
 	}
+}
+
+void Signal::TriggerRootBranch(GenericInputOutputs* pBranchRoot, SignalClosure& Signal)
+{
+	TriggerSystemOnEntityAndChildren(pBranchRoot, Signal);
 }
 
 void Signal::TriggerSignalOnEntity(Entity e, SignalClosure& Signal, uint32 systemID, uint32 targets)

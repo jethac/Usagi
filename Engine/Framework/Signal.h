@@ -38,6 +38,7 @@ protected:
 
 	static void TriggerSignalFromRoot(GenericInputOutputs* root, SignalClosure& Signal);
 	static void TriggerSignalOnEntity(Entity e, SignalClosure& Signal, uint32 systemID, uint32 targets = ON_ENTITY);
+	static void TriggerRootBranch(GenericInputOutputs* pBranchRoot, SignalClosure& Signal);
 
 private:
 	static void TriggerSignalOnChildEntities(Entity e, SignalClosure& Signal, uint32 systemID);
