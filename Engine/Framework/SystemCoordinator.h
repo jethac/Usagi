@@ -54,6 +54,7 @@ public:
 		uint32 uLastSignalId;
 		uint32 uLastSignalTaskCount;
 		uint32 uTotalSignalTaskCount;
+		uint32 uWorkerCount;
 	};
 
 	SystemCoordinator();

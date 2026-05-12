@@ -86,6 +86,7 @@ namespace usg
 		: uLastSignalId(0)
 		, uLastSignalTaskCount(0)
 		, uTotalSignalTaskCount(0)
+		, uWorkerCount(0)
 	{
 	}
 
@@ -252,6 +253,7 @@ namespace usg
 		result.uLastSignalId = stats.uLastSignalId;
 		result.uLastSignalTaskCount = stats.uLastSignalTaskCount;
 		result.uTotalSignalTaskCount = stats.uTotalSignalTaskCount;
+		result.uWorkerCount = stats.uWorkerCount;
 		return result;
 	}
 
@@ -289,6 +291,7 @@ SystemCoordinator::~SystemCoordinator()
 void SystemCoordinator::Cleanup(ComponentLoadHandles& handles)
 {
 	Clear(handles);
+	m_pInternalData->scheduler.Shutdown();
 
 	vdelete m_pInternalData;
 	m_pInternalData = nullptr;
@@ -305,6 +308,7 @@ void SystemCoordinator::Init(EventManager* pEventManager, MessageDispatch* pMess
 	m_pEventManager = pEventManager;
 	m_pMessageDispatch = pMessageDispatch;
 	m_pLuaVM = pLuaVM;
+	m_pInternalData->scheduler.Init(0, 0);
 }
 
 void SystemCoordinator::RegisterComponent(uint32 uComponentId, uint32 uComponentHash, const ComponentHelper& h)
