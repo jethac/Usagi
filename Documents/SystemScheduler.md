@@ -19,6 +19,7 @@ Root signals are split into branch callbacks before execution reaches
 `TaskRunner`. The scheduler still drains each branch immediately in sibling
 order, so branch visibility is available without changing traversal behavior.
 
-`TaskRunner` currently has zero workers and drains tasks inline. Future worker
-execution should keep that drain-before-return contract or copy task payloads
-into scheduler-owned storage before deferring work.
+`TaskRunner` currently has zero configured workers, so tasks drain inline. Its
+worker path is still synchronous: when workers are enabled, the caller also helps
+execute tasks and does not return until all tasks finish. Future scheduler work
+can opt into workers without changing the payload lifetime contract.
