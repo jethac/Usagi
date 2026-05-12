@@ -245,7 +245,7 @@ void Bloom::Resize(GFXDevice* pDevice, uint32 uScrWidth, uint32 uSrcHeight)
 
 	for (int i = 0; i < BLOOM_PASS_TEXTURES; i++)
 	{
-		m_bloomTex[i].Resize(pDevice, uScrWidth / 8, uScrWidth / 8);
+		m_bloomTex[i].Resize(pDevice, uScrWidth / 8, uSrcHeight / 8);
 		m_bloomRT[i].Resize(pDevice);
 	}
 
@@ -423,4 +423,3 @@ void Bloom::PassDataSet(GFXDevice* pDevice)
 }
 
 }
-
