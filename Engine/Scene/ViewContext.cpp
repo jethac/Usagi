@@ -274,12 +274,12 @@ namespace usg {
 		vector<RenderNode*>* pNodes;
 	};
 
-	void BeginRenderLayerTask(GFXContext* pContext, const RenderLayerTask& task)
+	static void BeginRenderLayerTask(GFXContext* pContext, const RenderLayerTask& task)
 	{
 		pContext->BeginGPUTag(task.szName);
 	}
 
-	void DrawRenderLayerTaskNodes(GFXContext* pContext, RenderNode::RenderContext& renderContext, const RenderLayerTask& task)
+	static void DrawRenderLayerTaskNodes(GFXContext* pContext, RenderNode::RenderContext& renderContext, const RenderLayerTask& task)
 	{
 		for (auto itr = task.pNodes->begin(); itr != task.pNodes->end(); ++itr)
 		{
@@ -288,7 +288,7 @@ namespace usg {
 		}
 	}
 
-	void EndRenderLayerTask(GFXContext* pContext)
+	static void EndRenderLayerTask(GFXContext* pContext)
 	{
 		pContext->EndGPUTag();
 	}
