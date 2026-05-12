@@ -15,7 +15,7 @@ public:
 	virtual bool LoadFile(const char* szFileName);
 	// Just load the wav for most platforms but support conversion
 	virtual bool LoadWavFile(const char* szFileName);
-	void ExportResources(const char* szFileName);
+	bool ExportResources(const char* szFileName);
 	void WriteDependencies(const char* szFileName);
 
 protected:
@@ -64,4 +64,3 @@ protected:
 	std::vector<ResourceEntry*> m_resources;
 	std::vector<std::string> m_referencedFiles;
 };
-

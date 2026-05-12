@@ -3,6 +3,7 @@
 #include "Engine/Core/Utility.h"
 #include "Engine/Resource/PakDecl.h"
 #include <algorithm>
+#include <string>
 #include <vector>
 
 struct DependencyEntry
@@ -83,6 +84,28 @@ namespace ResourcePakExporter
 		// Sort these entries so that dependencies come before other files
 		std::sort(entries.begin(), entries.end(), ComparePointers);
 
+		for (uint32 i = 0; i < entries.size(); i++)
+		{
+			for (auto& depItr : entries[i]->GetDeps())
+			{
+				bool bFound = false;
+				for (size_t depId = 0; depId < entries.size(); depId++)
+				{
+					if (entries[depId]->GetNameCRC() == depItr.fileNameCRC)
+					{
+						bFound = true;
+						break;
+					}
+				}
+
+				if (!bFound)
+				{
+					DEBUG_PRINT("Dependency %s for resource %s was not found in pak %s\n", depItr.fileName.c_str(), entries[i]->GetName().c_str(), szFileName);
+					return false;
+				}
+			}
+		}
+
 		uint32 uTmpOffset = sizeof(usg::PakFileDecl::ResourcePakHdr);
 		for (uint32 i = 0; i < entries.size(); i++)
 		{
@@ -92,18 +115,20 @@ namespace ResourcePakExporter
 		}
 
 		uint32 uKeepOffset = uTmpOffset;
+		bool bHasPersistentData = false;
 		for (uint32 i = 0; i < entries.size(); i++)
 		{
 			if (!entries[i]->KeepDataAfterLoading())
 			{
 				uKeepOffset += entries[i]->GetDataSize();
 			}
+			else if (entries[i]->GetDataSize() > 0)
+			{
+				bHasPersistentData = true;
+			}
 		}
 
-		if (uKeepOffset == uTmpOffset)
-		{
-			uKeepOffset = USG_INVALID_ID;
-		}
+		const uint32 uPersistentDataOffset = bHasPersistentData ? uKeepOffset : USG_INVALID_ID;
 
 		FILE* pFileOut = nullptr;
 		fopen_s(&pFileOut, szFileName, "wb");
@@ -117,7 +142,7 @@ namespace ResourcePakExporter
 		usg::PakFileDecl::ResourcePakHdr hdr;
 		hdr.uVersionId = usg::PakFileDecl::CURRENT_VERSION;
 		hdr.uFileCount = (uint32)entries.size();
-		hdr.uResDataOffset = uKeepOffset;
+		hdr.uResDataOffset = uPersistentDataOffset;
 		hdr.uTempDataOffset = uTmpOffset;
 
 		fwrite(&hdr, sizeof(hdr), 1, pFileOut);
@@ -171,7 +196,8 @@ namespace ResourcePakExporter
 					{
 						if (entries[depId]->GetNameCRC() == depItr.fileNameCRC)
 						{
-							dep.PakIndex = (uint32)i;
+							dep.PakIndex = (uint32)depId;
+							break;
 						}
 					}
 					fwrite(&dep, sizeof(dep), 1, pFileOut);

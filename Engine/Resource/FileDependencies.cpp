@@ -86,7 +86,7 @@ namespace usg
 	{
 		for (auto& dep : m_dependencies)
 		{
-			if (dep.resHandle->GetResourceType() == eType)
+			if (dep.resHandle && dep.resHandle->GetResourceType() == eType)
 			{
 				return dep.resHandle;
 			}
@@ -98,7 +98,7 @@ namespace usg
 	{
 		for (auto& dep : m_dependencies)
 		{
-			if (dep.resHandle->GetResourceType() == eType)
+			if (dep.resHandle && dep.resHandle->GetResourceType() == eType)
 			{
 				depOut.push_back(&dep);
 			}

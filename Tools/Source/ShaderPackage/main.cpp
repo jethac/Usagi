@@ -403,7 +403,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Write out the file
-	ResourcePakExporter::Export(outBinary.c_str(), resources);
+	bool bExportSuccess = ResourcePakExporter::Export(outBinary.c_str(), resources);
 
 	// Delete the binary data
 	for (uint32 i = 0; i < (uint32)usg::ShaderType::COUNT; i++)
@@ -427,5 +427,5 @@ int main(int argc, char *argv[])
 	pCompiler->Cleanup();
 	delete pCompiler;
 
-	return 0;
+	return bExportSuccess ? 0 : -1;
 }
