@@ -267,6 +267,32 @@ namespace usg {
 		return 0;
 	}
 
+	struct RenderLayerTask
+	{
+		uint32 uLayer;
+		const char* szName;
+		vector<RenderNode*>* pNodes;
+	};
+
+	void BeginRenderLayerTask(GFXContext* pContext, const RenderLayerTask& task)
+	{
+		pContext->BeginGPUTag(task.szName);
+	}
+
+	void DrawRenderLayerTaskNodes(GFXContext* pContext, RenderNode::RenderContext& renderContext, const RenderLayerTask& task)
+	{
+		for (auto itr = task.pNodes->begin(); itr != task.pNodes->end(); ++itr)
+		{
+			RenderNode* node = *itr;
+			node->Draw(pContext, renderContext);
+		}
+	}
+
+	void EndRenderLayerTask(GFXContext* pContext)
+	{
+		pContext->EndGPUTag();
+	}
+
 
 	Fog& ViewContext::GetFog(uint32 uIndex)
 	{ 
@@ -468,13 +494,9 @@ namespace usg {
 
 		for (uint32 uLayer = 0; uLayer < RenderLayer::LAYER_COUNT; uLayer++)
 		{
-			pContext->BeginGPUTag(g_szLayerNames[uLayer]);
-			//for(List<RenderNode>::Iterator it = m_drawLists[uLayer].Begin(); !it.IsEnd(); ++it)
-			for (auto itr = m_pImpl->pVisibleNodes[uLayer].begin(); itr != m_pImpl->pVisibleNodes[uLayer].end(); ++itr)
-			{
-				RenderNode* node = *itr;
-				node->Draw(pContext, renderContext);
-			}
+			RenderLayerTask task = { uLayer, g_szLayerNames[uLayer], &m_pImpl->pVisibleNodes[uLayer] };
+			BeginRenderLayerTask(pContext, task);
+			DrawRenderLayerTaskNodes(pContext, renderContext, task);
 
 			if (uLayer == RenderLayer::LAYER_OPAQUE_UNLIT)
 			{
@@ -484,7 +506,7 @@ namespace usg {
 			}
 			// TODO: Probably are going to want callbacks at the end of certain layers, for grabbing
 			// the linear depth information etc
-			pContext->EndGPUTag();
+			EndRenderLayerTask(pContext);
 		}
 	}
 
