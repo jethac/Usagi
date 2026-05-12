@@ -15,6 +15,6 @@ Effects:
   - { name: Gauss5x5,               vert: PostFX/fullscreen,        frag: PostFX/guass }
   - { name: Fader,                  vert: PostFX/fader,             frag: PostFX/fader }
   - { name: Copy,                   vert: PostFX/fullscreen,        frag: PostFX/screencopy }
+  - { name: DisplayEncode,          vert: PostFX/fullscreen,        frag: PostFX/displayencode }
   - { name: FilmNoise,              vert: PostFX/fullscreen,        frag: PostFX/filmnoise }  
   - { name: ClearAlpha,             vert: PostFX/fullscreensolid,   frag: PostFX/clearalpha }
-  

@@ -23,6 +23,101 @@
 
 namespace usg {
 
+static const DescriptorDeclaration g_displayEncodeDescriptorDecl[] =
+{
+	DESCRIPTOR_ELEMENT(0, DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
+	DESCRIPTOR_END()
+};
+
+class DisplayColorTransform : public PostEffect
+{
+public:
+	DisplayColorTransform()
+		: PostEffect()
+		, m_pSys(nullptr)
+		, m_pDestTarget(nullptr)
+	{
+		SetRenderMask(RENDER_MASK_POST_EFFECT);
+		SetLayer(LAYER_POST_PROCESS);
+		SetPriority(255);
+	}
+
+	void Init(GFXDevice* pDevice, ResourceMgr* pResource, PostFXSys* pSys) override
+	{
+		m_pSys = pSys;
+
+		SamplerDecl samplerDecl(SAMP_FILTER_POINT, SAMP_WRAP_CLAMP);
+		m_sampler = pDevice->GetSampler(samplerDecl);
+
+		m_pipelineDecl.inputBindings[0].Init(usg::GetVertexDeclaration(usg::VT_POSITION));
+		m_pipelineDecl.uInputBindingCount = 1;
+		m_pipelineDecl.ePrimType = PT_TRIANGLES;
+		m_pipelineDecl.pEffect = pResource->GetEffect(pDevice, "PostProcess.DisplayEncode");
+		m_pipelineDecl.layout.descriptorSets[0] = pDevice->GetDescriptorSetLayout(SceneConsts::g_globalDescriptorDecl);
+		m_pipelineDecl.layout.descriptorSets[1] = pDevice->GetDescriptorSetLayout(g_displayEncodeDescriptorDecl);
+		m_pipelineDecl.layout.uDescriptorSetCount = 2;
+		m_pipelineDecl.rasterizerState.eCullFace = CULL_FACE_NONE;
+		m_pipelineDecl.alphaState.SetColor0Only();
+
+		m_material.SetDescriptorLayout(pDevice, m_pipelineDecl.layout.descriptorSets[1]);
+	}
+
+	void Cleanup(GFXDevice* pDevice) override
+	{
+		m_material.Cleanup(pDevice);
+	}
+
+	bool ReadsTexture(Input eInput) const override
+	{
+		return eInput == PostEffect::Input::Color;
+	}
+
+	bool WritesTexture(Input eInput) const override
+	{
+		return eInput == PostEffect::Input::Color;
+	}
+
+	void SetTexture(GFXDevice* pDevice, Input eInput, const TextureHndl& texture) override
+	{
+		if(eInput == PostEffect::Input::Color)
+		{
+			m_material.SetTexture(0, texture, m_sampler);
+			m_material.UpdateDescriptors(pDevice);
+		}
+	}
+
+	void SetDestTarget(GFXDevice* pDevice, RenderTarget* pDst) override
+	{
+		if(m_pDestTarget != pDst)
+		{
+			m_pDestTarget = pDst;
+			m_material.SetPipelineState(pDevice->GetPipelineState(pDst->GetRenderPass(), m_pipelineDecl));
+		}
+	}
+
+	bool Draw(GFXContext* pContext, RenderContext& renderContext) override
+	{
+		if(!GetEnabled())
+			return false;
+
+		pContext->BeginGPUTag("DisplayEncode", Color::Green);
+
+		pContext->SetRenderTarget(m_pDestTarget);
+		m_material.Apply(pContext);
+		m_pSys->DrawFullScreenQuad(pContext);
+
+		pContext->EndGPUTag();
+		return true;
+	}
+
+private:
+	PostFXSys*			m_pSys;
+	RenderTarget*		m_pDestTarget;
+	SamplerHndl			m_sampler;
+	Material			m_material;
+	PipelineStateDecl	m_pipelineDecl;
+};
+
 inline int CompareNodes(const void* a, const void* b) 
 {
 	const PostEffect* arg1 = *(const PostEffect**)(a);
@@ -90,6 +185,7 @@ PostFXSys_ps::PostFXSys_ps()
 	m_pSkyFog = nullptr;
 	m_pDeferredShading = nullptr;
 	m_pSetNoDepthTarget = nullptr;
+	m_pDisplayColorTransform = nullptr;
 	m_fPixelScale = 1.0f;
 	m_bHDROut = false;
 }
@@ -233,6 +329,8 @@ void PostFXSys_ps::Init(PostFXSys* pParent, ResourceMgr* pResMgr, GFXDevice* pDe
 		m_pSSAO = vnew(ALLOC_OBJECT) ASSAO();
 		m_pDefaultEffects[m_uDefaultEffects++] = m_pSSAO;
 	}
+	m_pDisplayColorTransform = vnew(ALLOC_OBJECT) DisplayColorTransform();
+	m_pDefaultEffects[m_uDefaultEffects++] = m_pDisplayColorTransform;
 
 	for(uint32 i = 0; i < m_uDefaultEffects; i++)
 	{
@@ -689,6 +787,10 @@ void PostFXSys_ps::EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags)
 		m_pFilmGrain->SetEnabled((uEffectFlags & PostFXSys::EFFECT_FILM_GRAIN) != 0);
 	if (m_pSSAO)
 		m_pSSAO->SetEnabled((uEffectFlags & PostFXSys::EFFECT_SSAO) != 0);
+	if (m_pDisplayColorTransform)
+	{
+		m_pDisplayColorTransform->SetEnabled((uEffectFlags & (PostFXSys::EFFECT_FINAL_TARGET_HDR | PostFXSys::EFFECT_OFFSCREEN_TARGET)) == 0);
+	}
 
 	m_renderPasses.SetDeferredEnabled(m_pDeferredShading && (uEffectFlags & PostFXSys::EFFECT_DEFERRED_SHADING) != 0);
 
@@ -981,4 +1083,3 @@ SceneRenderPasses& PostFXSys_ps::GetRenderPasses()
 
 
 }
-

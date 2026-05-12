@@ -29,6 +29,7 @@ class RenderTarget;
 class ResourceMgr;
 class Display;
 class SMAA;
+class DisplayColorTransform;
 
 class PostFXSys_ps
 {
@@ -118,6 +119,7 @@ protected:
 	class ASSAO*			m_pSSAO;
 	class DeferredShading*	m_pDeferredShading;
 	class SetSceneTarget*	m_pSetNoDepthTarget;
+	DisplayColorTransform*	m_pDisplayColorTransform;
 	PostEffect*				m_pDefaultEffects[MAX_DEFAULT_EFFECTS];
 	vector<PostEffect*>		m_activeEffects;
 	list<PostEffect*>		m_customEffects;
