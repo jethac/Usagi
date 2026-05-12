@@ -133,6 +133,41 @@ enum class DepthFormat
 	INVALID = COUNT
 };
 
+inline bool IsSRGBFormat(ColorFormat eFormat)
+{
+	return eFormat == ColorFormat::SRGBA;
+}
+
+inline bool IsHDRFormat(ColorFormat eFormat)
+{
+	return eFormat == ColorFormat::RGBA_16F
+		|| eFormat == ColorFormat::RGB_HDR;
+}
+
+inline bool IsLinearDataFormat(ColorFormat eFormat)
+{
+	switch (eFormat)
+	{
+	case ColorFormat::SHADOW:
+	case ColorFormat::R_32F:
+	case ColorFormat::R_32:
+	case ColorFormat::RG_32F:
+	case ColorFormat::R_16F:
+	case ColorFormat::RG_16F:
+	case ColorFormat::R_8:
+	case ColorFormat::RG_8:
+	case ColorFormat::NORMAL:
+		return true;
+	default:
+		return false;
+	}
+}
+
+inline bool IsLinearRenderTargetFormat(ColorFormat eFormat)
+{
+	return !IsSRGBFormat(eFormat) && eFormat != ColorFormat::UNDEFINED && eFormat != ColorFormat::INVALID;
+}
+
 
 enum CompareFunc
 {
