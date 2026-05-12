@@ -16,20 +16,21 @@ class DebugRender;
 class DebugStats_ps : public IDebugStatGroup
 {
 public:
-	DebugStats_ps() : IDebugStatGroup() {}
+	DebugStats_ps();
 	~DebugStats_ps() {}
 
-	void Init(GFXDevice* pDevice) {}
+	void Init(GFXDevice* pDevice);
 	void Update(float fElapsed) override {}
 
-	void Draw(DebugRender* pRender) override {}
+	void Draw(DebugRender* pRender) override;
 	void PreDraw(GFXDevice* pDevice) override {}
 	void PostDraw(GFXDevice* pDevice) override {}
 
 
-	uint32 GetPageCount() const { return 0; }
+	uint32 GetPageCount() const { return 1; }
 
 private:
+	GFXDevice* m_pDevice;
 };
 
 } // namespace usagi
