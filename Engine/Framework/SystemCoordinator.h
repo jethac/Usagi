@@ -133,6 +133,8 @@ private:
 
 	void UpdateSystemList();
 	void BuildSignalExecutionBatches();
+	void TriggerRunner(Entity e, Signal& sig, const SignalRunner& runner, uint32 targets);
+	void TriggerRunnerFromRoot(Entity e, Signal& sig, const SignalRunner& runner);
 
 	struct InternalData;
 	InternalData* m_pInternalData = nullptr;

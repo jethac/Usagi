@@ -184,22 +184,28 @@ namespace usg
 		{
 			m_pInternalData->scheduler.BeginSignal(sig.uId);
 			SignalDispatchScope dispatchScope(m_pInternalData->uSignalDispatchDepth);
+#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
 			for (auto& runner : runners)
 			{
-#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
-				const uint32 systemID = runner.systemID;
-				ASSERT(systemID != SignalRunner::INVALID_SYSTEM_ID);
-				SystemHelper& helper = m_systemHelpers[systemID];
-
-				helper.timer.Start();
-#endif
-
-				m_pInternalData->scheduler.RunSignalTask(e, sig, runner, targets);
-
-#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
-				helper.timer.Stop();
-#endif
+				TriggerRunner(e, sig, runner, targets);
 			}
+#else
+			auto batchIt = m_pInternalData->signalExecutionBatches.find(sig.uId);
+			if (batchIt != m_pInternalData->signalExecutionBatches.end())
+			{
+				for (auto& batch : batchIt->second)
+				{
+					m_pInternalData->scheduler.RunSignalTasks(e, sig, &runners[0], &batch.runnerIndices[0], (uint32)batch.runnerIndices.size(), targets);
+				}
+			}
+			else
+			{
+				for (auto& runner : runners)
+				{
+					TriggerRunner(e, sig, runner, targets);
+				}
+			}
+#endif
 		}
 	}
 
@@ -211,21 +217,43 @@ namespace usg
 			SignalDispatchScope dispatchScope(m_pInternalData->uSignalDispatchDepth);
 			for (auto& runner : runners)
 			{
-#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
-				const uint32 systemID = runner.systemID;
-				ASSERT(systemID != SignalRunner::INVALID_SYSTEM_ID);
-				SystemHelper& helper = m_systemHelpers[systemID];
-
-				helper.timer.Start();
-#endif
-
-				m_pInternalData->scheduler.RunSignalTaskFromRoot(e, sig, runner);
-
-#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
-				helper.timer.Stop();
-#endif
+				TriggerRunnerFromRoot(e, sig, runner);
 			}
 		}
+	}
+
+	void SystemCoordinator::TriggerRunner(Entity e, Signal& sig, const SignalRunner& runner, uint32 targets)
+	{
+#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
+		const uint32 systemID = runner.systemID;
+		ASSERT(systemID != SignalRunner::INVALID_SYSTEM_ID);
+		SystemHelper& helper = m_pInternalData->systemHelpers[systemID];
+
+		helper.timer.Start();
+#endif
+
+		m_pInternalData->scheduler.RunSignalTask(e, sig, runner, targets);
+
+#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
+		helper.timer.Stop();
+#endif
+	}
+
+	void SystemCoordinator::TriggerRunnerFromRoot(Entity e, Signal& sig, const SignalRunner& runner)
+	{
+#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
+		const uint32 systemID = runner.systemID;
+		ASSERT(systemID != SignalRunner::INVALID_SYSTEM_ID);
+		SystemHelper& helper = m_pInternalData->systemHelpers[systemID];
+
+		helper.timer.Start();
+#endif
+
+		m_pInternalData->scheduler.RunSignalTaskFromRoot(e, sig, runner);
+
+#ifdef ENABLE_SYSTEM_PROFILE_TIMERS
+		helper.timer.Stop();
+#endif
 	}
 
 	uint32 SystemCoordinator::GetSystemDependencyCount() const

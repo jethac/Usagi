@@ -32,6 +32,12 @@ maximum task count. The default configuration remains zero workers.
 are asserted at dispatch time. Worker-backed dispatch also asserts that only one
 batch is active at a time.
 
+Targeted signal dispatch can submit a contiguous compatible-system batch to
+`TaskRunner`. With zero workers this drains inline in the original runner order;
+with workers configured, systems in the same batch may run concurrently. Root
+signal dispatch still uses the per-runner path because root branch batching also
+uses `TaskRunner` and needs a flattened execution path before nesting is safe.
+
 While a signal is being dispatched, `SystemCoordinator` asserts against entity IO
 membership mutation through `UpdateEntityIO` and `RemoveEntityIO`. Entity changes
 should be applied in the existing pre-dispatch check phase or deferred until a

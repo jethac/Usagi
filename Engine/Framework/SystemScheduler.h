@@ -67,6 +67,34 @@ public:
 		m_taskRunner.RunTasks(&task, 1);
 	}
 
+	void RunSignalTasks(Entity e, Signal& sig, const SignalRunner* pRunners, const uint32* pRunnerIndices, uint32 uRunnerCount, uint32 uTargets)
+	{
+		if (uRunnerCount == 0)
+		{
+			return;
+		}
+
+		usg::vector<SignalTaskData> taskData;
+		usg::vector<TaskRunner::Task> tasks;
+		taskData.reserve(uRunnerCount);
+		tasks.reserve(uRunnerCount);
+
+		for (uint32 i = 0; i < uRunnerCount; ++i)
+		{
+			const SignalRunner& runner = pRunners[pRunnerIndices[i]];
+			SignalTaskData data = { e, &sig, &runner, uTargets };
+			taskData.push_back(data);
+		}
+
+		for (uint32 i = 0; i < (uint32)taskData.size(); ++i)
+		{
+			tasks.push_back(TaskRunner::Task(RunSignalTaskInt, &taskData[i]));
+		}
+
+		RecordSignalTasks(uRunnerCount);
+		m_taskRunner.RunTasks(&tasks[0], (uint32)tasks.size());
+	}
+
 	void RunSignalTaskFromRoot(Entity e, Signal& sig, const SignalRunner& runner)
 	{
 		if (runner.TriggerRootBranch != nullptr)
@@ -163,8 +191,13 @@ private:
 
 	void RecordSignalTask()
 	{
-		m_stats.uLastSignalTaskCount++;
-		m_stats.uTotalSignalTaskCount++;
+		RecordSignalTasks(1);
+	}
+
+	void RecordSignalTasks(uint32 uTaskCount)
+	{
+		m_stats.uLastSignalTaskCount += uTaskCount;
+		m_stats.uTotalSignalTaskCount += uTaskCount;
 	}
 
 	void RecordRootBranchRunner()
