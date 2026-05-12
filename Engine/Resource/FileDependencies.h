@@ -25,7 +25,7 @@ namespace usg
 			uint32			uUsageCRC;
 		};
 
-		void Init(class PakFile* pCurrentFile, const PakFileDecl::Dependency* pDependencies, uint32 uDependencyCount);
+		void Init(class PakFile* pCurrentFile, const char* szPakName, const PakFileDecl::FileInfo* pOwnerFile, const PakFileDecl::Dependency* pDependencies, uint32 uDependencyCount);
 		uint32 GetDependencyCount() const { return (uint32)m_dependencies.size(); }
 		BaseResHandle GetDependencyByCRC(uint32 uFileCRC) const;
 		BaseResHandle GetDependencyByIndex(uint32 uFileIndex) const;

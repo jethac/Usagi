@@ -107,6 +107,10 @@ void ResourceMgr::LoadPackage(usg::GFXDevice* pDevice, const char* szPath, const
 			DEBUG_PRINT("Loaded %s in %f milliseconds\n", name.c_str(), loadTimer.GetTotalMilliSeconds());
 #endif
 		}
+		else
+		{
+			DEBUG_PRINT("Resource package not found: %s\n", name.c_str());
+		}
 	}
 	// Nothing on PC yet so no assert
 }
