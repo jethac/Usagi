@@ -22,7 +22,8 @@ This graph is a scheduling input, not a scheduler. The current runtime still
 uses the existing priority-sorted signal runners and serial dispatch path.
 
 After registration is locked, `SystemCoordinator` also builds observational
-signal execution batches. Batches are priority-bounded and greedily group runners
-that do not have generated component access conflicts. Dispatch still uses the
-serial runner loop; the batch data is exposed so later scheduler work can consume
-the same conservative grouping without changing registration order.
+signal execution batches. Batches are priority-bounded, contiguous in sorted
+runner order, and split when generated component access conflicts are found.
+Dispatch still uses the serial runner loop; the batch data is exposed so later
+scheduler work can consume the same conservative grouping without changing the
+zero-worker fallback order.

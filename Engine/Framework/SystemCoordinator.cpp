@@ -323,32 +323,28 @@ namespace usg
 			for (uint32 i = 0; i < (uint32)runners.size(); ++i)
 			{
 				const SignalRunner& runner = runners[i];
-				bool bPlaced = false;
-				for (uint32 j = 0; j < (uint32)batches.size(); ++j)
+				InternalData::SignalExecutionBatch* pBatch = batches.empty() ? nullptr : &batches.back();
+				bool bConflicts = runner.systemID == SignalRunner::INVALID_SYSTEM_ID;
+				if (pBatch != nullptr && pBatch->priority == runner.priority)
 				{
-					InternalData::SignalExecutionBatch& batch = batches[j];
-					bool bConflicts = runner.systemID == SignalRunner::INVALID_SYSTEM_ID;
-					for (uint32 k = 0; !bConflicts && k < (uint32)batch.runnerIndices.size(); ++k)
+					for (uint32 k = 0; !bConflicts && k < (uint32)pBatch->runnerIndices.size(); ++k)
 					{
-						const SignalRunner& batchRunner = runners[batch.runnerIndices[k]];
+						const SignalRunner& batchRunner = runners[pBatch->runnerIndices[k]];
 						bConflicts = batchRunner.systemID == SignalRunner::INVALID_SYSTEM_ID ||
 							DependenciesHaveSchedulingConflict(m_pInternalData->systemDependencies, batchRunner.systemID, runner.systemID);
 					}
-
-					if (batch.priority == runner.priority && !bConflicts)
-					{
-						batch.runnerIndices.push_back(i);
-						bPlaced = true;
-						break;
-					}
 				}
 
-				if (!bPlaced)
+				if (pBatch == nullptr || pBatch->priority != runner.priority || bConflicts)
 				{
 					InternalData::SignalExecutionBatch batch;
 					batch.priority = runner.priority;
 					batch.runnerIndices.push_back(i);
 					batches.push_back(batch);
+				}
+				else
+				{
+					pBatch->runnerIndices.push_back(i);
 				}
 			}
 		}
