@@ -44,6 +44,7 @@ m_pParent(nullptr)
 	m_bLightTexDirty = false;
 	m_uShadowCastingFlags = RENDER_MASK_ALL;
 	m_uShadowMapRes = g_uShadowResMap[m_qualitySettings.uShadowQuality];
+	m_uLocalShadowMapRes = g_uShadowResMap[m_qualitySettings.uLocalShadowQuality];
 }
 
 LightMgr::~LightMgr(void)
@@ -80,7 +81,9 @@ void LightMgr::SetQualitySettings(GFXDevice* pDevice, const QualitySettings& set
 	// TODO: Handle resizing after layers have been created (could be a useful performance optimization)
 	m_qualitySettings = settings;
 	m_qualitySettings.uShadowQuality = GetShadowQualityIndex(settings.uShadowQuality);
+	m_qualitySettings.uLocalShadowQuality = GetShadowQualityIndex(settings.uLocalShadowQuality);
 	m_uShadowMapRes = g_uShadowResMap[m_qualitySettings.uShadowQuality];
+	m_uLocalShadowMapRes = g_uShadowResMap[m_qualitySettings.uLocalShadowQuality];
 
 	if (m_cascadeBuffer.GetSlices() > 1)
 	{
@@ -275,7 +278,7 @@ void LightMgr::RemoveDirLight(DirLight* pLight)
 
 PointLight* LightMgr::AddPointLight(GFXDevice* pDevice, bool bSupportsShadow, const char* szName)
 {
-	PointLight* pLight = m_pointLights.GetLight(pDevice, m_pParent, bSupportsShadow && m_qualitySettings.bPointShadows);
+	PointLight* pLight = m_pointLights.GetLight(pDevice, m_pParent, bSupportsShadow && m_qualitySettings.bPointShadows, m_uLocalShadowMapRes);
 	if(szName)
 		pLight->SetName(szName);
 	return pLight;
@@ -289,7 +292,7 @@ void LightMgr::RemovePointLight(PointLight* pLight)
 
 SpotLight* LightMgr::AddSpotLight(GFXDevice* pDevice, bool bSupportsShadow, const char* szName)
 {
-	SpotLight* pLight = m_spotLights.GetLight(pDevice, m_pParent, bSupportsShadow && m_qualitySettings.bSpotShadows);
+	SpotLight* pLight = m_spotLights.GetLight(pDevice, m_pParent, bSupportsShadow && m_qualitySettings.bSpotShadows, m_uLocalShadowMapRes);
 	if(szName)
 		pLight->SetName(szName);
 	return pLight;
@@ -303,7 +306,7 @@ void LightMgr::RemoveSpotLight(SpotLight* pLight)
 
 ProjectionLight* LightMgr::AddProjectionLight(GFXDevice* pDevice, bool bSupportsShadow, const char* szName)
 {
-	ProjectionLight* pLight = m_projLights.GetLight(pDevice, m_pParent, bSupportsShadow && m_qualitySettings.bSpotShadows);
+	ProjectionLight* pLight = m_projLights.GetLight(pDevice, m_pParent, bSupportsShadow && m_qualitySettings.bSpotShadows, m_uLocalShadowMapRes);
 	if(szName)
 		pLight->SetName(szName);
 	return pLight;	

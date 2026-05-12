@@ -40,6 +40,7 @@ public:
 		bool	bSpotShadows = false;
 		bool	bPointShadows = false;
 		uint32	uShadowQuality = 2;	// 0-3
+		uint32	uLocalShadowQuality = 0;	// 0-3
 	};
 
 	// TODO: Add names to these lights?
@@ -120,7 +121,7 @@ private:
 			m_allocatedLights.clear();
 		}
 
-		LightType* GetLight(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
+		LightType* GetLight(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes = 0)
 		{
 			for (usg::vector<LightType*>::reverse_iterator it = m_freeLights.rbegin(); it != m_freeLights.rend(); it++)
 			{
@@ -133,7 +134,7 @@ private:
 				}
 			}
 			LightType* pReturn = vnew(ALLOC_OBJECT) LightType;
-			pReturn->Init(pDevice, pScene, bSupportsShadow);
+			pReturn->Init(pDevice, pScene, bSupportsShadow, uShadowRes);
 			m_allocatedLights.push_back(pReturn);
 			return pReturn;
 		}
@@ -181,6 +182,7 @@ private:
 	uint32					m_uShadowedDirLightIndex;
 	uint32					m_uActiveFrame;
 	uint32					m_uShadowMapRes;
+	uint32					m_uLocalShadowMapRes;
 	uint32					m_uShadowCastingFlags;
 	float					m_hemipshereLerp;
 	QualitySettings			m_qualitySettings;

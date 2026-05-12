@@ -19,17 +19,26 @@ targets for making them explicit.
 - Directional PCF kernel size is hard-coded as `PCF_BLUR_SIZE = 4`.
 - Bias/sample-range values are also hard-coded in `ShadowCascade.cpp`.
 
-## Spot And Projection Shadows
+## Local Shadows
 
-- `SpotLight` and `ProjectionLight` allocate `1024 x 1024` projection shadows
-  at initialization.
+- Point, spot, and projection lights use
+  `LightMgr::QualitySettings::uLocalShadowQuality`.
+- The local shadow quality map currently matches the directional resolution map:
+  - `0`: 1024
+  - `1`: 1536
+  - `2`: 2048
+  - `3`: 4096
+- The default local shadow quality is `0`, preserving the previous `1024 x 1024`
+  behavior for newly allocated local shadow maps.
+- `SpotLight` and `ProjectionLight` allocate projection shadows at this
+  resolution during initialization.
 - Projection-shadow bias is hard-coded in
   `Engine/Graphics/Shadows/ProjectionShadow.cpp`.
 - Spot-light culling currently uses a conservative sphere based on `m_fFar`.
 
 ## Point Shadows
 
-- Point-light cube shadows are allocated at `1024 x 1024`.
+- Point-light cube shadows are allocated at the local shadow quality resolution.
 - Deferred point-light shadow sampling uses the same 12-tap Poisson pattern as
   the other shadow paths.
 
@@ -53,8 +62,8 @@ targets for making them explicit.
 
 1. Move directional split distances, bias, and PCF size into a small quality
    settings structure.
-2. Route spot/projection/point shadow resolution through quality settings
-   instead of fixed `1024 x 1024` literals.
+2. Add resize support for existing pooled local lights when quality changes;
+   newly allocated local lights already use the selected local shadow quality.
 3. Keep a low-cost profile for lightweight targets and add an explicit high
    profile for modern hardware.
 4. Keep shader sample-count changes opt-in; changing the Poisson kernel affects

@@ -19,7 +19,7 @@ DirLight::~DirLight()
 
 }
 
-void DirLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
+void DirLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes)
 {
 	if (bSupportsShadow)
 	{
@@ -27,7 +27,7 @@ void DirLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
 		m_pShadowCascade->Init(pDevice, pScene, this);
 	}
 
-	Light::Init(pDevice, pScene, bSupportsShadow);
+	Light::Init(pDevice, pScene, bSupportsShadow, uShadowRes);
 }
 
 void DirLight::Cleanup(GFXDevice* pDevice, Scene* pScene)

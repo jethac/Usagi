@@ -79,7 +79,7 @@ SpotLight::~SpotLight(void)
 {
 }
 
-void SpotLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
+void SpotLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes)
 {
 	m_constants.Init(pDevice, g_spotLightDecl);
 	DescriptorSetLayoutHndl desc = pDevice->GetDescriptorSetLayout(g_spotLightDescDecl);
@@ -89,8 +89,9 @@ void SpotLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
 
 	if (bSupportsShadow)
 	{
+		uShadowRes = uShadowRes > 0 ? uShadowRes : 1024;
 		m_pShadow = vnew(ALLOC_OBJECT) ProjectionShadow;
-		m_pShadow->Init(pDevice, pScene, 1024, 1024);
+		m_pShadow->Init(pDevice, pScene, uShadowRes, uShadowRes);
 		SamplerDecl samp(SAMP_FILTER_LINEAR, SAMP_WRAP_CLAMP);
 		samp.bEnableCmp = true;
 		samp.eCmpFnc = CF_LESS;
@@ -103,7 +104,7 @@ void SpotLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
 		m_descriptorSetShadow.UpdateDescriptors(pDevice);
 	}
 
-	Light::Init(pDevice, pScene, bSupportsShadow);
+	Light::Init(pDevice, pScene, bSupportsShadow, uShadowRes);
 }
 
 void SpotLight::Cleanup(GFXDevice* pDevice, Scene* pScene)
@@ -236,4 +237,3 @@ const DescriptorSet* SpotLight::GetDescriptorSet(bool bWithShadow) const
 
 
 }
-

@@ -25,7 +25,7 @@ public:
 	ProjectionLight();
 	virtual ~ProjectionLight(void);
 
-	virtual void Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow) override;
+	virtual void Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes = 0) override;
 	virtual void Cleanup(GFXDevice* pDevice, Scene* pScene) override;
 	void	SetProjectionMtx(const Matrix4x4& projMat);
 	// Use one of the two, they will the reverse calculate the other

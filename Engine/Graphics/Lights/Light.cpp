@@ -23,7 +23,7 @@ Light::~Light()
 	m_bSupportsShadow = false;
 }
 
-void Light::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
+void Light::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes)
 {
 	m_bShadowEnabled = bSupportsShadow;
 	m_bSupportsShadow = bSupportsShadow;

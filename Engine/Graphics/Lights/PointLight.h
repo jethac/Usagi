@@ -25,7 +25,7 @@ public:
 	PointLight();
 	virtual ~PointLight(void);
 
-	void Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow) override;
+	void Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes = 0) override;
 	void Cleanup(GFXDevice* pDevice, Scene* pScene) override;
 
 	const DescriptorSet* GetDescriptorSet(bool bWithShadow) const;

@@ -29,7 +29,7 @@ public:
 	Light(LightType eType);
 	virtual ~Light(void);
 
-	virtual void	Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow);
+	virtual void	Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes = 0);
 
 	virtual void	Cleanup(GFXDevice* pDevice, Scene* pScene) {};
 

@@ -81,7 +81,7 @@ PointLight::~PointLight(void)
 {
 }
 
-void PointLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
+void PointLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow, uint32 uShadowRes)
 {
 	// TODO: Move this stuff out, it should really require the GFX device
 	m_constants.Init(pDevice, g_pointLightConstsDecl);
@@ -92,8 +92,9 @@ void PointLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
 
 	if (bSupportsShadow)
 	{
+		uShadowRes = uShadowRes > 0 ? uShadowRes : 1024;
 		m_pShadow = vnew(ALLOC_OBJECT) OmniShadow;
-		m_pShadow->Init(pDevice, pScene, 1024, 1024);
+		m_pShadow->Init(pDevice, pScene, uShadowRes, uShadowRes);
 
 		SamplerDecl samp(SAMP_FILTER_LINEAR, SAMP_WRAP_CLAMP);
 		samp.bEnableCmp = true;
@@ -108,7 +109,7 @@ void PointLight::Init(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
 
 	}
 
-	Light::Init(pDevice, pScene, bSupportsShadow);
+	Light::Init(pDevice, pScene, bSupportsShadow, uShadowRes);
 }
 
 
@@ -201,4 +202,3 @@ const Vector4f& PointLight::GetPosition() const
 }
 
 }
-
