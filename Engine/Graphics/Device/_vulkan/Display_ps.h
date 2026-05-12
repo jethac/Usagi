@@ -39,6 +39,7 @@ public:
 	VkSemaphore& GetImageAcquired() { return m_imageAcquired; }
 	VkImage GetActiveImage() const { return m_pSwapchainImages[m_uActiveImage]; }
 	bool HasHDRSupport() const { return m_bHDR; }
+	bool ExpectsSRGBNonlinearOutput() const { return m_swapChainColorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR; }
 
 private:
 	PRIVATIZE_COPY(Display_ps)
@@ -68,6 +69,7 @@ private:
 	VkSwapchainKHR		m_swapChain;
 	VkSemaphore			m_imageAcquired;
 	VkFormat			m_swapChainImageFormat;
+	VkColorSpaceKHR		m_swapChainColorSpace;
 	uint32				m_uSwapChainImageCount;
 	uint32				m_uID;
 	uint32				m_uWidth;

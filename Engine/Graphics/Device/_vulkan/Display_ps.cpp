@@ -38,6 +38,8 @@ Display_ps::Display_ps()
 {
 	m_swapChain = VK_NULL_HANDLE;
 	m_imageAcquired = VK_NULL_HANDLE;
+	m_swapChainImageFormat = VK_FORMAT_UNDEFINED;
+	m_swapChainColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 	m_uActiveImage = 0;
 	m_uSwapChainImageCount = 0;
 	m_bWindowResized = false;
@@ -253,6 +255,7 @@ void Display_ps::CreateSwapChain(GFXDevice* pDevice)
 	{
 		eFormat = VK_FORMAT_B8G8R8A8_UNORM;
 		colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+		m_eSwapChainFormat = ColorFormat::RGBA_8888;
 	}
 	else
 	{
@@ -381,6 +384,7 @@ void Display_ps::CreateSwapChain(GFXDevice* pDevice)
 	ASSERT(res == VK_SUCCESS);
 
 	m_swapChainImageFormat = eFormat;
+	m_swapChainColorSpace = colorSpace;
 
 	#if 0
 	VkHdrMetadataEXT metadata = {};
