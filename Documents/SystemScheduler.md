@@ -39,10 +39,12 @@ later safe phase.
 
 ## Coverage status
 
-Current verification is build-level: regenerate boilerplate when templates
-change, build the Framework target, then sweep dependent engine module targets.
-There is not yet a first-party ECS unit or smoke-test target in the generated
-project set. The only first-party test harness currently identified is under
-`Tools/Tests/ResourcePakExporter`, so scheduler acceptance still needs a small
-engine test target or demo harness that can compare single-worker and
+Current verification includes build-level checks: regenerate boilerplate when
+templates change, build the Framework target, then sweep dependent engine module
+targets.
+
+`Tools/Tests/SystemScheduler/Run.ps1` builds a standalone scheduler harness. It
+uses a synthetic system IO hierarchy to verify root-branch fan-out and scheduler
+stats without booting a full project. Full scheduler acceptance still needs an
+engine demo or frame-level harness that can compare single-worker and
 multi-worker branch results.
