@@ -16,11 +16,26 @@ namespace usg
 {
 
 	struct GenericInputOutputs;
+	class ComponentEntity;
 	class NewEntities;
 	struct ComponentLoadHandles;
 	struct UnsafeComponentGetter;
 
 	class ComponentType;
+	typedef ComponentEntity* Entity;
+
+	struct EntityHandle
+	{
+		EntityHandle() : uIndex(0), uGeneration(0) {}
+		EntityHandle(uint32 uIndexIn, uint32 uGenerationIn) : uIndex(uIndexIn), uGeneration(uGenerationIn) {}
+
+		bool IsValid() const { return uIndex != 0 && uGeneration != 0; }
+		bool operator==(const EntityHandle& rhs) const { return uIndex == rhs.uIndex && uGeneration == rhs.uGeneration; }
+		bool operator!=(const EntityHandle& rhs) const { return !(*this == rhs); }
+
+		uint32 uIndex;
+		uint32 uGeneration;
+	};
 
 	class ComponentEntity : public HierearchyNode<ComponentEntity>
 	{
@@ -133,11 +148,16 @@ namespace usg
 		{
 			return m_uSpawnFrame;
 		}
+
+		EntityHandle GetStableID() const { return EntityHandle(m_uIndex, m_uGeneration); }
+		static Entity GetEntityFromStableID(EntityHandle id);
+		static bool IsStableIDValid(EntityHandle id) { return GetEntityFromStableID(id) != nullptr; }
 	private:
 		static NewEntities& GetNewEntities();
 
 		uint32			 m_uSpawnFrame = 0;
 		uint32           m_uIndex;
+		uint32			 m_uGeneration;
 		uint32			 m_uOnCollisionMask;
 		float            m_fCatchupTime;
 		bool             m_bChanged;
@@ -154,6 +174,8 @@ namespace usg
 		static ComponentEntity *				g_hierarchy;
 		static uint32							g_uNumSystemTypes;
 
+		static void RegisterStableEntity(ComponentEntity* entity);
+		static void UnregisterStableEntity(ComponentEntity* entity);
 		void SetComponentBit(uint32 uBitfieldOffset, uint32 uBitfieldIndex, bool bValue);
 
 		uint32 GetSystemIDFromIndex(uint32 uSysIndex) const { return uSysIndex + 1; }
@@ -162,8 +184,6 @@ namespace usg
 		void LinkComponent(ComponentType *pComp);
 		void UnlinkComponent(ComponentType *pComp);
 	};
-
-	typedef ComponentEntity* Entity;
 
 	inline Entity CreateEntity(Entity parent)
 	{
@@ -180,6 +200,7 @@ namespace usg
 		struct EntityID
 		{
 			Entity id;
+			EntityHandle stableId;
 		};
 	}
 
