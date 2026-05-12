@@ -36,6 +36,35 @@ static uint32 GetShadowFilterQualityIndex(uint32 uShadowFilterQuality)
 	return Math::Min(uShadowFilterQuality, 3u);
 }
 
+LightMgr::QualitySettings LightMgr::QualitySettings::Lightweight()
+{
+	QualitySettings settings;
+	settings.bDirectionalShadows = true;
+	settings.bSpotShadows = false;
+	settings.bPointShadows = false;
+	settings.uShadowQuality = 0;
+	settings.uLocalShadowQuality = 0;
+	settings.uShadowFilterQuality = 0;
+	return settings;
+}
+
+LightMgr::QualitySettings LightMgr::QualitySettings::Default()
+{
+	return QualitySettings();
+}
+
+LightMgr::QualitySettings LightMgr::QualitySettings::ModernHardware()
+{
+	QualitySettings settings;
+	settings.bDirectionalShadows = true;
+	settings.bSpotShadows = true;
+	settings.bPointShadows = true;
+	settings.uShadowQuality = 3;
+	settings.uLocalShadowQuality = 2;
+	settings.uShadowFilterQuality = 2;
+	return settings;
+}
+
 LightMgr::LightMgr(void):
 m_pParent(nullptr)
 {

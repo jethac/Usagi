@@ -42,6 +42,10 @@ public:
 		uint32	uShadowQuality = 2;	// 0-3
 		uint32	uLocalShadowQuality = 0;	// 0-3
 		uint32	uShadowFilterQuality = 1;	// 0-3
+
+		static QualitySettings Lightweight();
+		static QualitySettings Default();
+		static QualitySettings ModernHardware();
 	};
 
 	// TODO: Add names to these lights?

@@ -3,6 +3,20 @@
 This document records the current shadow quality knobs and the first migration
 targets for making them explicit.
 
+## Presets
+
+`LightMgr::QualitySettings` exposes named presets:
+
+- `Lightweight()` keeps directional shadows enabled at `1024 x 1024`, keeps
+  local shadow casting disabled by default, and uses the cheapest directional
+  filter radius.
+- `Default()` returns the legacy-equivalent settings: directional shadows at
+  `2048 x 2048`, local shadow maps allocated at `1024 x 1024` when local shadow
+  casting is enabled by the caller, and filter quality `1`.
+- `ModernHardware()` opts into directional shadows at `4096 x 4096`, enables
+  spot and point shadow casting, allocates new local shadow maps at
+  `2048 x 2048`, and uses filter quality `2`.
+
 ## Directional Shadows
 
 - Resolution is selected through `LightMgr::QualitySettings::uShadowQuality`.
