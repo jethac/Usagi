@@ -13,6 +13,7 @@
 #include "Engine/Physics/Signals/OnRaycastHit.h"
 #include "Engine/Core/stl/algorithm.h"
 #include "Engine/Framework/EventManager.h"
+#include "Engine/Framework/SystemScheduler.h"
 
 using namespace usg;
 
@@ -28,6 +29,7 @@ namespace usg
 	{
 		usg::vector<SystemHelper> systemHelpers;
 		usg::vector<SystemDependencyInfo> systemDependencies;
+		SystemScheduler scheduler;
 		usg::vector<ComponentHelper> componentHelpers;
 		usg::hash_map<uint32, uint32> componentHashLookUp; // component-hash => id mapping
 		usg::hash_map<uint32, usg::vector<SignalRunner>> signalRunners;
@@ -80,6 +82,13 @@ namespace usg
 		return uKeyCount;
 	}
 
+	SystemCoordinator::SystemSchedulerStats::SystemSchedulerStats()
+		: uLastSignalId(0)
+		, uLastSignalTaskCount(0)
+		, uTotalSignalTaskCount(0)
+	{
+	}
+
 	void SystemCoordinator::RegisterProtocolBufferTypeInt(const uint32 uTypeId, memsize uDataSize, void(*pPtrToReader)(ProtocolBufferFile& file, void* data))
 	{
 		auto& readerData = m_pInternalData->protocolBufferReaders[uTypeId];
@@ -128,6 +137,7 @@ namespace usg
 	{
 		auto& runners = m_pInternalData->signalRunners[sig.uId];
 		{
+			m_pInternalData->scheduler.BeginSignal(sig.uId);
 			for (auto& runner : runners)
 			{
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
@@ -138,7 +148,7 @@ namespace usg
 				helper.timer.Start();
 #endif
 
-				runner.Trigger(e, &sig, runner.systemID, targets, runner.userData);
+				m_pInternalData->scheduler.RunSignalTask(e, sig, runner, targets);
 
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
 				helper.timer.Stop();
@@ -151,6 +161,7 @@ namespace usg
 	{
 		auto& runners = m_pInternalData->signalRunners[sig.uId];
 		{
+			m_pInternalData->scheduler.BeginSignal(sig.uId);
 			for (auto& runner : runners)
 			{
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
@@ -161,7 +172,7 @@ namespace usg
 				helper.timer.Start();
 #endif
 
-				runner.TriggerFromRoot(e, &sig, runner.systemID, runner.userData);
+				m_pInternalData->scheduler.RunSignalTaskFromRoot(e, sig, runner);
 
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
 				helper.timer.Stop();
@@ -227,6 +238,21 @@ namespace usg
 		}
 
 		return false;
+	}
+
+	SystemCoordinator::SystemSchedulerStats SystemCoordinator::GetSystemSchedulerStats() const
+	{
+		SystemSchedulerStats result;
+		if (m_pInternalData == nullptr)
+		{
+			return result;
+		}
+
+		const SystemScheduler::Stats& stats = m_pInternalData->scheduler.GetStats();
+		result.uLastSignalId = stats.uLastSignalId;
+		result.uLastSignalTaskCount = stats.uLastSignalTaskCount;
+		result.uTotalSignalTaskCount = stats.uTotalSignalTaskCount;
+		return result;
 	}
 
 	SystemCoordinator::SystemCoordinator()

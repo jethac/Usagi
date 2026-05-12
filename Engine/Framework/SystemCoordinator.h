@@ -47,6 +47,15 @@ public:
 		uint32 uOnCollisionMask;
 	};
 
+	struct SystemSchedulerStats
+	{
+		SystemSchedulerStats();
+
+		uint32 uLastSignalId;
+		uint32 uLastSignalTaskCount;
+		uint32 uTotalSignalTaskCount;
+	};
+
 	SystemCoordinator();
 	~SystemCoordinator();
 
@@ -80,6 +89,7 @@ public:
 	const SystemDependencyInfo* GetSystemDependencyInfo(uint32 uSystemId) const;
 	bool SystemsHaveRequiredComponentOverlap(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
 	bool SystemsHaveComponentAccessConflict(uint32 uLhsSystemId, uint32 uRhsSystemId) const;
+	SystemSchedulerStats GetSystemSchedulerStats() const;
 
 #ifdef ENABLE_SYSTEM_PROFILE_TIMERS
 	void RegisterTimers();
