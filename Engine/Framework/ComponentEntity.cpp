@@ -66,6 +66,7 @@ void ComponentEntity::Reset()
 	g_hierarchy = nullptr;
 	s_pNewEntities.reset(nullptr);
 	s_stableEntityLookup.clear();
+	ResetSystemExecutionDepth();
 	g_uNumSystemTypes = 0;
 	s_uEntityNum = 1;
 }
@@ -86,6 +87,8 @@ ComponentEntity::~ComponentEntity()
 
 void ComponentEntity::SetComponent(uint32 uCompIndex, ComponentType *pComp)
 {
+	AssertStructureMutationAllowed();
+
 	uint32 uCompID = GetComponentIDFromIndex(uCompIndex);
 	uint32 bitfieldOffset = uCompIndex / BITFIELD_LENGTH;
 	uint32 bitfieldIndex = uCompIndex % BITFIELD_LENGTH;
@@ -111,6 +114,7 @@ void ComponentEntity::SetComponent(uint32 uCompIndex, ComponentType *pComp)
 
 void ComponentEntity::Activate()
 {
+	AssertStructureMutationAllowed();
 	ASSERT(!m_bActive);
     
 	m_pComponents.SetAllocator(g_pMemHeap);
@@ -149,6 +153,7 @@ uint32 ComponentEntity::NextSystemType()
 
 void ComponentEntity::SetParent(ComponentEntity* pParent)
 {
+	AssertStructureMutationAllowed();
 	DetachSelf();
 	AttachToNode(pParent);
 	SetChanged();
@@ -156,6 +161,7 @@ void ComponentEntity::SetParent(ComponentEntity* pParent)
 
 void ComponentEntity::SetSystem(uint32 uSysIndex, GenericInputOutputs *pSys)
 {
+	AssertStructureMutationAllowed();
 	uint32 uSysID = GetSystemIDFromIndex(uSysIndex);
 	if(pSys == nullptr)
 	{
@@ -179,12 +185,14 @@ GenericInputOutputs* ComponentEntity::GetSystem(uint32 uSysIndex) const
 
 void ComponentEntity::SetComponentPendingDelete()
 {
+	AssertStructureMutationAllowed();
 	m_bPendingDeletions = true;
 	SetChanged();
 }
 
 void ComponentEntity::SetChanged()
 {
+	AssertStructureMutationAllowed();
 	m_bChanged = true;
 	ComponentEntity* parent = GetParentEntity();
 	if(parent != nullptr)
@@ -194,6 +202,8 @@ void ComponentEntity::SetChanged()
 
 void ComponentEntity::HandlePendingDeletes(ComponentLoadHandles& handles)
 {
+	AssertStructureMutationAllowed();
+
 	if (!m_bPendingDeletions)
 		return;
 
@@ -214,6 +224,7 @@ void ComponentEntity::HandlePendingDeletes(ComponentLoadHandles& handles)
 
 void ComponentEntity::SetChildrenChanged()
 {
+	AssertStructureMutationAllowed();
 	m_bChildrenChanged = true;
 	ComponentEntity* parent = GetParentEntity();
 	if(parent != nullptr)
@@ -222,6 +233,7 @@ void ComponentEntity::SetChildrenChanged()
 
 void ComponentEntity::Deactivate()
 {
+	AssertStructureMutationAllowed();
 	ASSERT(m_bActive);
     
 	m_bActive = false;

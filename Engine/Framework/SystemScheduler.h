@@ -67,7 +67,7 @@ public:
 
 	void RunSignalTask(Entity e, Signal& sig, const SignalRunner& runner, uint32 uTargets)
 	{
-		SignalTaskData taskData = { e, &sig, &runner, uTargets };
+		SignalTaskData taskData = { e, &sig, &runner, uTargets, ShouldTrackSystemExecution() };
 		TaskRunner::Task task(RunSignalTaskInt, &taskData);
 		RecordSignalTask();
 		m_taskRunner.RunTasks(&task, 1);
@@ -88,7 +88,7 @@ public:
 		for (uint32 i = 0; i < uRunnerCount; ++i)
 		{
 			const SignalRunner& runner = pRunners[pRunnerIndices[i]];
-			SignalTaskData data = { e, &sig, &runner, uTargets };
+			SignalTaskData data = { e, &sig, &runner, uTargets, ShouldTrackSystemExecution() };
 			taskData.push_back(data);
 		}
 
@@ -109,7 +109,7 @@ public:
 			return;
 		}
 
-		SignalTaskData taskData = { e, &sig, &runner, 0 };
+		SignalTaskData taskData = { e, &sig, &runner, 0, ShouldTrackSystemExecution() };
 		TaskRunner::Task task(RunSignalTaskFromRootInt, &taskData);
 		RecordSignalTask();
 		m_taskRunner.RunTasks(&task, 1);
@@ -136,7 +136,7 @@ public:
 			}
 			else
 			{
-				SignalTaskData data = { e, &sig, &runner, 0 };
+				SignalTaskData data = { e, &sig, &runner, 0, ShouldTrackSystemExecution() };
 				signalTaskData.push_back(data);
 				SignalTaskRef taskRef = { false, (uint32)signalTaskData.size() - 1 };
 				taskRefs.push_back(taskRef);
@@ -172,6 +172,7 @@ private:
 		Signal* pSignal;
 		const SignalRunner* pRunner;
 		uint32 uTargets;
+		bool bTrackSystemExecution;
 	};
 
 	struct RootBranchTaskData
@@ -179,11 +180,13 @@ private:
 		GenericInputOutputs* pBranchRoot;
 		Signal* pSignal;
 		const SignalRunner* pRunner;
+		bool bTrackSystemExecution;
 	};
 
 	static void RunSignalTaskInt(void* pData)
 	{
 		SignalTaskData* pTask = (SignalTaskData*)pData;
+		ComponentEntity::SystemExecutionScope executionScope(pTask->bTrackSystemExecution);
 		const SignalRunner& runner = *pTask->pRunner;
 		runner.Trigger(pTask->e, pTask->pSignal, runner.systemID, pTask->uTargets, runner.userData);
 	}
@@ -191,6 +194,7 @@ private:
 	static void RunSignalTaskFromRootInt(void* pData)
 	{
 		SignalTaskData* pTask = (SignalTaskData*)pData;
+		ComponentEntity::SystemExecutionScope executionScope(pTask->bTrackSystemExecution);
 		const SignalRunner& runner = *pTask->pRunner;
 		runner.TriggerFromRoot(pTask->e, pTask->pSignal, runner.systemID, runner.userData);
 	}
@@ -241,7 +245,7 @@ private:
 		taskRefs.reserve(taskRefs.size() + uBranchCount);
 		for (GenericInputOutputs* pBranch = pRoot->GetChildEntity(); pBranch != nullptr; pBranch = pBranch->GetNextSibling())
 		{
-			RootBranchTaskData taskData = { pBranch, &sig, &runner };
+			RootBranchTaskData taskData = { pBranch, &sig, &runner, ShouldTrackSystemExecution() };
 			branchData.push_back(taskData);
 			SignalTaskRef taskRef = { true, (uint32)branchData.size() - 1 };
 			taskRefs.push_back(taskRef);
@@ -251,7 +255,13 @@ private:
 	static void RunRootBranchTaskInt(void* pData)
 	{
 		RootBranchTaskData* pTask = (RootBranchTaskData*)pData;
+		ComponentEntity::SystemExecutionScope executionScope(pTask->bTrackSystemExecution);
 		pTask->pRunner->TriggerRootBranch(pTask->pBranchRoot, pTask->pSignal, pTask->pRunner->userData);
+	}
+
+	bool ShouldTrackSystemExecution() const
+	{
+		return m_taskRunner.GetWorkerCount() > 0;
 	}
 
 	void RecordSignalTask()

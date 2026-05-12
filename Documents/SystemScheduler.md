@@ -1,10 +1,9 @@
 # System Scheduler
 
-`SystemScheduler` is the first scheduling seam for ECS signal dispatch.
+`SystemScheduler` is the scheduling layer for ECS signal dispatch.
 
-The current implementation is immediate and single-threaded. It records a small
-task count for trace/debug use, wraps work in `TaskRunner::Task`, then invokes
-the same `SignalRunner` callback on the same stack frame. This preserves:
+With the default zero-worker configuration, scheduler tasks drain inline and
+preserve:
 
 - priority-sorted runner order
 - stack-backed `Signal` and event payload lifetimes
@@ -21,10 +20,9 @@ order, so branch visibility is available without changing traversal behavior.
 Scheduler stats track both runner dispatch count and root-branch task count, so
 the branch fan-out can be inspected without changing execution policy.
 
-`TaskRunner` currently has zero configured workers, so tasks drain inline. Its
-worker path is still synchronous: when workers are enabled, the caller also helps
-execute tasks and does not return until all tasks finish. Future scheduler work
-can opt into workers without changing the payload lifetime contract.
+`TaskRunner` is synchronous even when workers are enabled: the caller also helps
+execute tasks and does not return until all tasks finish. Scheduler work can opt
+into workers without changing the payload lifetime contract.
 
 Use `SystemCoordinator::ConfigureSystemScheduler` to set the worker count and
 maximum task count. The default configuration remains zero workers.
@@ -43,6 +41,14 @@ membership mutation through `UpdateEntityIO` and `RemoveEntityIO`. Entity change
 should be applied in the existing pre-dispatch check phase or deferred until a
 later safe phase.
 
+When scheduler workers are configured, signal tasks also mark system execution
+active. Low-level component, entity hierarchy, system IO membership, dirty flag,
+pending-delete, activation, and deactivation mutation paths assert while that
+worker-backed execution is active. This keeps the threaded path from racing ECS
+structure changes before those operations have an explicit synchronization or
+deferred-queue design. Zero-worker dispatch does not enable this guard, so the
+existing serial behavior remains available by default.
+
 ## Coverage status
 
 Current verification includes build-level checks: regenerate boilerplate when
@@ -50,7 +56,8 @@ templates change, build the Framework target, then sweep dependent engine module
 targets.
 
 `Tools/Tests/SystemScheduler/Run.ps1` builds a standalone scheduler harness. It
-uses a synthetic system IO hierarchy to verify root-branch fan-out and scheduler
-stats without booting a full project. Full scheduler acceptance still needs an
-engine demo or frame-level harness that can compare single-worker and
+uses a synthetic system IO hierarchy to verify root-branch fan-out, targeted
+system batches, worker-backed batch overlap, execution guard visibility, and
+scheduler stats without booting a full project. Full scheduler acceptance still
+needs an engine demo or frame-level harness that can compare single-worker and
 multi-worker branch results.

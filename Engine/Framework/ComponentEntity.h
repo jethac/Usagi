@@ -11,6 +11,7 @@
 #include "Engine/Memory/FastPool.h"
 #include "HierarchyNode.h"
 #include "SystemKey.h"
+#include <atomic>
 
 namespace usg
 {
@@ -67,6 +68,35 @@ namespace usg
 		void SetParent(ComponentEntity* pParent);
 		void SetSystem(uint32 uSysIndex, GenericInputOutputs *pSys);
 		GenericInputOutputs* GetSystem(uint32 uSysIndex) const;
+
+		static void BeginSystemExecution();
+		static void EndSystemExecution();
+		static bool IsSystemExecutionActive();
+		static void AssertStructureMutationAllowed();
+
+		class SystemExecutionScope
+		{
+		public:
+			SystemExecutionScope(bool bActive = true)
+				: m_bActive(bActive)
+			{
+				if (m_bActive)
+				{
+					BeginSystemExecution();
+				}
+			}
+
+			~SystemExecutionScope()
+			{
+				if (m_bActive)
+				{
+					EndSystemExecution();
+				}
+			}
+
+		private:
+			bool m_bActive;
+		};
 
 		bool IsActive() const { return m_bActive; }
 
@@ -176,6 +206,8 @@ namespace usg
 
 		static void RegisterStableEntity(ComponentEntity* entity);
 		static void UnregisterStableEntity(ComponentEntity* entity);
+		static std::atomic<uint32>& SystemExecutionDepth();
+		static void ResetSystemExecutionDepth();
 		void SetComponentBit(uint32 uBitfieldOffset, uint32 uBitfieldIndex, bool bValue);
 
 		uint32 GetSystemIDFromIndex(uint32 uSysIndex) const { return uSysIndex + 1; }
@@ -184,6 +216,43 @@ namespace usg
 		void LinkComponent(ComponentType *pComp);
 		void UnlinkComponent(ComponentType *pComp);
 	};
+
+	inline std::atomic<uint32>& ComponentEntity::SystemExecutionDepth()
+	{
+		static std::atomic<uint32> s_uSystemExecutionDepth(0);
+		return s_uSystemExecutionDepth;
+	}
+
+	inline void ComponentEntity::BeginSystemExecution()
+	{
+		SystemExecutionDepth().fetch_add(1, std::memory_order_acq_rel);
+	}
+
+	inline void ComponentEntity::EndSystemExecution()
+	{
+		std::atomic<uint32>& depth = SystemExecutionDepth();
+		const uint32 uPreviousDepth = depth.fetch_sub(1, std::memory_order_acq_rel);
+		ASSERT(uPreviousDepth > 0);
+		if (uPreviousDepth == 0)
+		{
+			depth.fetch_add(1, std::memory_order_acq_rel);
+		}
+	}
+
+	inline bool ComponentEntity::IsSystemExecutionActive()
+	{
+		return SystemExecutionDepth().load(std::memory_order_acquire) > 0;
+	}
+
+	inline void ComponentEntity::AssertStructureMutationAllowed()
+	{
+		ASSERT(!IsSystemExecutionActive());
+	}
+
+	inline void ComponentEntity::ResetSystemExecutionDepth()
+	{
+		SystemExecutionDepth().store(0, std::memory_order_release);
+	}
 
 	inline Entity CreateEntity(Entity parent)
 	{
