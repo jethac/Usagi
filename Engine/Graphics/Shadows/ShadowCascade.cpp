@@ -17,11 +17,30 @@
 //#define CLAMP_TO_TEXEL
 
 
-#define PCF_BLUR_SIZE 4 // Should get by default with linear sampling
-
 const float FADE_BUFFER = 0.96f;
 
 namespace usg {
+
+static const float g_shadowSampleRanges[][ShadowCascade::MAX_CASCADES] =
+{
+	{ 1.0f, 0.75f, 0.5f, 0.25f },
+	{ 3.0f, 2.5f, 2.0f, 0.5f },
+	{ 4.0f, 3.25f, 2.5f, 0.75f },
+	{ 5.0f, 4.0f, 3.0f, 1.0f }
+};
+
+static const uint32 g_shadowFilterBlurSize[] =
+{
+	1,
+	4,
+	5,
+	6
+};
+
+static uint32 GetFilterQualityIndex(uint32 uFilterQuality)
+{
+	return Math::Min(uFilterQuality, (uint32)ARRAY_SIZE(g_shadowFilterBlurSize) - 1);
+}
 
 
 
@@ -50,6 +69,7 @@ ShadowCascade::ShadowCascade()
 	m_uGroupWidth = 0;
 	m_uGroupHeight = 0;
 	m_uCascadeStartIndex = 0;
+	m_uFilterQuality = 1;
 	m_pRenderTarget = nullptr;
 
 	for (int i = 0; i < MAX_CASCADES; i++)
@@ -143,7 +163,8 @@ void ShadowCascade::Update(const Camera& sceneCam)
 	float fBiasMul = 10.125f;
 
     readData->vBias.Assign(-0.000008f*fBiasMul, -0.000004f*fBiasMul, -0.000007f*fBiasMul, -0.000009f*fBiasMul);
-	readData->vSampleRange.Assign(3.0f, 2.5f, 2.0f, 0.5f);
+	const float* pSampleRange = g_shadowSampleRanges[m_uFilterQuality];
+	readData->vSampleRange.Assign(pSampleRange[0], pSampleRange[1], pSampleRange[2], pSampleRange[3]);
 
 	float fadeDistances[MAX_CASCADES];
 	float invFadeRange[MAX_CASCADES];
@@ -171,6 +192,11 @@ void ShadowCascade::SetNonShadowFlags(uint32 uFlags)
             m_pSceneContext[i]->SetNonShadowFlags(uFlags);
         }
     }
+}
+
+void ShadowCascade::SetFilterQuality(uint32 uFilterQuality)
+{
+	m_uFilterQuality = GetFilterQualityIndex(uFilterQuality);
 }
 
 void ShadowCascade::GPUUpdate(GFXDevice* pDevice)
@@ -336,7 +362,8 @@ void ShadowCascade::InitFrame(const Camera& sceneCam)
 
         
         // Adjust to the blur size
-        float fScaleDuetoBlureAMT = ( (float)( PCF_BLUR_SIZE * 2 + 1 ) 
+		const uint32 uBlurSize = g_shadowFilterBlurSize[m_uFilterQuality];
+        float fScaleDuetoBlureAMT = ( (float)( uBlurSize * 2 + 1 )
             /(float)m_uGroupWidth );
         Vector4f vScaleDuetoBlureAMT(fScaleDuetoBlureAMT, fScaleDuetoBlureAMT, 0.0f, 0.0f);
 

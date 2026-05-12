@@ -89,6 +89,14 @@ void DirLight::SetNonShadowFlags(uint32 uFlags)
 	}
 }
 
+void DirLight::SetShadowFilterQuality(uint32 uFilterQuality)
+{
+	if (m_pShadowCascade)
+	{
+		m_pShadowCascade->SetFilterQuality(uFilterQuality);
+	}
+}
+
 bool DirLight::operator < (const DirLight& rhs) const
 {
 	// Put the non shadowed lights first

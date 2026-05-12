@@ -16,8 +16,13 @@ targets for making them explicit.
 - Cascade split distances are currently hard-coded in
   `Engine/Graphics/Shadows/ShadowCascade.cpp` as `30, 160, 400, 1000`, then
   scaled by resolution.
-- Directional PCF kernel size is hard-coded as `PCF_BLUR_SIZE = 4`.
-- Bias/sample-range values are also hard-coded in `ShadowCascade.cpp`.
+- Directional filter radius is selected through
+  `LightMgr::QualitySettings::uShadowFilterQuality`.
+  - `0`: low filter radius for cheaper, sharper cascades
+  - `1`: legacy-equivalent filter radius and default
+  - `2`: wider filter radius
+  - `3`: widest filter radius
+- Bias values remain hard-coded in `ShadowCascade.cpp`.
 
 ## Local Shadows
 
@@ -60,8 +65,8 @@ targets for making them explicit.
 
 ## Next Implementation Targets
 
-1. Move directional split distances, bias, and PCF size into a small quality
-   settings structure.
+1. Move directional split distances and bias into a small quality settings
+   structure.
 2. Add resize support for existing pooled local lights when quality changes;
    newly allocated local lights already use the selected local shadow quality.
 3. Keep a low-cost profile for lightweight targets and add an explicit high

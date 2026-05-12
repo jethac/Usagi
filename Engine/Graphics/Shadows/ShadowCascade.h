@@ -34,6 +34,7 @@ public:
 	virtual void Finished(GFXContext* pContext);
 
 	void SetNonShadowFlags(uint32 uFlags);
+	void SetFilterQuality(uint32 uFilterQuality);
 
 	const ConstantSet* GetShadowReadConstants() const { return &m_readConstants; }
 	ShadowContext* GetContext(uint32 uContext) { return m_pSceneContext[uContext]; }
@@ -80,6 +81,7 @@ private:
 
 	uint32					m_uGroupWidth;
 	uint32					m_uGroupHeight;
+	uint32					m_uFilterQuality;
 
 	Matrix4x4				m_lightView;
 	Matrix4x4				m_lightProj;

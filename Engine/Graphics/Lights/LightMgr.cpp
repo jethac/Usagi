@@ -31,6 +31,11 @@ static uint32 GetShadowQualityIndex(uint32 uShadowQuality)
 	return Math::Min(uShadowQuality, (uint32)ARRAY_SIZE(g_uShadowResMap) - 1);
 }
 
+static uint32 GetShadowFilterQualityIndex(uint32 uShadowFilterQuality)
+{
+	return Math::Min(uShadowFilterQuality, 3u);
+}
+
 LightMgr::LightMgr(void):
 m_pParent(nullptr)
 {
@@ -45,6 +50,7 @@ m_pParent(nullptr)
 	m_uShadowCastingFlags = RENDER_MASK_ALL;
 	m_uShadowMapRes = g_uShadowResMap[m_qualitySettings.uShadowQuality];
 	m_uLocalShadowMapRes = g_uShadowResMap[m_qualitySettings.uLocalShadowQuality];
+	m_uShadowFilterQuality = m_qualitySettings.uShadowFilterQuality;
 }
 
 LightMgr::~LightMgr(void)
@@ -82,8 +88,15 @@ void LightMgr::SetQualitySettings(GFXDevice* pDevice, const QualitySettings& set
 	m_qualitySettings = settings;
 	m_qualitySettings.uShadowQuality = GetShadowQualityIndex(settings.uShadowQuality);
 	m_qualitySettings.uLocalShadowQuality = GetShadowQualityIndex(settings.uLocalShadowQuality);
+	m_qualitySettings.uShadowFilterQuality = GetShadowFilterQualityIndex(settings.uShadowFilterQuality);
 	m_uShadowMapRes = g_uShadowResMap[m_qualitySettings.uShadowQuality];
 	m_uLocalShadowMapRes = g_uShadowResMap[m_qualitySettings.uLocalShadowQuality];
+	m_uShadowFilterQuality = m_qualitySettings.uShadowFilterQuality;
+
+	for (auto itr : m_dirLights.GetActiveLights())
+	{
+		itr->SetShadowFilterQuality(m_uShadowFilterQuality);
+	}
 
 	if (m_cascadeBuffer.GetSlices() > 1)
 	{
@@ -258,6 +271,7 @@ DirLight* LightMgr::AddDirectionalLight(GFXDevice* pDevice, bool bSupportsShadow
 		pLight->SetName(szName);
 
 	pLight->SetNonShadowFlags(m_uShadowCastingFlags);
+	pLight->SetShadowFilterQuality(m_uShadowFilterQuality);
 
 	if (bSupportsShadow)
 		m_uShadowedDirLights++;

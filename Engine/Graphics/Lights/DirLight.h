@@ -34,6 +34,7 @@ public:
 	ShadowCascade* GetCascade() { return m_pShadowCascade; }
 
 	void SetNonShadowFlags(uint32 uFlags);
+	void SetShadowFilterQuality(uint32 uFilterQuality);
 
 	bool operator < (const DirLight& rhs) const;
 protected:

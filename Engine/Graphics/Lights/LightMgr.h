@@ -41,6 +41,7 @@ public:
 		bool	bPointShadows = false;
 		uint32	uShadowQuality = 2;	// 0-3
 		uint32	uLocalShadowQuality = 0;	// 0-3
+		uint32	uShadowFilterQuality = 1;	// 0-3
 	};
 
 	// TODO: Add names to these lights?
@@ -183,6 +184,7 @@ private:
 	uint32					m_uActiveFrame;
 	uint32					m_uShadowMapRes;
 	uint32					m_uLocalShadowMapRes;
+	uint32					m_uShadowFilterQuality;
 	uint32					m_uShadowCastingFlags;
 	float					m_hemipshereLerp;
 	QualitySettings			m_qualitySettings;
