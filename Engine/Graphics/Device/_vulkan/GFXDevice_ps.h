@@ -5,6 +5,7 @@
 #define _USG_GRAPHICS_PC_GFXDEVICE_
 
 #include "Engine/Graphics/Device/Display.h"
+#include "Engine/Core/Timer/ProfilingTimer.h"
 #include "Engine/Scene/RenderNode.h"
 #include "Engine/Core/stl/list.h"
 #include "Engine/Core/stl/queue.h"
@@ -46,6 +47,9 @@ public:
 	void End();
 	void QueueFrameCommandBuffer(VkCommandBuffer commandBuffer);
 	float GetGPUTime() const { return m_fGPUTime; }
+	uint32 GetLastSubmittedCommandBufferCount() const { return m_uLastSubmittedCommandBuffers; }
+	float GetLastCommandRecordTimeMS() const { return m_fLastCommandRecordTimeMS; }
+	float GetLastQueueSubmitTimeMS() const { return m_queueSubmitTimer.GetTotalMilliSeconds(); }
 	
 	GFXContext* CreateDeferredContext(uint32 uSizeMul);
 
@@ -184,6 +188,7 @@ private:
 
 	VkPipelineCache						m_pipelineCache;
 	VkAllocationCallbacks				m_allocCallbacks;
+	ProfilingTimer						m_queueSubmitTimer;
 	usg::vector<VkCommandBuffer>		m_frameCommandBuffers;
 	usg::vector<GFXContext*>			m_deferredContexts;
 
@@ -193,6 +198,8 @@ private:
 	MemoryPool							m_memoryPools[VK_MAX_MEMORY_TYPES];
 
 	float		m_fGPUTime;
+	float		m_fLastCommandRecordTimeMS;
+	uint32		m_uLastSubmittedCommandBuffers;
 };
 
 }

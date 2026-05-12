@@ -66,6 +66,7 @@ namespace usg {
 	void GFXContext_ps::Begin(bool bApplyDefaults)
 	{
 		VkResult err;
+		m_recordTimer.ClearAndStart();
 
 		VkCommandBufferInheritanceInfo cmd_buf_hinfo = {};
 		cmd_buf_hinfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -95,6 +96,7 @@ namespace usg {
 	{
 		VkResult res = vkEndCommandBuffer(m_cmdBuff);
 		ASSERT(res == VK_SUCCESS);
+		m_recordTimer.Stop();
 	}
 
 	void GFXContext_ps::Transfer(RenderTarget* pTarget, Display* pDisplay)

@@ -203,6 +203,8 @@ GFXDevice_ps::GFXDevice_ps()
 	m_pQueueProps = NULL;
 	m_uDisplayCount = 0;
 	m_fGPUTime = 0.0f;
+	m_fLastCommandRecordTimeMS = 0.0f;
+	m_uLastSubmittedCommandBuffers = 0;
 }
 
 void GFXDevice_ps::Cleanup(GFXDevice* pParent)
@@ -747,6 +749,9 @@ const DisplaySettings* GFXDevice_ps::GetDisplayInfo(uint32 uIndex)
 void GFXDevice_ps::Begin()
 {
 	m_frameCommandBuffers.clear();
+	m_queueSubmitTimer.Clear();
+	m_fLastCommandRecordTimeMS = 0.0f;
+	m_uLastSubmittedCommandBuffers = 0;
 
 	static bool bFirst = true;
 	if (!bFirst)
@@ -791,6 +796,8 @@ void GFXDevice_ps::End()
 	// For now the collector only contains the immediate context. Deferred
 	// contexts can append here once command generation is split.
 	QueueFrameCommandBuffer(m_pParent->GetImmediateCtxt()->GetPlatform().GetVkCmdBuffer());
+	m_fLastCommandRecordTimeMS = m_pParent->GetImmediateCtxt()->GetPlatform().GetRecordTimeMS();
+	m_uLastSubmittedCommandBuffers = (uint32)m_frameCommandBuffers.size();
 
 	VkSubmitInfo submitInfo = {};
 	VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -803,7 +810,9 @@ void GFXDevice_ps::End()
 	submitInfo.pWaitSemaphores = &m_pParent->GetDisplay(0)->GetPlatform().GetImageAcquired();
 	submitInfo.pWaitDstStageMask = &pipe_stage_flags;
 
+	m_queueSubmitTimer.ClearAndStart();
 	VkResult res = vkQueueSubmit(m_queue[QUEUE_TYPE_GRAPHICS], 1, &submitInfo, m_drawFence);
+	m_queueSubmitTimer.Stop();
 	ASSERT(res == VK_SUCCESS);
 }
 

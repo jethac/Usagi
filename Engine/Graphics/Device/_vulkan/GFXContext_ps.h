@@ -5,6 +5,7 @@
 #define _USG_GRAPHICS_PC_GFXCONTEXT_
 
 #include "Engine/Graphics/Device/Display.h"
+#include "Engine/Core/Timer/ProfilingTimer.h"
 #include "Engine/Graphics/Primitives/VertexBuffer.h"
 #include OS_HEADER(Engine/Graphics/Device, VulkanIncludes.h)
 
@@ -68,12 +69,14 @@ public:
 
 	// PS Specific functions
 	VkCommandBuffer GetVkCmdBuffer() { return m_cmdBuff; }
+	float GetRecordTimeMS() const { return m_recordTimer.GetTotalMilliSeconds(); }
 	void ImageBarrier(VkImage image, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void SetImageLayout(VkImage image, VkImageLayout oldImageLayout, VkImageLayout newImageLayout, VkImageSubresourceRange subresourceRange, VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
 private:
 
 	GFXContext*			m_pParent;
+	ProfilingTimer		m_recordTimer;
 	VkCommandBuffer		m_cmdBuff;
 	VkCommandPool		m_cmdPool;
 	VkPipelineLayout	m_pipelineLayout;
