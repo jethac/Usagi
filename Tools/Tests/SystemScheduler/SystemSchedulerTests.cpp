@@ -46,6 +46,8 @@ namespace
 
 	usg::GenericInputOutputs* g_pRoot = nullptr;
 	std::vector<usg::GenericInputOutputs*> g_triggeredBranches;
+	std::vector<uint32> g_triggeredSystems;
+	std::vector<uint32> g_triggeredTargets;
 
 	struct TestSignal : public usg::Signal
 	{
@@ -70,11 +72,25 @@ namespace
 		g_triggeredBranches.push_back(pBranchRoot);
 	}
 
+	void TriggerTarget(usg::Entity, void*, const uint32 uSystemId, uint32 targets, void*)
+	{
+		g_triggeredSystems.push_back(uSystemId);
+		g_triggeredTargets.push_back(targets);
+	}
+
 	usg::SignalRunner MakeRootBranchRunner()
 	{
 		usg::SignalRunner runner;
 		runner.systemID = TEST_SYSTEM_ID;
 		runner.TriggerRootBranch = TriggerRootBranch;
+		return runner;
+	}
+
+	usg::SignalRunner MakeTargetRunner(uint32 uSystemId)
+	{
+		usg::SignalRunner runner;
+		runner.systemID = uSystemId;
+		runner.Trigger = TriggerTarget;
 		return runner;
 	}
 }
@@ -196,6 +212,36 @@ namespace
 		ok &= Expect(stats.uTotalRootBranchTaskCount == 6, "batched root runners total branch tasks");
 		return ok;
 	}
+
+	bool TestTargetedBatchStats()
+	{
+		TestSignal signal;
+		usg::SignalRunner runners[] =
+		{
+			MakeTargetRunner(TEST_SYSTEM_ID),
+			MakeTargetRunner(TEST_SYSTEM_ID + 1)
+		};
+		uint32 runnerIndices[] = { 0, 1 };
+		usg::SystemScheduler scheduler;
+
+		g_triggeredSystems.clear();
+		g_triggeredTargets.clear();
+
+		scheduler.BeginSignal(signal.uId);
+		scheduler.RunSignalTasks(nullptr, signal, runners, runnerIndices, ARRAY_SIZE(runnerIndices), usg::ON_ENTITY);
+
+		const usg::SystemScheduler::Stats& stats = scheduler.GetStats();
+		bool ok = true;
+		ok &= Expect(g_triggeredSystems.size() == 2, "targeted batch triggers each runner");
+		ok &= Expect(g_triggeredSystems[0] == TEST_SYSTEM_ID, "targeted batch preserves first runner order");
+		ok &= Expect(g_triggeredSystems[1] == TEST_SYSTEM_ID + 1, "targeted batch preserves second runner order");
+		ok &= Expect(g_triggeredTargets[0] == usg::ON_ENTITY && g_triggeredTargets[1] == usg::ON_ENTITY, "targeted batch forwards target mask");
+		ok &= Expect(stats.uLastSignalTaskCount == 2, "targeted batch counts one signal task per runner");
+		ok &= Expect(stats.uTotalSignalTaskCount == 2, "targeted batch total signal tasks");
+		ok &= Expect(stats.uLastRootBranchRunnerCount == 0, "targeted batch does not count branch runners");
+		ok &= Expect(stats.uLastRootBranchTaskCount == 0, "targeted batch does not count branch tasks");
+		return ok;
+	}
 }
 
 int main()
@@ -204,6 +250,7 @@ int main()
 	ok &= TestRootBranchFanOutStats();
 	ok &= TestEmptyRootBranchStats();
 	ok &= TestRootBranchBatchFanOutStats();
+	ok &= TestTargetedBatchStats();
 
 	if (ok)
 	{
