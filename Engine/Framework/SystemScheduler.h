@@ -5,6 +5,7 @@
 #define _SYSTEM_SCHEDULER_H
 
 #include "Engine/Core/Thread/TaskRunner.h"
+#include "Engine/Core/stl/vector.h"
 #include "Engine/Framework/ComponentSystemInputOutputs.h"
 #include "Engine/Framework/Signal.h"
 
@@ -112,14 +113,34 @@ private:
 			return;
 		}
 
-		GenericInputOutputs* pBranch = pRoot->GetChildEntity();
-		while (pBranch != nullptr)
+		uint32 uBranchCount = 0;
+		for (GenericInputOutputs* pBranch = pRoot->GetChildEntity(); pBranch != nullptr; pBranch = pBranch->GetNextSibling())
+		{
+			uBranchCount++;
+		}
+
+		if (uBranchCount == 0)
+		{
+			return;
+		}
+
+		usg::vector<RootBranchTaskData> branchData;
+		usg::vector<TaskRunner::Task> tasks;
+		branchData.reserve(uBranchCount);
+		tasks.reserve(uBranchCount);
+
+		for (GenericInputOutputs* pBranch = pRoot->GetChildEntity(); pBranch != nullptr; pBranch = pBranch->GetNextSibling())
 		{
 			RootBranchTaskData taskData = { pBranch, &sig, &runner };
-			TaskRunner::Task task(RunRootBranchTaskInt, &taskData);
-			m_taskRunner.RunTasks(&task, 1);
-			pBranch = pBranch->GetNextSibling();
+			branchData.push_back(taskData);
 		}
+
+		for (uint32 i = 0; i < (uint32)branchData.size(); ++i)
+		{
+			tasks.push_back(TaskRunner::Task(RunRootBranchTaskInt, &branchData[i]));
+		}
+
+		m_taskRunner.RunTasks(&tasks[0], (uint32)tasks.size());
 	}
 
 	static void RunRootBranchTaskInt(void* pData)
