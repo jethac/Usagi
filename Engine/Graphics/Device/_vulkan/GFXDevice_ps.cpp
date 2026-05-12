@@ -1043,12 +1043,26 @@ void GFXDevice_ps::FlushCommandBuffer(VkCommandBuffer commandBuffer, bool free)
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
 
-	res = vkQueueSubmit(m_queue[QUEUE_TYPE_TRANSFER], 1, &submitInfo, VK_NULL_HANDLE);
+	VkFenceCreateInfo fenceInfo = {};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.pNext = NULL;
+	fenceInfo.flags = 0;
+
+	VkFence uploadFence;
+	res = vkCreateFence(m_vkDevice, &fenceInfo, NULL, &uploadFence);
 	ASSERT(res == VK_SUCCESS);
 
-	// TODO: Remove these waits
-	res = vkQueueWaitIdle(m_queue[QUEUE_TYPE_TRANSFER]);
+	res = vkQueueSubmit(m_queue[QUEUE_TYPE_TRANSFER], 1, &submitInfo, uploadFence);
 	ASSERT(res == VK_SUCCESS);
+	if (res == VK_SUCCESS)
+	{
+		do {
+			res = vkWaitForFences(m_vkDevice, 1, &uploadFence, VK_TRUE, 100000);
+		} while (res == VK_TIMEOUT);
+		ASSERT(res == VK_SUCCESS);
+	}
+
+	vkDestroyFence(m_vkDevice, uploadFence, NULL);
 
 	if (free)
 	{
