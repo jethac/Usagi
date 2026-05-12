@@ -71,6 +71,7 @@ namespace usg{
 	public:
 		ResourceCpuLoadWorker()
 			: m_bStarted(false)
+			, m_bAcceptingRequests(false)
 		{
 		}
 
@@ -83,6 +84,7 @@ namespace usg{
 		{
 			m_requestQueue.Init(uQueueSize);
 			m_completedQueue.Init(uQueueSize);
+			m_bAcceptingRequests = true;
 			StartThread();
 			m_bStarted = true;
 		}
@@ -91,6 +93,9 @@ namespace usg{
 		{
 			if (m_bStarted)
 			{
+				m_bAcceptingRequests = false;
+				DiscardPendingJobs();
+				DiscardCompletedResults();
 				EndThread();
 				JoinThread();
 				DiscardCompletedResults();
@@ -100,9 +105,16 @@ namespace usg{
 
 		bool Queue(const ResourceCpuLoadJob& job)
 		{
+			if (!m_bAcceptingRequests)
+			{
+				return false;
+			}
+
 			ResourceCpuLoadJob queuedJob = job;
 			return m_requestQueue.TryEnqueue(queuedJob);
 		}
+
+		bool IsAcceptingRequests() const { return m_bAcceptingRequests; }
 
 		bool TryGetCompleted(ResourceCpuLoadResult& result)
 		{
@@ -141,7 +153,21 @@ namespace usg{
 					break;
 				}
 
-				m_completedQueue.Enqueue(result);
+				if (!m_bAcceptingRequests || !m_completedQueue.TryEnqueue(result))
+				{
+					if (result.pResource != nullptr)
+					{
+						vdelete result.pResource;
+					}
+				}
+			}
+		}
+
+		void DiscardPendingJobs()
+		{
+			ResourceCpuLoadJob job;
+			while (m_requestQueue.TryDequeue(job))
+			{
 			}
 		}
 
@@ -160,6 +186,7 @@ namespace usg{
 		MessageQueue<ResourceCpuLoadJob>		m_requestQueue;
 		MessageQueue<ResourceCpuLoadResult>	m_completedQueue;
 		bool								m_bStarted;
+		volatile bool						m_bAcceptingRequests;
 	};
 
 
@@ -173,6 +200,7 @@ namespace usg{
 		~PIMPL()
 		{
 			cpuLoadWorker.Stop();
+			resources.ClearRequests();
 		}
 
 		ResourceData					resources;
@@ -593,6 +621,12 @@ bool ResourceMgr::RequestSkeletalAnimation(const char* szFileName, uint32 uPrior
 	if (request.eState == ResourceState::CPU_LOADING || request.eState == ResourceState::READY)
 	{
 		return true;
+	}
+
+	if (!m_pImpl->cpuLoadWorker.IsAcceptingRequests())
+	{
+		m_pImpl->resources.SetRequestState(request, ResourceState::CANCELLED);
+		return false;
 	}
 
 	if (File::FileStatus(path.c_str()) != FILE_STATUS_VALID)
