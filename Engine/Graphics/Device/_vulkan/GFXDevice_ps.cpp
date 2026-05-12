@@ -801,14 +801,27 @@ void GFXDevice_ps::End()
 
 	VkSubmitInfo submitInfo = {};
 	VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	usg::vector<VkSemaphore> waitSemaphores;
+	usg::vector<VkPipelineStageFlags> waitStageMasks;
+	const uint32 uDisplayCount = m_pParent->GetValidDisplayCount();
+	waitSemaphores.reserve(uDisplayCount);
+	waitStageMasks.reserve(uDisplayCount);
+	for (uint32 i = 0; i < uDisplayCount; ++i)
+	{
+		Display* pDisplay = m_pParent->GetDisplay(i);
+		if (pDisplay)
+		{
+			waitSemaphores.push_back(pDisplay->GetPlatform().GetImageAcquired());
+			waitStageMasks.push_back(pipe_stage_flags);
+		}
+	}
 
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = (uint32)m_frameCommandBuffers.size();
 	submitInfo.pCommandBuffers = &m_frameCommandBuffers[0];
-	// FIXME: Semaphores for all displays
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = &m_pParent->GetDisplay(0)->GetPlatform().GetImageAcquired();
-	submitInfo.pWaitDstStageMask = &pipe_stage_flags;
+	submitInfo.waitSemaphoreCount = (uint32)waitSemaphores.size();
+	submitInfo.pWaitSemaphores = waitSemaphores.empty() ? nullptr : &waitSemaphores[0];
+	submitInfo.pWaitDstStageMask = waitStageMasks.empty() ? nullptr : &waitStageMasks[0];
 
 	m_queueSubmitTimer.ClearAndStart();
 	VkResult res = vkQueueSubmit(m_queue[QUEUE_TYPE_GRAPHICS], 1, &submitInfo, m_drawFence);
