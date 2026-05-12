@@ -37,6 +37,7 @@ namespace usg {
 Display_ps::Display_ps()
 {
 	m_swapChain = VK_NULL_HANDLE;
+	m_imageAcquired = VK_NULL_HANDLE;
 	m_uActiveImage = 0;
 	m_uSwapChainImageCount = 0;
 	m_bWindowResized = false;
@@ -88,6 +89,12 @@ void Display_ps::Cleanup(usg::GFXDevice* pDevice)
 	{
 		vkDestroySurfaceKHR(pDevice->GetPlatform().GetVKInstance(), m_surface, nullptr);
 		m_surface = VK_NULL_HANDLE;
+	}
+
+	if (m_imageAcquired != VK_NULL_HANDLE)
+	{
+		vkDestroySemaphore(pDevice->GetPlatform().GetVKDevice(), m_imageAcquired, nullptr);
+		m_imageAcquired = VK_NULL_HANDLE;
 	}
 }
 
@@ -665,4 +672,3 @@ void Display_ps::Minimized(usg::GFXDevice* pDevice)
 }
 
 }
-
