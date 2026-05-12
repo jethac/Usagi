@@ -382,7 +382,7 @@ void LightMgr::GetProjectionLightsInView(const Camera* pCamera, list<ProjectionL
 		if( (*it)->IsActive() )
 		{
 			(*it)->SetVisibleFrame(m_uActiveFrame);
-			if( (*it)->GetFrustum().ArePointsInFrustum( (*it)->GetCorners(), 8 ) )
+			if( pCamera->GetFrustum().ArePointsInFrustum( (*it)->GetCorners(), 8 ) )
 			{
 				lightsOut.push_back(*it);
 			}
