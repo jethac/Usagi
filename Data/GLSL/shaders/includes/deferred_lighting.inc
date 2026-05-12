@@ -33,14 +33,14 @@ void main(void)
 	vec4 vDiffuse = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
 
-	int count = iCascadeLightStart;
+	int count = iCascadeLightStart < 0 ? iDirLightCount : iCascadeLightStart;
 
 	for(int i=0; i<count; i++)
 	{
-		CalculateDirectionalLighting(0, vNormal, vFSVector, fSpecPow, vDiffuse, vSpecular);
+		CalculateDirectionalLighting(i, vNormal, vFSVector, fSpecPow, vDiffuse, vSpecular);
 	}
 
-	if(iCascadeLightStart < iDirLightCount)
+	if(iCascadeLightStart >= 0 && iCascadeLightStart < iDirLightCount)
 	{
 		// Apply the first shadowed light
 		CalculateDirectionalLighting(iCascadeLightStart, vNormal, vFSVector, fSpecPow, vDiffuse, vSpecular);	
@@ -61,4 +61,3 @@ void main(void)
 }
 
 #endif
-
