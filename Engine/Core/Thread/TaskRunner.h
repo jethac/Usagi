@@ -91,8 +91,15 @@ public:
 
 	void RunTasks(const Task* pTasks, uint32 uTaskCount)
 	{
+		ASSERT(pTasks != nullptr || uTaskCount == 0);
+		ASSERT(m_uMaxTasks == 0 || uTaskCount <= m_uMaxTasks);
 		m_uLastTaskCount = uTaskCount;
 		m_uTotalTaskCount += uTaskCount;
+
+		if (uTaskCount == 0)
+		{
+			return;
+		}
 
 		if (m_uWorkerCount > 0 && uTaskCount > 1)
 		{
@@ -144,6 +151,8 @@ private:
 	{
 		{
 			CriticalSection::ScopedLock lock(m_criticalSection);
+			ASSERT(m_pPendingTasks == nullptr);
+			ASSERT(m_uRemainingTasks == 0);
 			m_pPendingTasks = pTasks;
 			m_uPendingTaskCount = uTaskCount;
 			m_uNextTask = 0;

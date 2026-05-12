@@ -28,3 +28,6 @@ can opt into workers without changing the payload lifetime contract.
 
 Use `SystemCoordinator::ConfigureSystemScheduler` to set the worker count and
 maximum task count. The default configuration remains zero workers.
+`TaskRunner` treats a maximum task count of zero as unlimited; nonzero limits
+are asserted at dispatch time. Worker-backed dispatch also asserts that only one
+batch is active at a time.
