@@ -26,6 +26,11 @@ static const uint32 g_uShadowResMap[] =
 	4096
 };
 
+static uint32 GetShadowQualityIndex(uint32 uShadowQuality)
+{
+	return Math::Min(uShadowQuality, (uint32)ARRAY_SIZE(g_uShadowResMap) - 1);
+}
+
 LightMgr::LightMgr(void):
 m_pParent(nullptr)
 {
@@ -74,6 +79,7 @@ void LightMgr::SetQualitySettings(GFXDevice* pDevice, const QualitySettings& set
 {
 	// TODO: Handle resizing after layers have been created (could be a useful performance optimization)
 	m_qualitySettings = settings;
+	m_qualitySettings.uShadowQuality = GetShadowQualityIndex(settings.uShadowQuality);
 	m_uShadowMapRes = g_uShadowResMap[m_qualitySettings.uShadowQuality];
 
 	if (m_cascadeBuffer.GetSlices() > 1)

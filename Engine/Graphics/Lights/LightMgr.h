@@ -39,7 +39,7 @@ public:
 		bool	bDirectionalShadows = true;
 		bool	bSpotShadows = false;
 		bool	bPointShadows = false;
-		uint32	uShadowQuality = 2;	// 1-4
+		uint32	uShadowQuality = 2;	// 0-3
 	};
 
 	// TODO: Add names to these lights?
