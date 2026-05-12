@@ -61,6 +61,18 @@ namespace
 		uint32 uContribution;
 	};
 
+	struct RootBranchStressData
+	{
+		usg::GenericInputOutputs** ppBranches;
+		std::atomic<uint32>* pCounts;
+		std::atomic<uint32>* pSum;
+		uint32 uBranchCount;
+		uint32 uWaitForOverlap;
+		std::atomic<uint32> uStarted;
+		std::atomic<uint32> uActive;
+		std::atomic<uint32> uMaxActive;
+	};
+
 	struct TestSignal : public usg::Signal
 	{
 		TestSignal()
@@ -119,11 +131,48 @@ namespace
 		pData->pSum->fetch_add(pData->uContribution + uSystemId + targets, std::memory_order_acq_rel);
 	}
 
+	void TriggerRootBranchStress(usg::GenericInputOutputs* pBranchRoot, void*, void* pUserData)
+	{
+		RootBranchStressData* pData = (RootBranchStressData*)pUserData;
+		for (uint32 i = 0; i < pData->uBranchCount; ++i)
+		{
+			if (pData->ppBranches[i] == pBranchRoot)
+			{
+				pData->pCounts[i].fetch_add(1, std::memory_order_acq_rel);
+				pData->pSum->fetch_add(i + 1, std::memory_order_acq_rel);
+				break;
+			}
+		}
+
+		const uint32 active = pData->uActive.fetch_add(1, std::memory_order_acq_rel) + 1;
+		uint32 maxActive = pData->uMaxActive.load(std::memory_order_acquire);
+		while (active > maxActive && !pData->uMaxActive.compare_exchange_weak(maxActive, active, std::memory_order_acq_rel))
+		{
+		}
+
+		pData->uStarted.fetch_add(1, std::memory_order_acq_rel);
+		while (pData->uWaitForOverlap > 0 && pData->uStarted.load(std::memory_order_acquire) < pData->uWaitForOverlap)
+		{
+			usg::Thread::Sleep(0);
+		}
+
+		pData->uActive.fetch_sub(1, std::memory_order_acq_rel);
+	}
+
 	usg::SignalRunner MakeRootBranchRunner()
 	{
 		usg::SignalRunner runner;
 		runner.systemID = TEST_SYSTEM_ID;
 		runner.TriggerRootBranch = TriggerRootBranch;
+		return runner;
+	}
+
+	usg::SignalRunner MakeRootBranchStressRunner(RootBranchStressData* pData)
+	{
+		usg::SignalRunner runner;
+		runner.systemID = TEST_SYSTEM_ID;
+		runner.TriggerRootBranch = TriggerRootBranchStress;
+		runner.userData = pData;
 		return runner;
 	}
 
@@ -389,6 +438,85 @@ namespace
 		ok &= Expect(uSerialSum == uWorkerSum, "worker stress batch matches serial result");
 		return ok;
 	}
+
+	bool RunRootBranchStressBatch(uint32 uWorkerCount, uint32 uWaitForOverlap, uint32& uOutSum, uint32& uOutMaxActive)
+	{
+		static const uint32 BRANCH_COUNT = 8;
+
+		TestSignal signal;
+		usg::GenericInputOutputs root(nullptr, nullptr);
+		usg::GenericInputOutputs branches[BRANCH_COUNT] =
+		{
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr),
+			usg::GenericInputOutputs(nullptr, nullptr)
+		};
+		usg::GenericInputOutputs* branchPtrs[BRANCH_COUNT];
+		std::atomic<uint32> counts[BRANCH_COUNT];
+		std::atomic<uint32> sum(0);
+		RootBranchStressData data;
+
+		uint32 uExpectedSum = 0;
+		for (uint32 i = 0; i < BRANCH_COUNT; ++i)
+		{
+			branches[i].AttachToNode(&root);
+			branchPtrs[i] = &branches[i];
+			counts[i].store(0, std::memory_order_release);
+			uExpectedSum += i + 1;
+		}
+
+		data.ppBranches = branchPtrs;
+		data.pCounts = counts;
+		data.pSum = &sum;
+		data.uBranchCount = BRANCH_COUNT;
+		data.uWaitForOverlap = uWaitForOverlap;
+		data.uStarted.store(0, std::memory_order_release);
+		data.uActive.store(0, std::memory_order_release);
+		data.uMaxActive.store(0, std::memory_order_release);
+
+		g_pRoot = &root;
+		usg::SignalRunner runner = MakeRootBranchStressRunner(&data);
+		usg::SystemScheduler scheduler;
+		scheduler.Init(uWorkerCount, BRANCH_COUNT);
+		scheduler.BeginSignal(signal.uId);
+		scheduler.RunSignalTaskFromRoot(nullptr, signal, runner);
+		scheduler.Shutdown();
+
+		bool ok = true;
+		for (uint32 i = 0; i < BRANCH_COUNT; ++i)
+		{
+			ok &= Expect(counts[i].load(std::memory_order_acquire) == 1, "root branch stress count");
+		}
+
+		uOutSum = sum.load(std::memory_order_acquire);
+		uOutMaxActive = data.uMaxActive.load(std::memory_order_acquire);
+		const usg::SystemScheduler::Stats& stats = scheduler.GetStats();
+		ok &= Expect(uOutSum == uExpectedSum, "root branch stress sum");
+		ok &= Expect(stats.uLastSignalTaskCount == 1, "root branch stress signal task count");
+		ok &= Expect(stats.uLastRootBranchRunnerCount == 1, "root branch stress runner count");
+		ok &= Expect(stats.uLastRootBranchTaskCount == BRANCH_COUNT, "root branch stress branch task count");
+		return ok;
+	}
+
+	bool TestWorkerRootBranchStressResults()
+	{
+		uint32 uSerialSum = 0;
+		uint32 uWorkerSum = 0;
+		uint32 uSerialMaxActive = 0;
+		uint32 uWorkerMaxActive = 0;
+		bool ok = true;
+		ok &= RunRootBranchStressBatch(0, 0, uSerialSum, uSerialMaxActive);
+		ok &= RunRootBranchStressBatch(3, 4, uWorkerSum, uWorkerMaxActive);
+		ok &= Expect(uSerialSum == uWorkerSum, "worker root branch stress matches serial result");
+		ok &= Expect(uSerialMaxActive == 1, "serial root branch stress remains inline");
+		ok &= Expect(uWorkerMaxActive > 1, "worker root branch stress overlaps branches");
+		return ok;
+	}
 }
 
 int main()
@@ -400,6 +528,7 @@ int main()
 	ok &= TestTargetedBatchStats();
 	ok &= TestWorkerTargetedBatchOverlap();
 	ok &= TestRepeatedWorkerBatchResults();
+	ok &= TestWorkerRootBranchStressResults();
 
 	if (ok)
 	{
