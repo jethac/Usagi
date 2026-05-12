@@ -27,14 +27,15 @@ namespace usg
 		{
 			if (m_pBuffer)
 			{
-				vdelete m_pBuffer;
+				vdelete[] m_pBuffer;
 			}
 		}
 
 		void Init(uint32 uMessageCount)
 		{
+			ASSERT(uMessageCount > 1);
 			m_criticalSection.Initialize();
-			m_pBuffer = vnew(ALLOC_OBJECT) MessageType;
+			m_pBuffer = vnew(ALLOC_OBJECT) MessageType[uMessageCount];
 			m_uMessageCount = uMessageCount;
 		}
 
