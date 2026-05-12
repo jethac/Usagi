@@ -145,6 +145,106 @@ ArgumentReadResult ReadArgumentValue(std::string& value, std::string& arg, const
 	return ARGUMENT_NO_MATCH;
 }
 
+void PrintYamlError(const std::string& fileName, const std::string& fieldPath, const std::string& message, const YAML::Node& node)
+{
+	if (node)
+	{
+		YAML::Mark mark = node.Mark();
+		if (mark.line >= 0)
+		{
+			fprintf(stderr, "%s:%d:%d: %s: %s\n", fileName.c_str(), mark.line + 1, mark.column + 1, fieldPath.c_str(), message.c_str());
+			return;
+		}
+	}
+
+	fprintf(stderr, "%s: %s: %s\n", fileName.c_str(), fieldPath.c_str(), message.c_str());
+}
+
+bool RequireMap(const std::string& fileName, const std::string& fieldPath, const YAML::Node& node)
+{
+	if (!node || !node.IsMap())
+	{
+		PrintYamlError(fileName, fieldPath, "expected a map", node);
+		return false;
+	}
+	return true;
+}
+
+bool RequireSequence(const std::string& fileName, const std::string& fieldPath, const YAML::Node& node)
+{
+	if (!node || !node.IsSequence())
+	{
+		PrintYamlError(fileName, fieldPath, "expected a sequence", node);
+		return false;
+	}
+	return true;
+}
+
+bool ReadRequiredString(const std::string& fileName, const std::string& fieldPath, const YAML::Node& parent, const char* fieldName, std::string& value)
+{
+	YAML::Node node = parent[fieldName];
+	if (!node || !node.IsScalar())
+	{
+		PrintYamlError(fileName, fieldPath + "." + fieldName, "expected a scalar string", node);
+		return false;
+	}
+
+	value = node.Scalar();
+	if (value.empty())
+	{
+		PrintYamlError(fileName, fieldPath + "." + fieldName, "value must not be empty", node);
+		return false;
+	}
+
+	return true;
+}
+
+bool ReadOptionalString(const std::string& fileName, const std::string& fieldPath, const YAML::Node& parent, const char* fieldName, std::string& value)
+{
+	YAML::Node node = parent[fieldName];
+	if (!node)
+	{
+		return true;
+	}
+	if (!node.IsScalar())
+	{
+		PrintYamlError(fileName, fieldPath + "." + fieldName, "expected a scalar string", node);
+		return false;
+	}
+
+	value = node.Scalar();
+	return true;
+}
+
+bool ReadOptionalBool(const std::string& fileName, const std::string& fieldPath, const YAML::Node& parent, const char* fieldName, bool& value)
+{
+	YAML::Node node = parent[fieldName];
+	if (!node)
+	{
+		return true;
+	}
+	if (!node.IsScalar())
+	{
+		PrintYamlError(fileName, fieldPath + "." + fieldName, "expected true or false", node);
+		return false;
+	}
+
+	std::string scalar = node.Scalar();
+	if (scalar == "true" || scalar == "True" || scalar == "TRUE" || scalar == "1")
+	{
+		value = true;
+		return true;
+	}
+	if (scalar == "false" || scalar == "False" || scalar == "FALSE" || scalar == "0")
+	{
+		value = false;
+		return true;
+	}
+
+	PrintYamlError(fileName, fieldPath + "." + fieldName, "expected true or false", node);
+	return false;
+}
+
 IShaderCompiler* pCompiler = nullptr;
 
 int main(int argc, char *argv[])
@@ -283,6 +383,19 @@ int main(int argc, char *argv[])
 	YAML::Node mainNode = YAML::LoadFile(inputFile.c_str());
 	YAML::Node yamlEffect = mainNode["Effects"];
 	YAML::Node customFX = mainNode["CustomEffects"];
+	if (!RequireMap(inputFile, "<root>", mainNode))
+	{
+		return -1;
+	}
+	if (!RequireSequence(inputFile, "Effects", yamlEffect))
+	{
+		return -1;
+	}
+	if (customFX && !RequireMap(inputFile, "CustomEffects", customFX))
+	{
+		return -1;
+	}
+
 	std::map<uint32, ShaderEntry> requiredShaders[(uint32)usg::ShaderType::COUNT];
 	std::vector<EffectDefinition> effects;
 	std::vector<std::string> referencedFiles;
@@ -296,18 +409,35 @@ int main(int argc, char *argv[])
 
 	std::vector<CustomFXEntry> customFXEntries;
 	
+	uint32 effectIndex = 0;
 	for (YAML::const_iterator it = yamlEffect.begin(); it != yamlEffect.end(); ++it)
 	{
+		YAML::Node effectNode = *it;
+		std::string effectPath = std::string("Effects[") + std::to_string(effectIndex) + "]";
+		if (!RequireMap(inputFile, effectPath, effectNode))
+		{
+			return -1;
+		}
+
 		EffectDefinition def;
-		def.name = (*it)["name"].as<std::string>();
-		def.prog[(uint32)usg::ShaderType::VS] = (*it)["vert"].as<std::string>();
-		def.prog[(uint32)usg::ShaderType::PS] = (*it)["frag"].as<std::string>();
-		def.customFXName = (*it)["custom_effect"] ? (*it)["custom_effect"].as<std::string>() : "";
+		if (!ReadRequiredString(inputFile, effectPath, effectNode, "name", def.name)
+			|| !ReadRequiredString(inputFile, effectPath, effectNode, "vert", def.prog[(uint32)usg::ShaderType::VS])
+			|| !ReadRequiredString(inputFile, effectPath, effectNode, "frag", def.prog[(uint32)usg::ShaderType::PS])
+			|| !ReadOptionalString(inputFile, effectPath, effectNode, "custom_effect", def.customFXName))
+		{
+			return -1;
+		}
+		if (!def.customFXName.empty() && (!customFX || !customFX[def.customFXName]))
+		{
+			PrintYamlError(inputFile, effectPath + ".custom_effect", std::string("references missing CustomEffects entry '") + def.customFXName + "'", effectNode["custom_effect"]);
+			return -1;
+		}
+
 		{
 			bool bHasDefault = true;
-			if ((*it)["has_default"])
+			if (!ReadOptionalBool(inputFile, effectPath, effectNode, "has_default", bHasDefault))
 			{
-				bHasDefault = (*it)["has_default"].as<bool>();
+				return -1;
 			}
 
 			DefineSets set;
@@ -318,47 +448,76 @@ int main(int argc, char *argv[])
 				set.definesAsCRC = "";
 				set.defines = "";
 				set.customFXName = def.customFXName;
-				if ((*it)["geom"])
+				if (!ReadOptionalString(inputFile, effectPath, effectNode, "geom", def.prog[(uint32)usg::ShaderType::GS])
+					|| !ReadOptionalString(inputFile, effectPath, effectNode, "tesc", def.prog[(uint32)usg::ShaderType::TC])
+					|| !ReadOptionalString(inputFile, effectPath, effectNode, "tese", def.prog[(uint32)usg::ShaderType::TE]))
 				{
-					def.prog[(uint32)usg::ShaderType::GS] = (*it)["geom"].as<std::string>();
-				}
-				if ((*it)["tesc"])
-				{
-					def.prog[(uint32)usg::ShaderType::TC] = (*it)["tesc"].as<std::string>();
-				}
-				if ((*it)["tese"])
-				{
-					def.prog[(uint32)usg::ShaderType::TE] = (*it)["tese"].as<std::string>();
+					return -1;
 				}
 				def.sets.push_back(set);
 			}
 
-			if ((*it)["define_sets"])
+			if (effectNode["define_sets"])
 			{
-				YAML::Node defineSets = (*it)["define_sets"];
+				YAML::Node defineSets = effectNode["define_sets"];
+				if (!RequireSequence(inputFile, effectPath + ".define_sets", defineSets))
+				{
+					return -1;
+				}
+				uint32 defineSetIndex = 0;
 				for (YAML::const_iterator defineIt = defineSets.begin(); defineIt != defineSets.end(); ++defineIt)
 				{
+					YAML::Node defineNode = *defineIt;
+					std::string definePath = effectPath + ".define_sets[" + std::to_string(defineSetIndex) + "]";
+					if (!RequireMap(inputFile, definePath, defineNode))
+					{
+						return -1;
+					}
+
 					// Package.Effect.DefineSet.fx
-					set.defineSetName = std::string(".") + (*defineIt)["name"].as<std::string>();
+					std::string defineName;
+					if (!ReadRequiredString(inputFile, definePath, defineNode, "name", defineName)
+						|| !ReadRequiredString(inputFile, definePath, defineNode, "defines", set.defines))
+					{
+						return -1;
+					}
+					set.defineSetName = std::string(".") + defineName;
 					set.customFXName = def.customFXName;
 					set.name = intFileName + "." + def.name + set.defineSetName + ".fx";
-					set.defines = (*defineIt)["defines"].as<std::string>();
 					set.definesAsCRC = std::string(".") + std::to_string(utl::CRC32(set.defines.c_str()));
 					def.sets.push_back(set);
+					defineSetIndex++;
 				}
 			}
 
 			uint32 uStandardSets = (uint32)def.sets.size();
 
 			// Anything in a "global" define set is a combination of defines appended to every other shader
-			if ((*it)["global_sets"])
+			if (effectNode["global_sets"])
 			{
-				YAML::Node globalSets = (*it)["global_sets"];
+				YAML::Node globalSets = effectNode["global_sets"];
+				if (!RequireSequence(inputFile, effectPath + ".global_sets", globalSets))
+				{
+					return -1;
+				}
+				uint32 globalSetIndex = 0;
 				for (YAML::const_iterator globalIt = globalSets.begin(); globalIt != globalSets.end(); ++globalIt)
 				{
+					YAML::Node globalNode = *globalIt;
+					std::string globalPath = effectPath + ".global_sets[" + std::to_string(globalSetIndex) + "]";
+					if (!RequireMap(inputFile, globalPath, globalNode))
+					{
+						return -1;
+					}
+
 					// Package.Effect.DefineSet.fx
-					std::string name = (*globalIt)["name"].as<std::string>();
-					std::string defines = (*globalIt)["defines"].as<std::string>();
+					std::string name;
+					std::string defines;
+					if (!ReadRequiredString(inputFile, globalPath, globalNode, "name", name)
+						|| !ReadRequiredString(inputFile, globalPath, globalNode, "defines", defines))
+					{
+						return -1;
+					}
 
 					for (uint32 i = 0; i < uStandardSets; i++)
 					{
@@ -372,10 +531,11 @@ int main(int argc, char *argv[])
 							set.defines = defines;
 						}
 						set.definesAsCRC = std::string(".") + std::to_string(utl::CRC32(set.defines.c_str()));
-						set.defineSetName = set.defineSetName + std::string(".") + (*globalIt)["name"].as<std::string>();
+						set.defineSetName = set.defineSetName + std::string(".") + name;
 						set.name = intFileName + "." + def.name + set.defineSetName + ".fx";
 						def.sets.push_back(set);
 					}
+					globalSetIndex++;
 				}
 			}
 		}
@@ -445,6 +605,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		effects.push_back(def);
+		effectIndex++;
 	}
 
 	for (uint32 i = 0; i < referencedFiles.size(); i++)
