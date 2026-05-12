@@ -17,10 +17,12 @@ class GFXDevice;
 class ParticleEffectResource : public ResourceBase
 {
 public:
-    ParticleEffectResource();
-    virtual ~ParticleEffectResource();
+	ParticleEffectResource();
+	virtual ~ParticleEffectResource();
 
 	bool Load(const char* szFileName);
+	bool LoadCPUData(const char* szFileName);
+	bool FinalizeCPUData(const char* szFileName);
 
 	const particles::EffectGroup& GetEffectGroup() const { return m_definition; }
 	uint32 GetEmitterCount() const { return m_definition.emitters_count; }

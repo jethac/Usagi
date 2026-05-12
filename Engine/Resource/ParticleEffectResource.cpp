@@ -17,15 +17,34 @@ namespace usg{
 
 	bool ParticleEffectResource::Load(const char* szFileName)
 	{
+		bool bReadSucceeded = LoadCPUData(szFileName);
+		if (bReadSucceeded)
+		{
+			FinalizeCPUData(szFileName);
+		}
+		else
+		{
+			SetState(ResourceState::FAILED);
+		}
+		return bReadSucceeded;
+	}
+
+	bool ParticleEffectResource::LoadCPUData(const char* szFileName)
+	{
 		m_name = szFileName;
 		str::RemovePath(m_name);
 		str::TruncateExtension(m_name);
 		SetupHash(szFileName);
 		ProtocolBufferFile effectVPB(szFileName);
 		bool bReadSucceeded = effectVPB.Read(&m_definition);	
-		SetReady(true);
 		return bReadSucceeded;
 	}
 
-}
+	bool ParticleEffectResource::FinalizeCPUData(const char* szFileName)
+	{
+		UNUSED_VAR(szFileName);
+		SetReady(true);
+		return true;
+	}
 
+}
