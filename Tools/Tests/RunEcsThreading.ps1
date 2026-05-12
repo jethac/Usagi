@@ -4,7 +4,8 @@ $TestRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $Tests = @(
     'SystemScheduler',
-    'ComponentMutation'
+    'ComponentMutation',
+    'ECSFrameThreading'
 )
 
 foreach ($Test in $Tests) {
