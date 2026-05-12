@@ -904,6 +904,14 @@ void PostFXSys_ps::SetSkyTexture(GFXDevice* pDevice, const TextureHndl& tex)
 	}
 }
 
+void PostFXSys_ps::SetBloomParameters(GFXDevice* pDevice, float fThreshold, float fIntensity, float fRadius)
+{
+	if (m_pBloom)
+	{
+		m_pBloom->SetParameters(pDevice, fThreshold, fIntensity, fRadius);
+	}
+}
+
 
 
 PipelineStateHndl PostFXSys_ps::GetDownscale4x4Pipeline(GFXDevice* pDevice, ResourceMgr* pResMgr, const RenderPassHndl& renderPass) const

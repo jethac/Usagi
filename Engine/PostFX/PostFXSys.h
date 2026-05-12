@@ -74,6 +74,7 @@ public:
 	void DrawFullScreenQuad(GFXContext* pCtxt) const;
 
 	void SetSkyTexture(GFXDevice* pDevice, const TextureHndl& hndl);
+	void SetBloomParameters(GFXDevice* pDevice, float fThreshold, float fIntensity, float fRadius);
 	void UpdateRTSize(GFXDevice* pDevice, Display* pDisplay);
 
 	uint32 GetFinalTargetWidth(bool bOrient = true) { return m_platform.GetFinalTargetWidth(bOrient); }

@@ -27,6 +27,7 @@ public:
 	virtual void Resize(GFXDevice* pDevice, uint32 uWidth, uint32 uHeight);
 	virtual void SetDestTarget(GFXDevice* pDevice, RenderTarget* pDst);
 	virtual bool Draw(GFXContext* pContext, RenderContext& renderContext);
+	void SetParameters(GFXDevice* pDevice, float fThreshold, float fIntensity, float fRadius);
 
 	virtual bool ReadsTexture(Input eInput) const override;
 	virtual bool LoadsTexture(Input eInput) const override;
@@ -39,6 +40,7 @@ private:
 	void GetOffsetsAndWeights(uint32 texSize, float fDeviation, float fMultiplier, float* pWeights, float* pOffsets);
 	void SetOffsetsHor(GFXDevice* pDevice, uint32 uWidth, float fDeviation, float fMultiplier);
 	void SetOffsetsVer(GFXDevice* pDevice, uint32 uHeight, float fDeviation, float fMultiplier);
+	void UpdateParameterConstants(GFXDevice* pDevice);
 
 	enum
 	{
@@ -83,6 +85,13 @@ private:
 	RenderTarget	m_brightPassRT;
 	RenderTarget	m_bloomSourceRT;
 	RenderTarget	m_bloomRT[BLOOM_PASS_TEXTURES];
+
+	float			m_fBrightPassMiddleGray;
+	float			m_fBrightPassThreshold;
+	float			m_fBrightPassOffset;
+	float			m_fBloomScale;
+	float			m_fBlurDeviation;
+	float			m_fBlurMultiplier;
 };
 
 }

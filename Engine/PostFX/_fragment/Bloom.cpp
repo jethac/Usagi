@@ -24,12 +24,14 @@ struct BloomConstants
 
 struct BloomFinalConstants
 {
-	Vector4f	vBloomScale;
+	float	fBloomScale;
 };
 
 struct BloomBrightPassConstants
 {
-	Vector4f	vMiddleGray;
+	float	fMiddleGray;
+	float	fThreshold;
+	float	fOffset;
 };
 
 static const ShaderConstantDecl g_bloomConstantDef[] = 
@@ -40,13 +42,15 @@ static const ShaderConstantDecl g_bloomConstantDef[] =
 
 static const ShaderConstantDecl g_bloomFinalConstantDef[] = 
 {
-	SHADER_CONSTANT_ELEMENT( BloomFinalConstants, vBloomScale,	CT_VECTOR_4, 1 ),
+	SHADER_CONSTANT_ELEMENT( BloomFinalConstants, fBloomScale,	CT_FLOAT, 1 ),
 	SHADER_CONSTANT_END()
 };
 
 static const ShaderConstantDecl g_brightpassConstantDef[] = 
 {
-	SHADER_CONSTANT_ELEMENT( BloomBrightPassConstants, vMiddleGray,	CT_VECTOR_4, 1 ),
+	SHADER_CONSTANT_ELEMENT( BloomBrightPassConstants, fMiddleGray,	CT_FLOAT, 1 ),
+	SHADER_CONSTANT_ELEMENT( BloomBrightPassConstants, fThreshold,	CT_FLOAT, 1 ),
+	SHADER_CONSTANT_ELEMENT( BloomBrightPassConstants, fOffset,		CT_FLOAT, 1 ),
 	SHADER_CONSTANT_END()
 };
 
@@ -72,6 +76,12 @@ PostEffect(), m_pSys(NULL)
 	SetRenderMask(RENDER_MASK_POST_EFFECT);
 	SetLayer(LAYER_POST_PROCESS);
 	SetPriority(20);
+	m_fBrightPassMiddleGray = 0.005f;
+	m_fBrightPassThreshold = 4.0f;
+	m_fBrightPassOffset = 10.0f;
+	m_fBloomScale = 1.0f;
+	m_fBlurDeviation = 3.0f;
+	m_fBlurMultiplier = 2.0f;
 }
 
 
@@ -147,7 +157,7 @@ void Bloom::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSys)
 	m_constants[PASS_HOR_BLOOM].Init(pDevice, g_bloomConstantDef);
 	m_constants[PASS_VER_BLOOM].Init(pDevice, g_bloomConstantDef);
 	m_constants[PASS_FINAL].Init(pDevice, g_bloomFinalConstantDef);
-	m_constants[PASS_BRIGHT_PASS].Init(pDevice, g_bloomFinalConstantDef);
+	m_constants[PASS_BRIGHT_PASS].Init(pDevice, g_brightpassConstantDef);
 
 	m_descriptors[PASS_BRIGHT_PASS].Init(pDevice, desc1Tex);
 	m_descriptors[PASS_HOR_BLOOM].Init(pDevice, desc1Tex);
@@ -155,18 +165,10 @@ void Bloom::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSys)
 	m_descriptors[PASS_FINAL].Init(pDevice, desc2Tex);
 
 
-	BloomBrightPassConstants* pConsts = m_constants[PASS_BRIGHT_PASS].Lock<BloomBrightPassConstants>();
-	pConsts->vMiddleGray.x = 0.005f;
-	m_constants[PASS_BRIGHT_PASS].Unlock();
-	m_constants[PASS_BRIGHT_PASS].UpdateData(pDevice);
+	UpdateParameterConstants(pDevice);
 
-	BloomFinalConstants* pFinalConsts = m_constants[PASS_FINAL].Lock<BloomFinalConstants>();
-	pFinalConsts->vBloomScale.x = 1.0f;
-	m_constants[PASS_FINAL].Unlock();
-	m_constants[PASS_FINAL].UpdateData(pDevice);
-
-	SetOffsetsHor(pDevice, m_bloomRT[2].GetWidth(), 3.0f, 2.0f);
-	SetOffsetsVer(pDevice, m_bloomRT[1].GetHeight(), 3.0f, 2.0f);
+	SetOffsetsHor(pDevice, m_bloomRT[2].GetWidth(), m_fBlurDeviation, m_fBlurMultiplier);
+	SetOffsetsVer(pDevice, m_bloomRT[1].GetHeight(), m_fBlurDeviation, m_fBlurMultiplier);
 
 
 	pSys->GetPlatform().SetupDownscale4x4(pDevice, m_constants[PASS_4X4], m_descriptors[PASS_4X4], uScrWidth, uScrHeight);
@@ -189,6 +191,41 @@ void Bloom::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSys)
 	{
 		// These passes don't change
 		m_descriptors[i].UpdateDescriptors(pDevice);
+	}
+}
+
+void Bloom::SetParameters(GFXDevice* pDevice, float fThreshold, float fIntensity, float fRadius)
+{
+	m_fBrightPassThreshold = Math::Max(fThreshold, 0.0f);
+	m_fBloomScale = Math::Max(fIntensity, 0.0f);
+	m_fBlurDeviation = Math::Max(fRadius, 0.001f);
+	UpdateParameterConstants(pDevice);
+
+	if (m_constants[PASS_HOR_BLOOM].IsValid())
+	{
+		SetOffsetsHor(pDevice, m_bloomRT[2].GetWidth(), m_fBlurDeviation, m_fBlurMultiplier);
+		SetOffsetsVer(pDevice, m_bloomRT[1].GetHeight(), m_fBlurDeviation, m_fBlurMultiplier);
+	}
+}
+
+void Bloom::UpdateParameterConstants(GFXDevice* pDevice)
+{
+	if (m_constants[PASS_BRIGHT_PASS].IsValid())
+	{
+		BloomBrightPassConstants* pConsts = m_constants[PASS_BRIGHT_PASS].Lock<BloomBrightPassConstants>();
+		pConsts->fMiddleGray = m_fBrightPassMiddleGray;
+		pConsts->fThreshold = m_fBrightPassThreshold;
+		pConsts->fOffset = m_fBrightPassOffset;
+		m_constants[PASS_BRIGHT_PASS].Unlock();
+		m_constants[PASS_BRIGHT_PASS].UpdateData(pDevice);
+	}
+
+	if (m_constants[PASS_FINAL].IsValid())
+	{
+		BloomFinalConstants* pFinalConsts = m_constants[PASS_FINAL].Lock<BloomFinalConstants>();
+		pFinalConsts->fBloomScale = m_fBloomScale;
+		m_constants[PASS_FINAL].Unlock();
+		m_constants[PASS_FINAL].UpdateData(pDevice);
 	}
 }
 

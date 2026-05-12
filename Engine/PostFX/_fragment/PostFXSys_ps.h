@@ -54,6 +54,7 @@ public:
 	const SceneRenderPasses& GetRenderPasses() const;
 	SceneRenderPasses& GetRenderPasses();
 	void SetSkyTexture(GFXDevice* pDevice, const TextureHndl& hndl);
+	void SetBloomParameters(GFXDevice* pDevice, float fThreshold, float fIntensity, float fRadius);
 	
 	uint32 GetFinalTargetWidth(bool bOrient ) { return m_colorBuffer[BUFFER_LDR_0].GetWidth(); }
 	uint32 GetFinalTargetHeight(bool bOrient) { return m_colorBuffer[BUFFER_LDR_0].GetHeight(); }

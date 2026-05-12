@@ -124,6 +124,11 @@ void PostFXSys::SetSkyTexture(GFXDevice* pDevice, const TextureHndl& hndl)
 	m_platform.SetSkyTexture(pDevice, hndl);
 }
 
+void PostFXSys::SetBloomParameters(GFXDevice* pDevice, float fThreshold, float fIntensity, float fRadius)
+{
+	m_platform.SetBloomParameters(pDevice, fThreshold, fIntensity, fRadius);
+}
+
 
 void PostFXSys::UpdateRTSize(GFXDevice* pDevice, Display* pDisplay)
 {
@@ -174,4 +179,3 @@ void PostFXSys::Copy(GFXContext* pContext, RenderTarget* pSrc, RenderTarget* pDs
 }
 
 }
-
