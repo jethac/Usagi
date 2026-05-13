@@ -26,15 +26,34 @@ try
         throw new FileNotFoundException("Input file not found.", options.InputPath);
     }
 
-    if (string.IsNullOrWhiteSpace(options.OutputPath))
+    if (!options.ValidateOnly && string.IsNullOrWhiteSpace(options.OutputPath))
     {
         throw new ArgumentException("Output file was not specified.");
     }
 
     var bank = AudioBankYamlParser.ParseFile(options.InputPath);
-    var output = options.Proto
-        ? FsidBuilder.WriteProto(bank, options.EnumName)
-        : FsidBuilder.WriteHeader(bank, options.IfndefName, options.EnumName);
+    var diagnostics = AudioBankValidator.Validate(bank, options.ProjectRoot);
+    foreach (var diagnostic in diagnostics)
+    {
+        var writer = diagnostic.Severity == AudioBankDiagnosticSeverity.Error ? Console.Error : Console.Out;
+        writer.WriteLine($"{diagnostic.Severity}: {diagnostic.Field}: {diagnostic.Message}");
+    }
+
+    if (options.ValidateOnly)
+    {
+        return diagnostics.Any(diagnostic => diagnostic.Severity == AudioBankDiagnosticSeverity.Error) ? 1 : 0;
+    }
+
+    if (diagnostics.Any(diagnostic => diagnostic.Severity == AudioBankDiagnosticSeverity.Error))
+    {
+        return 1;
+    }
+
+    var output = options.NormalizeYaml
+        ? AudioBankYamlWriter.Write(bank)
+        : options.Proto
+            ? FsidBuilder.WriteProto(bank, options.EnumName)
+            : FsidBuilder.WriteHeader(bank, options.IfndefName, options.EnumName);
 
     var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(options.OutputPath));
     if (!string.IsNullOrEmpty(outputDirectory))
@@ -57,7 +76,10 @@ internal sealed record AudioToolOptions
     public string OutputPath { get; private init; } = "";
     public string EnumName { get; private init; } = "UsagiAudio";
     public string IfndefName { get; private init; } = "_CLR_TANK_FSID_";
+    public string? ProjectRoot { get; private init; }
     public bool Proto { get; private init; }
+    public bool NormalizeYaml { get; private init; }
+    public bool ValidateOnly { get; private init; }
     public bool ShowHelp { get; private init; }
     public string? Error { get; private init; }
 
@@ -77,6 +99,12 @@ internal sealed record AudioToolOptions
                 case "--proto":
                     options = options with { Proto = true };
                     break;
+                case "--normalize-yaml":
+                    options = options with { NormalizeYaml = true };
+                    break;
+                case "--validate":
+                    options = options with { ValidateOnly = true };
+                    break;
                 case "-i":
                 case "--input":
                     options = options with { InputPath = ReadValue(args, ref i, arg) };
@@ -93,6 +121,9 @@ internal sealed record AudioToolOptions
                 case "--ifndefName":
                     options = options with { IfndefName = ReadValue(args, ref i, arg) };
                     break;
+                case "--project-root":
+                    options = options with { ProjectRoot = ReadValue(args, ref i, arg) };
+                    break;
                 default:
                     if (TrySplitOption(arg, out var name, out var value))
                     {
@@ -102,6 +133,7 @@ internal sealed record AudioToolOptions
                             "--output" => options with { OutputPath = value },
                             "--enumName" => options with { EnumName = value },
                             "--ifndefName" => options with { IfndefName = value },
+                            "--project-root" => options with { ProjectRoot = value },
                             "-i" => options with { InputPath = value },
                             "-o" => options with { OutputPath = value },
                             "-e" => options with { EnumName = value },
@@ -132,6 +164,9 @@ internal sealed record AudioToolOptions
         writer.WriteLine("  -g, --ifndefName=VALUE     name of #ifndef guard to use");
         writer.WriteLine("  -p, --proto                generate a protocol buffer file instead of a C++");
         writer.WriteLine("                               header");
+        writer.WriteLine("      --normalize-yaml       write normalized AudioBank YAML");
+        writer.WriteLine("      --validate             validate input without writing output");
+        writer.WriteLine("      --project-root=VALUE   project root for asset validation");
         writer.WriteLine("  -h, --help                 show this message and exit");
     }
 

@@ -74,4 +74,31 @@ Test-AudioBuilderFixture `
     -ExpectedProto (Join-Path $fixtureRoot 'expected-edge.proto') `
     -ExpectedHeader (Join-Path $fixtureRoot 'expected-edge.h')
 
+$normalizedYaml = Join-Path $outDir 'minimal.normalized.yml'
+dotnet run --project $toolProject --no-restore -- -i (Join-Path $fixtureRoot 'minimal-legacy.yml') -o $normalizedYaml --normalize-yaml
+if ($LASTEXITCODE -ne 0) {
+    throw "Audio tool YAML normalization failed with exit code $LASTEXITCODE"
+}
+
+$normalized = Get-Content -Raw -LiteralPath $normalizedYaml
+foreach ($required in @('filterCRC:', 'effectCRCs:', 'roomNameCRC:', 'filters:', 'reverbs:', 'rooms:')) {
+    if (!$normalized.Contains($required)) {
+        throw "Normalized YAML did not contain expected field $required"
+    }
+}
+
+$invalidYaml = Join-Path $outDir 'invalid.yml'
+@'
+AudioBank:
+  soundFiles:
+    - enumName: 1 invalid
+      filename: bad.wav
+      volume: -1
+'@ | Set-Content -LiteralPath $invalidYaml -NoNewline
+
+dotnet run --project $toolProject --no-restore -- -i $invalidYaml --validate
+if ($LASTEXITCODE -eq 0) {
+    throw 'Audio tool validation unexpectedly succeeded for invalid YAML.'
+}
+
 Write-Host 'Audio tool builder matched legacy FSID fixtures.'
