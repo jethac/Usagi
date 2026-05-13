@@ -15,6 +15,7 @@
 #include "Engine/Graphics/Device/GFXContext.h" 
 #include <vulkan/vulkan.h>
 #include "Engine/Core/stl/vector.h"
+#include <cstring>
 
 // Note disable for render doc builds, otherwise VK_EXT_validation_features extension will topple the replay
 #ifdef DEBUG_BUILD
@@ -79,6 +80,56 @@ static const VkFormat gFallbackColorFormatMap[][gMaxColorFormatFallbacks] =
 	{ VK_FORMAT_R8G8B8A8_SRGB },																									// CF_SRGBA
 	{ },																									// CF_UNDEFINED	// Only makes sense for render passes
 };
+
+static bool IsInstanceExtensionAvailable(const char* szExtensionName)
+{
+	uint32 uExtensionCount = 0;
+	if (vkEnumerateInstanceExtensionProperties(nullptr, &uExtensionCount, nullptr) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	vector<VkExtensionProperties> availableExtensions(uExtensionCount);
+	if (vkEnumerateInstanceExtensionProperties(nullptr, &uExtensionCount, availableExtensions.data()) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	for (const VkExtensionProperties& extension : availableExtensions)
+	{
+		if (std::strcmp(extension.extensionName, szExtensionName) == 0)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool IsInstanceLayerAvailable(const char* szLayerName)
+{
+	uint32 uLayerCount = 0;
+	if (vkEnumerateInstanceLayerProperties(&uLayerCount, nullptr) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	vector<VkLayerProperties> availableLayers(uLayerCount);
+	if (vkEnumerateInstanceLayerProperties(&uLayerCount, availableLayers.data()) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	for (const VkLayerProperties& layer : availableLayers)
+	{
+		if (std::strcmp(layer.layerName, szLayerName) == 0)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
 
 
 
@@ -388,7 +439,10 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	vector<const char*> extensions;
 	extensions.push_back("VK_KHR_surface");
 	extensions.push_back("VK_KHR_win32_surface");
-	extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	if (IsInstanceExtensionAvailable(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	}
 	
 	// Check to see if an HMD has been loaded and grab the extensions
 	uint32 uHMDId = IHeadMountedDisplay::GetModuleTypeNameStatic();
@@ -426,7 +480,11 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	{
 		"VK_LAYER_KHRONOS_validation" /* Enable validation layers in debug builds to detect validation errors */
 	};
-	int validationLayerCount = ARRAY_SIZE(validationLayerNames);
+	int validationLayerCount = IsInstanceLayerAvailable(validationLayerNames[0]) ? ARRAY_SIZE(validationLayerNames) : 0;
+	if (validationLayerCount == 0)
+	{
+		DEBUG_PRINT("Vulkan validation layer not found; continuing without validation.\n");
+	}
 
 	VkValidationFeatureDisableEXT disabledValidation[] = { VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT, VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT };
 	VkValidationFeaturesEXT validation = {};
@@ -447,7 +505,7 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	inst_info.enabledExtensionCount = (uint32)extensions.size();
 	inst_info.ppEnabledExtensionNames = extensions.data();
 	inst_info.enabledLayerCount = validationLayerCount;
-	inst_info.ppEnabledLayerNames = validationLayerNames;
+	inst_info.ppEnabledLayerNames = validationLayerCount > 0 ? validationLayerNames : nullptr;
 
 	VkResult res;
 
@@ -459,7 +517,7 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	}
 	else if (res)
 	{
-		ASSERT_MSG(false, "unknown error\n");
+		ASSERT_MSG(false, "vkCreateInstance failed: %d\n", res);
 		return;
 	}
 
