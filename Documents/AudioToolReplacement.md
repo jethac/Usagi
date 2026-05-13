@@ -199,19 +199,18 @@ Nice-to-have follow-up features:
 Current implementation status:
 
 - `Tools/Source/UsagiTools/src/Usagi.ToolCore/Audio` contains the first managed
-  audio-bank parser and FSID generation library.
+  audio-bank parser, normalizing writer, validator, and FSID generation
+  library.
 - `Tools/Source/UsagiTools/src/Usagi.AudioToolCli` provides a
   `FSIDBuilder.exe`-compatible command-line surface for `-i`, `-o`, `-e`, `-g`,
-  and `--proto`.
+  and `--proto`, plus `--normalize-yaml`, `--validate`, and
+  `--project-root`.
 - `Tools/Tests/AudioToolBuilder/Run.ps1` verifies the new CLI against the
-  legacy golden proto/header fixtures captured from `FSIDBuilder.exe`.
+  legacy golden proto/header fixtures captured from `FSIDBuilder.exe`, and now
+  checks normalized YAML and validation failure behavior.
 
 Remaining implementation work before switching project builds:
 
-- Preserve and write the full current `AudioBank.proto` schema, including
-  filters, reverbs, rooms, `filterCRC`, `effectCRCs`, and `roomNameCRC`.
-- Add audio YAML normalization/validation output, not only FSID proto/header
-  generation.
 - Add WAV metadata parsing for editor diagnostics.
 - Add VPB and PakFileGen integration tests.
 - Decide and implement the escape hatch for keeping the legacy binary available
