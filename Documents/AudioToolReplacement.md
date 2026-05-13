@@ -221,11 +221,20 @@ Current implementation status:
   `FSIDBuilder.exe` during parity checks.
 - `Tools/Tests/AudioToolBuildRules/Run.ps1` verifies the default generated
   build-rule command, the legacy escape hatch, and a synthetic FSID proto build.
+- `Tools/Tests/AudioToolParity/Run.ps1` verifies direct managed-vs-legacy FSID
+  parity for a project-shaped legacy-compatible bank, then records the expected
+  limitation that `FSIDBuilder.exe` rejects current full-schema YAML containing
+  fields such as `filterCRC`.
+
+No original game audio bank data is available in this workspace. Usagi was only
+used for one shipped game, and that source/data is not present, so parity must be
+proved with synthetic contract fixtures unless the original project data is
+recovered later.
 
 Remaining implementation work after switching project builds:
 
-- Run the switched builder against recovered project audio banks and keep the
-  `USAGI_USE_LEGACY_AUDIO_TOOL=1` fallback until project parity is proven.
+- Keep `USAGI_USE_LEGACY_AUDIO_TOOL=1` only as a legacy-compatible input escape
+  hatch. It cannot process normalized/current full-schema audio YAML.
 - Add the artist-facing audio editor UI.
 
 Implemented WAV metadata support:
