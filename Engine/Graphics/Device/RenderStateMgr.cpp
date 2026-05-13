@@ -36,7 +36,7 @@ template <class DeclarationType, class ResourceType, class HandleType, uint32 CO
 class StateResources
 {
 public:
-	StateResources() { m_uPairs = 0; m_uStaticPairs = 0;}
+	StateResources() { m_uPairs = 0; m_uStaticPairs = 0; m_uLastHit = COUNT; }
 	~StateResources() {}
 	
 	void SetDefault(HandleType defaultIn) { m_default = defaultIn; }
@@ -56,10 +56,16 @@ public:
 			return m_default;
 		}
 
+		if (m_uLastHit < m_uPairs && *pDecl == m_pairings[m_uLastHit].decl)
+		{
+			return HandleType(m_pairings[m_uLastHit].state, m_uLastHit);
+		}
+
 		for (uint32 i = 0; i < m_uPairs; i++)
 		{
 			if (*pDecl == m_pairings[i].decl)
 			{
+				m_uLastHit = i;
 				return HandleType(m_pairings[i].state, i);
 			}
 		}
@@ -71,6 +77,7 @@ public:
 			m_pairings[m_uPairs].state->Init(pDevice, m_pairings[m_uPairs].decl, m_uPairs);
 			m_uPairs++;
 			uint32 uIndex = m_uPairs - 1;
+			m_uLastHit = uIndex;
 			return HandleType(m_pairings[uIndex].state, uIndex);
 		}
 
@@ -90,6 +97,10 @@ public:
 			vdelete m_pairings[i].state;
 		}
 		m_uPairs = m_uStaticPairs;
+		if (m_uLastHit >= m_uPairs)
+		{
+			m_uLastHit = COUNT;
+		}
 
 	}
 
@@ -100,6 +111,7 @@ public:
 			vdelete m_pairings[i].state;
 		}
 		m_uPairs = 0;
+		m_uLastHit = COUNT;
 
 	}
 
@@ -127,6 +139,7 @@ private:
 	Pairing				m_pairings[COUNT];
 	uint32				m_uPairs;
 	uint32				m_uStaticPairs;
+	uint32				m_uLastHit;
 
 };
 
