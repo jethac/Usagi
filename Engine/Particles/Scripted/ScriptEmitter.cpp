@@ -25,6 +25,11 @@ namespace usg
 		RenderLayer::LAYER_ADDITIVE
 	};
 
+	static bool HasValidTexturePattern(const particles::TextureData& textureData)
+	{
+		return textureData.uPatternRepeatHor > 0 && textureData.uPatternRepeatVer > 0;
+	}
+
 	ScriptEmitter::FloatAnimation::FloatAnimation()
 	{
 		m_fValue = 0.0f;
@@ -222,7 +227,7 @@ namespace usg
 			}
 		}
 
-		TextureHndl pTextures[particles::EmitterEmission::textureData_max_count];
+		TextureHndl pTextures[particles::EmitterEmission::textureData_max_count] = {};
 		for (uint32 i = 0; i < m_emissionDef.textureData_count; i++)
 		{
 			SamplerDecl decl;
@@ -230,7 +235,7 @@ namespace usg
 			pTextures[i] = ResourceMgr::Inst()->GetTexture(pDevice, m_emissionDef.textureData[i].name);
 			m_material.SetTexture(i, pTextures[i], pDevice->GetSampler(decl));
 		}
-		if (pTextures[0])
+		if (m_emissionDef.textureData_count > 0 && pTextures[0] && HasValidTexturePattern(m_emissionDef.textureData[0]))
 		{
 			float fWidth = (float)pTextures[0]->GetWidth() / (float)m_emissionDef.textureData[0].uPatternRepeatHor;
 			float fHeight = (float)pTextures[0]->GetHeight() / (float)m_emissionDef.textureData[0].uPatternRepeatVer;
@@ -277,18 +282,30 @@ namespace usg
 	{
 		//m_material.SetEffect(m_pEffects[m_emissionDef.eParticleType]);
 
+		for (uint32 i = 0; i < particles::EmitterEmission::textureData_max_count; i++)
+		{
+			m_vUVScale[i] = Vector2f(1.0f, 1.0f);
+		}
+
 		for(uint32 i=0; i<m_emissionDef.textureData_count; i++)
 		{ 
-			m_vUVScale[i].x = 1.0f / (float)m_emissionDef.textureData[i].uPatternRepeatHor;
-			m_vUVScale[i].y = 1.0f / (float)m_emissionDef.textureData[i].uPatternRepeatVer;
+			if (HasValidTexturePattern(m_emissionDef.textureData[i]))
+			{
+				m_vUVScale[i].x = 1.0f / (float)m_emissionDef.textureData[i].uPatternRepeatHor;
+				m_vUVScale[i].y = 1.0f / (float)m_emissionDef.textureData[i].uPatternRepeatVer;
+			}
 		}
 
 		// For the benefit of the particle editor
-		if(m_material.GetTexture(0))
+		if(m_emissionDef.textureData_count > 0 && m_material.GetTexture(0) && HasValidTexturePattern(m_emissionDef.textureData[0]))
 		{
 			float fWidth = (float)m_material.GetTexture(0)->GetWidth()/(float)m_emissionDef.textureData[0].uPatternRepeatHor;
 			float fHeight = (float)m_material.GetTexture(0)->GetHeight()/(float)m_emissionDef.textureData[0].uPatternRepeatVer;
 			m_fParticleAspect = fWidth/fHeight;
+		}
+		else
+		{
+			m_fParticleAspect = 1.0f;
 		}
 
 		SetMaxCount(m_emissionDef.emission.uMaxParticles);
