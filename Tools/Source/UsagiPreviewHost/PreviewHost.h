@@ -1,83 +1,54 @@
 /****************************************************************************
-//  Usagi Engine - Preview Host for Tool Integration
-//  Description: Headless preview server for external tool communication
+//  Minimal native preview host for Avalonia tools.
 ****************************************************************************/
 #pragma once
 
-#ifndef USG_PREVIEW_HOST_H
-#define USG_PREVIEW_HOST_H
+#ifndef USAGI_PREVIEW_HOST_H
+#define USAGI_PREVIEW_HOST_H
 
-#include "Engine/Game/GameInterface.h"
-#include "Engine/Scene/Scene.h"
-#include "Engine/Core/Timer/Timer.h"
-#include "Engine/Scene/Camera/Camera.h"
-#include "Engine/Graphics/Lights/DirLight.h"
-#include "Engine/PostFX/PostFXSys.h"
-#include "Engine/Particles/ParticleEffect.h"
-#include "Engine/Particles/ParticleEffectHndl.h"
-#include "Engine/Particles/Scripted/ScriptEmitter.h"
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 #include "IpcProtocol.h"
 
-namespace usg
-{
-    class ViewContext;
-    class IMGuiRenderer;
-    class ParticleMgr;
-}
-
-class PreviewHost : public usg::GameInterface
+class PreviewHost
 {
 public:
     PreviewHost();
-    virtual ~PreviewHost();
+    ~PreviewHost();
 
-    // GameInterface implementation
-    virtual void PreGFXInit() override;
-    virtual void Init(usg::GFXDevice* pDevice, usg::ResourceMgr* pResMgr) override;
-    virtual void Cleanup(usg::GFXDevice* pDevice) override;
-    virtual void Update(usg::GFXDevice* pDevice) override;
-    virtual void Draw(usg::GFXDevice* pDevice) override;
-    virtual void OnMessage(usg::GFXDevice* const pDevice, const uint32 messageID, const void* const pParameters) override;
-
-    // IPC command handlers
-    void HandleInit(const IpcInitCommand& cmd);
-    void HandleAttachWindow(const IpcAttachWindowCommand& cmd);
-    void HandleLoadEntity(const IpcLoadEntityCommand& cmd);
-    void HandleLoadParticle(const IpcLoadParticleCommand& cmd);
-    void HandleTick(const IpcTickCommand& cmd);
-    void HandlePick(const IpcPickCommand& cmd);
-    void HandleSetCameraPosition(const IpcSetCameraPositionCommand& cmd);
-    void HandleShutdown();
+    int Run(HINSTANCE instance, int showCommand);
 
 private:
-    void ProcessIpcInput();
+    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+
+    bool CreatePreviewWindow(HINSTANCE instance);
+    void PumpStdIn();
+    void ProcessLine(const char* line);
+    void HandleInit(const IpcInitCommand& command);
+    void HandleAttachWindow(const IpcAttachWindowCommand& command);
+    void HandleLoadEntity(const IpcLoadEntityCommand& command);
+    void HandleLoadParticle(const IpcLoadParticleCommand& command);
+    void HandlePick(const IpcPickCommand& command);
+    void HandleShutdown();
+
+    void ResizeHostedWindow(int width, int height);
     void SendResponse(const char* json);
     void SendReady();
     void SendError(const char* message, const char* details = nullptr);
     void SendLoaded(const char* resourceType, const char* path, bool success, const char* error = nullptr);
     void SendDiagnostic(const char* level, const char* message, const char* source = nullptr);
 
-    void SetupDefaultScene(usg::GFXDevice* pDevice);
-    void ClearScene(usg::GFXDevice* pDevice);
-
-    usg::Timer          m_timer;
-    usg::Scene          m_scene;
-    usg::PostFXSys      m_postFX;
-    usg::Camera         m_camera;
-    usg::DirLight*      m_pDirLight;
-    usg::ViewContext*   m_pViewContext;
-
-    // Active particle effect handle
-    usg::ParticleEffectHndl m_activeEffect;
-    bool                m_bHasActiveEffect;
-
-    WindHndl            m_hwnd;
-    bool                m_bInitialized;
-    bool                m_bShutdownRequested;
-
-    // IPC state
-    char                m_inputBuffer[8192];
-    int                 m_inputPos;
+    HWND m_hwnd;
+    HWND m_parentHwnd;
+    HANDLE m_stdin;
+    HANDLE m_stdout;
+    DWORD m_stdinType;
+    bool m_shutdownRequested;
+    bool m_protocolReady;
+    char m_inputBuffer[8192];
+    int m_inputPos;
 };
 
-#endif // USG_PREVIEW_HOST_H
+#endif

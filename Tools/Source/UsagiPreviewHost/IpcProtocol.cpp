@@ -1,116 +1,159 @@
 /****************************************************************************
-//  Usagi Engine - Preview Host IPC Protocol Implementation
+//  Usagi preview host IPC protocol implementation.
 ****************************************************************************/
-#include "Engine/Common/Common.h"
 #include "IpcProtocol.h"
-#include <cstring>
+
 #include <cstdio>
 #include <cstdlib>
-
-// Simple JSON parsing helpers (no external dependencies)
+#include <cstring>
 
 static const char* SkipWhitespace(const char* p)
 {
-    while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')
     {
-        p++;
+        ++p;
     }
+
     return p;
 }
 
 static const char* FindKey(const char* json, const char* key)
 {
-    char searchPattern[128];
-    snprintf(searchPattern, sizeof(searchPattern), "\"%s\"", key);
+    char pattern[128];
+    std::snprintf(pattern, sizeof(pattern), "\"%s\"", key);
 
-    const char* found = strstr(json, searchPattern);
-    if (!found) return nullptr;
+    const char* found = std::strstr(json, pattern);
+    if (found == nullptr)
+    {
+        return nullptr;
+    }
 
-    // Skip past the key and colon
-    found += strlen(searchPattern);
+    found += std::strlen(pattern);
     found = SkipWhitespace(found);
-    if (*found != ':') return nullptr;
-    found++;
-    found = SkipWhitespace(found);
+    if (*found != ':')
+    {
+        return nullptr;
+    }
 
-    return found;
+    return SkipWhitespace(found + 1);
 }
 
 const char* IpcParser::FindString(const char* json, const char* key, char* buffer, int bufferSize)
 {
-    const char* value = FindKey(json, key);
-    if (!value) return nullptr;
+    if (bufferSize <= 0)
+    {
+        return nullptr;
+    }
 
-    if (*value == 'n' && strncmp(value, "null", 4) == 0)
+    const char* value = FindKey(json, key);
+    if (value == nullptr)
+    {
+        return nullptr;
+    }
+
+    if (std::strncmp(value, "null", 4) == 0)
     {
         buffer[0] = '\0';
         return buffer;
     }
 
-    if (*value != '"') return nullptr;
-    value++;
+    if (*value != '"')
+    {
+        return nullptr;
+    }
+
+    ++value;
 
     int i = 0;
-    while (*value && *value != '"' && i < bufferSize - 1)
+    while (*value != '\0' && *value != '"' && i < bufferSize - 1)
     {
-        if (*value == '\\' && *(value + 1))
+        if (*value == '\\' && value[1] != '\0')
         {
-            value++;
+            ++value;
             switch (*value)
             {
-            case 'n': buffer[i++] = '\n'; break;
-            case 't': buffer[i++] = '\t'; break;
-            case 'r': buffer[i++] = '\r'; break;
-            case '\\': buffer[i++] = '\\'; break;
-            case '"': buffer[i++] = '"'; break;
-            default: buffer[i++] = *value; break;
+            case 'n':
+                buffer[i++] = '\n';
+                break;
+            case 'r':
+                buffer[i++] = '\r';
+                break;
+            case 't':
+                buffer[i++] = '\t';
+                break;
+            case '"':
+            case '\\':
+                buffer[i++] = *value;
+                break;
+            default:
+                buffer[i++] = *value;
+                break;
             }
         }
         else
         {
             buffer[i++] = *value;
         }
-        value++;
-    }
-    buffer[i] = '\0';
 
+        ++value;
+    }
+
+    buffer[i] = '\0';
     return buffer;
 }
 
 bool IpcParser::FindInt(const char* json, const char* key, int& out)
 {
     const char* value = FindKey(json, key);
-    if (!value) return false;
+    if (value == nullptr)
+    {
+        return false;
+    }
 
-    char* end;
-    long result = strtol(value, &end, 10);
-    if (end == value) return false;
+    char* end = nullptr;
+    const long result = std::strtol(value, &end, 10);
+    if (end == value)
+    {
+        return false;
+    }
 
-    out = (int)result;
+    out = static_cast<int>(result);
     return true;
 }
 
 bool IpcParser::FindInt64(const char* json, const char* key, int64_t& out)
 {
     const char* value = FindKey(json, key);
-    if (!value) return false;
+    if (value == nullptr)
+    {
+        return false;
+    }
 
-    char* end;
-    int64_t result = strtoll(value, &end, 10);
-    if (end == value) return false;
+    char* end = nullptr;
+    const long long result = _strtoi64(value, &end, 10);
+    if (end == value)
+    {
+        return false;
+    }
 
-    out = result;
+    out = static_cast<int64_t>(result);
     return true;
 }
 
 bool IpcParser::FindFloat(const char* json, const char* key, float& out)
 {
     const char* value = FindKey(json, key);
-    if (!value) return false;
+    if (value == nullptr)
+    {
+        return false;
+    }
 
-    char* end;
-    float result = strtof(value, &end);
-    if (end == value) return false;
+    char* end = nullptr;
+    const float result = std::strtof(value, &end);
+    if (end == value)
+    {
+        return false;
+    }
 
     out = result;
     return true;
@@ -119,27 +162,31 @@ bool IpcParser::FindFloat(const char* json, const char* key, float& out)
 IpcCommandType IpcParser::ParseCommandType(const char* json)
 {
     char type[64];
-    if (!FindString(json, "type", type, sizeof(type)))
+    if (FindString(json, "type", type, sizeof(type)) == nullptr)
     {
         return IpcCommandType::Unknown;
     }
 
-    if (strcmp(type, "init") == 0) return IpcCommandType::Init;
-    if (strcmp(type, "shutdown") == 0) return IpcCommandType::Shutdown;
-    if (strcmp(type, "attachWindow") == 0) return IpcCommandType::AttachWindow;
-    if (strcmp(type, "loadEntity") == 0) return IpcCommandType::LoadEntity;
-    if (strcmp(type, "loadParticle") == 0) return IpcCommandType::LoadParticle;
-    if (strcmp(type, "tick") == 0) return IpcCommandType::Tick;
-    if (strcmp(type, "pick") == 0) return IpcCommandType::Pick;
-    if (strcmp(type, "setCameraPosition") == 0) return IpcCommandType::SetCameraPosition;
+    if (std::strcmp(type, "init") == 0) return IpcCommandType::Init;
+    if (std::strcmp(type, "shutdown") == 0) return IpcCommandType::Shutdown;
+    if (std::strcmp(type, "attachWindow") == 0) return IpcCommandType::AttachWindow;
+    if (std::strcmp(type, "loadEntity") == 0) return IpcCommandType::LoadEntity;
+    if (std::strcmp(type, "loadParticle") == 0) return IpcCommandType::LoadParticle;
+    if (std::strcmp(type, "tick") == 0) return IpcCommandType::Tick;
+    if (std::strcmp(type, "pick") == 0) return IpcCommandType::Pick;
+    if (std::strcmp(type, "setCameraPosition") == 0) return IpcCommandType::SetCameraPosition;
 
     return IpcCommandType::Unknown;
 }
 
 bool IpcParser::ParseInit(const char* json, IpcInitCommand& out)
 {
-    memset(&out, 0, sizeof(out));
-    FindInt(json, "protocolVersion", out.protocolVersion);
+    std::memset(&out, 0, sizeof(out));
+    if (!FindInt(json, "protocolVersion", out.protocolVersion))
+    {
+        return false;
+    }
+
     FindString(json, "dataPath", out.dataPath, sizeof(out.dataPath));
     FindString(json, "romfilesPath", out.romfilesPath, sizeof(out.romfilesPath));
     return true;
@@ -147,103 +194,95 @@ bool IpcParser::ParseInit(const char* json, IpcInitCommand& out)
 
 bool IpcParser::ParseAttachWindow(const char* json, IpcAttachWindowCommand& out)
 {
-    memset(&out, 0, sizeof(out));
+    std::memset(&out, 0, sizeof(out));
     if (!FindInt64(json, "hwnd", out.hwnd)) return false;
-    FindInt(json, "width", out.width);
-    FindInt(json, "height", out.height);
+    if (!FindInt(json, "width", out.width)) out.width = 1;
+    if (!FindInt(json, "height", out.height)) out.height = 1;
     return true;
 }
 
 bool IpcParser::ParseLoadEntity(const char* json, IpcLoadEntityCommand& out)
 {
-    memset(&out, 0, sizeof(out));
+    std::memset(&out, 0, sizeof(out));
     return FindString(json, "path", out.path, sizeof(out.path)) != nullptr;
 }
 
 bool IpcParser::ParseLoadParticle(const char* json, IpcLoadParticleCommand& out)
 {
-    memset(&out, 0, sizeof(out));
-    if (!FindString(json, "emitterPath", out.emitterPath, sizeof(out.emitterPath)))
+    std::memset(&out, 0, sizeof(out));
+    if (FindString(json, "emitterPath", out.emitterPath, sizeof(out.emitterPath)) == nullptr)
     {
         return false;
     }
+
     FindString(json, "effectPath", out.effectPath, sizeof(out.effectPath));
     return true;
 }
 
 bool IpcParser::ParseTick(const char* json, IpcTickCommand& out)
 {
-    memset(&out, 0, sizeof(out));
-    out.deltaTime = 1.0f / 60.0f;  // Default
+    std::memset(&out, 0, sizeof(out));
+    out.deltaTime = 1.0f / 60.0f;
     FindFloat(json, "deltaTime", out.deltaTime);
     return true;
 }
 
 bool IpcParser::ParsePick(const char* json, IpcPickCommand& out)
 {
-    memset(&out, 0, sizeof(out));
-    if (!FindInt(json, "x", out.x)) return false;
-    if (!FindInt(json, "y", out.y)) return false;
-    return true;
+    std::memset(&out, 0, sizeof(out));
+    return FindInt(json, "x", out.x) && FindInt(json, "y", out.y);
 }
 
 bool IpcParser::ParseSetCameraPosition(const char* json, IpcSetCameraPositionCommand& out)
 {
-    memset(&out, 0, sizeof(out));
-    if (!FindFloat(json, "x", out.x)) return false;
-    if (!FindFloat(json, "y", out.y)) return false;
-    if (!FindFloat(json, "z", out.z)) return false;
-    if (!FindFloat(json, "targetX", out.targetX)) return false;
-    if (!FindFloat(json, "targetY", out.targetY)) return false;
-    if (!FindFloat(json, "targetZ", out.targetZ)) return false;
-    return true;
+    std::memset(&out, 0, sizeof(out));
+    return FindFloat(json, "x", out.x)
+        && FindFloat(json, "y", out.y)
+        && FindFloat(json, "z", out.z)
+        && FindFloat(json, "targetX", out.targetX)
+        && FindFloat(json, "targetY", out.targetY)
+        && FindFloat(json, "targetZ", out.targetZ);
 }
 
-// Response builders
-
-static void EscapeJsonString(const char* input, char* output, int maxLen)
+static void EscapeJsonString(const char* input, char* output, int outputSize)
 {
     int j = 0;
-    for (int i = 0; input[i] && j < maxLen - 2; i++)
+    const char* safeInput = input != nullptr ? input : "";
+
+    for (int i = 0; safeInput[i] != '\0' && j < outputSize - 1; ++i)
     {
-        char c = input[i];
-        if (c == '"' || c == '\\')
+        const char c = safeInput[i];
+        const char* replacement = nullptr;
+        char escaped[3] = {};
+
+        switch (c)
         {
-            output[j++] = '\\';
-        }
-        else if (c == '\n')
-        {
-            output[j++] = '\\';
-            c = 'n';
-        }
-        else if (c == '\r')
-        {
-            output[j++] = '\\';
-            c = 'r';
-        }
-        else if (c == '\t')
-        {
-            output[j++] = '\\';
-            c = 't';
+        case '"': replacement = "\\\""; break;
+        case '\\': replacement = "\\\\"; break;
+        case '\n': replacement = "\\n"; break;
+        case '\r': replacement = "\\r"; break;
+        case '\t': replacement = "\\t"; break;
+        default:
+            escaped[0] = c;
+            replacement = escaped;
+            break;
         }
 
-        if (j < maxLen - 1)
+        for (int k = 0; replacement[k] != '\0' && j < outputSize - 1; ++k)
         {
-            output[j++] = c;
+            output[j++] = replacement[k];
         }
     }
+
     output[j] = '\0';
 }
 
 void IpcResponse::Ready(char* buffer, int bufferSize, int protocolVersion, const char* engineVersion)
 {
-    char escapedVersion[128] = "";
-    if (engineVersion)
-    {
-        EscapeJsonString(engineVersion, escapedVersion, sizeof(escapedVersion));
-    }
+    char escapedVersion[128];
+    EscapeJsonString(engineVersion, escapedVersion, sizeof(escapedVersion));
 
-    snprintf(buffer, bufferSize,
+    std::snprintf(buffer, bufferSize,
         "{\"type\":\"ready\",\"protocolVersion\":%d,\"engineVersion\":\"%s\"}",
         protocolVersion, escapedVersion);
 }
@@ -253,17 +292,17 @@ void IpcResponse::Error(char* buffer, int bufferSize, const char* message, const
     char escapedMessage[512];
     EscapeJsonString(message, escapedMessage, sizeof(escapedMessage));
 
-    if (details)
+    if (details != nullptr)
     {
         char escapedDetails[512];
         EscapeJsonString(details, escapedDetails, sizeof(escapedDetails));
-        snprintf(buffer, bufferSize,
+        std::snprintf(buffer, bufferSize,
             "{\"type\":\"error\",\"message\":\"%s\",\"details\":\"%s\"}",
             escapedMessage, escapedDetails);
     }
     else
     {
-        snprintf(buffer, bufferSize,
+        std::snprintf(buffer, bufferSize,
             "{\"type\":\"error\",\"message\":\"%s\"}",
             escapedMessage);
     }
@@ -271,21 +310,22 @@ void IpcResponse::Error(char* buffer, int bufferSize, const char* message, const
 
 void IpcResponse::Loaded(char* buffer, int bufferSize, const char* resourceType, const char* path, bool success, const char* error)
 {
-    char escapedType[64], escapedPath[512];
+    char escapedType[64];
+    char escapedPath[IPC_MAX_PATH];
     EscapeJsonString(resourceType, escapedType, sizeof(escapedType));
     EscapeJsonString(path, escapedPath, sizeof(escapedPath));
 
-    if (error)
+    if (error != nullptr)
     {
         char escapedError[512];
         EscapeJsonString(error, escapedError, sizeof(escapedError));
-        snprintf(buffer, bufferSize,
+        std::snprintf(buffer, bufferSize,
             "{\"type\":\"loaded\",\"resourceType\":\"%s\",\"path\":\"%s\",\"success\":%s,\"error\":\"%s\"}",
             escapedType, escapedPath, success ? "true" : "false", escapedError);
     }
     else
     {
-        snprintf(buffer, bufferSize,
+        std::snprintf(buffer, bufferSize,
             "{\"type\":\"loaded\",\"resourceType\":\"%s\",\"path\":\"%s\",\"success\":%s}",
             escapedType, escapedPath, success ? "true" : "false");
     }
@@ -293,42 +333,49 @@ void IpcResponse::Loaded(char* buffer, int bufferSize, const char* resourceType,
 
 void IpcResponse::Picked(char* buffer, int bufferSize, const char* entityId, const char* componentName)
 {
-    if (entityId)
+    if (entityId == nullptr)
     {
-        char escapedId[256], escapedComp[256] = "";
-        EscapeJsonString(entityId, escapedId, sizeof(escapedId));
-        if (componentName)
-        {
-            EscapeJsonString(componentName, escapedComp, sizeof(escapedComp));
-        }
+        std::snprintf(buffer, bufferSize, "{\"type\":\"picked\",\"entityId\":null}");
+        return;
+    }
 
-        snprintf(buffer, bufferSize,
-            "{\"type\":\"picked\",\"entityId\":\"%s\",\"componentName\":%s}",
-            escapedId, componentName ? escapedComp : "null");
+    char escapedId[256];
+    EscapeJsonString(entityId, escapedId, sizeof(escapedId));
+
+    if (componentName != nullptr)
+    {
+        char escapedComponent[256];
+        EscapeJsonString(componentName, escapedComponent, sizeof(escapedComponent));
+        std::snprintf(buffer, bufferSize,
+            "{\"type\":\"picked\",\"entityId\":\"%s\",\"componentName\":\"%s\"}",
+            escapedId, escapedComponent);
     }
     else
     {
-        snprintf(buffer, bufferSize, "{\"type\":\"picked\",\"entityId\":null}");
+        std::snprintf(buffer, bufferSize,
+            "{\"type\":\"picked\",\"entityId\":\"%s\",\"componentName\":null}",
+            escapedId);
     }
 }
 
 void IpcResponse::Diagnostic(char* buffer, int bufferSize, const char* level, const char* message, const char* source)
 {
-    char escapedLevel[32], escapedMessage[1024];
+    char escapedLevel[32];
+    char escapedMessage[1024];
     EscapeJsonString(level, escapedLevel, sizeof(escapedLevel));
     EscapeJsonString(message, escapedMessage, sizeof(escapedMessage));
 
-    if (source)
+    if (source != nullptr)
     {
         char escapedSource[256];
         EscapeJsonString(source, escapedSource, sizeof(escapedSource));
-        snprintf(buffer, bufferSize,
+        std::snprintf(buffer, bufferSize,
             "{\"type\":\"diagnostic\",\"level\":\"%s\",\"message\":\"%s\",\"source\":\"%s\"}",
             escapedLevel, escapedMessage, escapedSource);
     }
     else
     {
-        snprintf(buffer, bufferSize,
+        std::snprintf(buffer, bufferSize,
             "{\"type\":\"diagnostic\",\"level\":\"%s\",\"message\":\"%s\"}",
             escapedLevel, escapedMessage);
     }

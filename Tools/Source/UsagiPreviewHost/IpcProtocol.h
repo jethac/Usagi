@@ -1,24 +1,17 @@
 /****************************************************************************
-//  Usagi Engine - Preview Host IPC Protocol
-//  Description: JSON-lines protocol for external tool communication
-//  Protocol version: 1
+//  Usagi preview host IPC protocol.
+//  JSON-lines messages shared with Usagi.ToolCore.Preview.
 ****************************************************************************/
 #pragma once
 
-#ifndef USG_IPC_PROTOCOL_H
-#define USG_IPC_PROTOCOL_H
+#ifndef USAGI_PREVIEW_HOST_IPC_PROTOCOL_H
+#define USAGI_PREVIEW_HOST_IPC_PROTOCOL_H
 
-#include "Engine/Common/Common.h"
 #include <cstdint>
 
-// Protocol version
 static constexpr int IPC_PROTOCOL_VERSION = 1;
-
-// Maximum lengths
 static constexpr int IPC_MAX_PATH = 512;
-static constexpr int IPC_MAX_MESSAGE = 1024;
 
-// Command types (parsed from JSON "type" field)
 enum class IpcCommandType
 {
     Unknown,
@@ -31,8 +24,6 @@ enum class IpcCommandType
     Pick,
     SetCameraPosition
 };
-
-// Command structures
 
 struct IpcInitCommand
 {
@@ -72,11 +63,14 @@ struct IpcPickCommand
 
 struct IpcSetCameraPositionCommand
 {
-    float x, y, z;
-    float targetX, targetY, targetZ;
+    float x;
+    float y;
+    float z;
+    float targetX;
+    float targetY;
+    float targetZ;
 };
 
-// Parser utilities
 class IpcParser
 {
 public:
@@ -96,7 +90,6 @@ private:
     static bool FindFloat(const char* json, const char* key, float& out);
 };
 
-// Response builder
 class IpcResponse
 {
 public:
@@ -107,4 +100,4 @@ public:
     static void Diagnostic(char* buffer, int bufferSize, const char* level, const char* message, const char* source = nullptr);
 };
 
-#endif // USG_IPC_PROTOCOL_H
+#endif

@@ -1,482 +1,405 @@
 /****************************************************************************
-//  Usagi Engine - Preview Host Implementation
+//  Minimal native preview host for Avalonia tools.
 ****************************************************************************/
-#include "Engine/Common/Common.h"
-#include "Engine/Graphics/Device/GFXDevice.h"
-#include API_HEADER(Engine/Graphics/Device, GFXDevice_ps.h)
-#include "Engine/Scene/ViewContext.h"
-#include "Engine/Scene/SceneContext.h"
-#include "Engine/Graphics/Device/GFXContext.h"
-#include "Engine/Graphics/Device/Display.h"
-#include "Engine/Graphics/Lights/LightMgr.h"
-#include "Engine/Resource/ResourceMgr.h"
-#include "Engine/Particles/ParticleMgr.h"
-#include "Engine/Particles/ParticleEffect.h"
-#include "Engine/Particles/Scripted/ScriptEmitter.h"
-#include "Engine/Maths/AABB.h"
-#include "Engine/Maths/MathUtil.h"
 #include "PreviewHost.h"
+
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
-#ifdef PLATFORM_PC
-#include <io.h>
-#include <fcntl.h>
-#endif
-
-static PreviewHost* g_spPreviewHost = nullptr;
-
-usg::GameInterface* usg::CreateGame()
-{
-    return vnew(usg::ALLOC_OBJECT) PreviewHost();
-}
-
-const char* usg::GetGameName()
-{
-    return "UsagiPreviewHost";
-}
+static const char* kWindowClassName = "UsagiPreviewHostWindow";
+static const char* kEngineVersion = "UsagiPreviewHost scaffold";
 
 PreviewHost::PreviewHost()
-    : GameInterface()
-    , m_pDirLight(nullptr)
-    , m_pViewContext(nullptr)
-    , m_bHasActiveEffect(false)
-    , m_hwnd(nullptr)
-    , m_bInitialized(false)
-    , m_bShutdownRequested(false)
+    : m_hwnd(nullptr)
+    , m_parentHwnd(nullptr)
+    , m_stdin(GetStdHandle(STD_INPUT_HANDLE))
+    , m_stdout(GetStdHandle(STD_OUTPUT_HANDLE))
+    , m_stdinType(FILE_TYPE_UNKNOWN)
+    , m_shutdownRequested(false)
+    , m_protocolReady(false)
     , m_inputPos(0)
 {
-    g_spPreviewHost = this;
-    memset(m_inputBuffer, 0, sizeof(m_inputBuffer));
+    std::memset(m_inputBuffer, 0, sizeof(m_inputBuffer));
+    if (m_stdin != INVALID_HANDLE_VALUE && m_stdin != nullptr)
+    {
+        m_stdinType = GetFileType(m_stdin);
+    }
 }
 
 PreviewHost::~PreviewHost()
 {
-    g_spPreviewHost = nullptr;
-}
-
-void PreviewHost::PreGFXInit()
-{
-#ifdef PLATFORM_PC
-    // Set stdin to non-blocking binary mode
-    _setmode(_fileno(stdin), _O_BINARY);
-    setvbuf(stdin, nullptr, _IONBF, 0);
-    setvbuf(stdout, nullptr, _IONBF, 0);
-#endif
-}
-
-void PreviewHost::Init(usg::GFXDevice* pDevice, usg::ResourceMgr* pResMgr)
-{
-    m_timer.Init();
-
-    // Basic scene setup
-    SetupDefaultScene(pDevice);
-
-    m_bInitialized = true;
-
-    // Send ready response
-    SendReady();
-
-    SendDiagnostic("info", "Preview host initialized");
-}
-
-void PreviewHost::SetupDefaultScene(usg::GFXDevice* pDevice)
-{
-    // Set up world bounds for the scene
-    usg::AABB worldBounds;
-    worldBounds.SetCentreRadii(usg::Vector3f(0.0f, 0.0f, 0.0f), usg::Vector3f(512.0f, 512.0f, 512.0f));
-
-    // Initialize scene with particle support (NULL for ParticleSet means scripted particles only)
-    m_scene.Init(pDevice, usg::ResourceMgr::Inst(), worldBounds, nullptr);
-
-    // Create view context for rendering
-    m_pViewContext = m_scene.CreateViewContext(pDevice);
-
-    // Initialize camera with default aspect ratio (will be updated when window is attached)
-    m_camera.Init(1.0f);
-    m_camera.SetUp(usg::Vector4f(0.0f, 1.0f, 0.0f, 0.0f));
-    m_camera.SetPos(usg::Vector4f(0.0f, 5.0f, -20.0f, 1.0f));
-    m_camera.SetTarget(usg::Vector4f(0.0f, 0.0f, 0.0f, 1.0f));
-
-    // Initialize PostFX system with basic effects
-    uint32 uEffectFlags = usg::PostFXSys::EFFECT_DEFERRED_SHADING | usg::PostFXSys::EFFECT_BLOOM;
-    m_postFX.Init(pDevice, usg::ResourceMgr::Inst(), 800, 600, uEffectFlags);
-    m_postFX.SetSkyTexture(pDevice, usg::ResourceMgr::Inst()->GetTexture(pDevice, "white_default"));
-
-    // Initialize view context with PostFX
-    m_pViewContext->Init(pDevice, usg::ResourceMgr::Inst(), &m_postFX, 0, usg::RenderMask::RENDER_MASK_ALL);
-    m_pViewContext->SetCamera(&m_camera);
-
-    // Add directional light
-    m_pDirLight = m_scene.GetLightMgr().AddDirectionalLight(pDevice, false);
-    m_pDirLight->SetAmbient(usg::Color(0.3f, 0.3f, 0.3f));
-    m_pDirLight->SetDiffuse(usg::Color(2.0f, 2.0f, 2.0f));
-    m_pDirLight->SetSpecularColor(usg::Color(5.0f, 5.0f, 5.0f));
-    m_pDirLight->SetDirection(usg::Vector4f(-1.0f, -1.0f, 0.5f, 0.0f).GetNormalised());
-    m_pDirLight->SwitchOn(true);
-}
-
-void PreviewHost::ClearScene(usg::GFXDevice* pDevice)
-{
-    // Kill any active particle effect
-    if (m_bHasActiveEffect && m_activeEffect.GetEffect() != nullptr)
+    if (m_hwnd != nullptr)
     {
-        m_activeEffect.Kill(true); // Force immediate cleanup
-        m_bHasActiveEffect = false;
+        DestroyWindow(m_hwnd);
+        m_hwnd = nullptr;
     }
 }
 
-void PreviewHost::Cleanup(usg::GFXDevice* pDevice)
+int PreviewHost::Run(HINSTANCE instance, int showCommand)
 {
-    ClearScene(pDevice);
+    UNREFERENCED_PARAMETER(showCommand);
 
-    // Clean up lighting
-    if (m_pDirLight)
+    if (!CreatePreviewWindow(instance))
     {
-        m_scene.GetLightMgr().RemoveDirLight(m_pDirLight);
-        m_pDirLight = nullptr;
+        SendError("Failed to create preview host window");
+        return 1;
     }
 
-    // Clean up view context
-    if (m_pViewContext)
+    SendDiagnostic("info", "Preview host process started");
+
+    MSG message = {};
+    while (!m_shutdownRequested)
     {
-        m_scene.DeleteViewContext(m_pViewContext);
-        m_pViewContext = nullptr;
-    }
-
-    // Clean up PostFX and scene
-    m_postFX.Cleanup(pDevice);
-    m_scene.Cleanup(pDevice);
-
-    m_bInitialized = false;
-}
-
-void PreviewHost::Update(usg::GFXDevice* pDevice)
-{
-    // Process any pending IPC commands
-    ProcessIpcInput();
-
-    if (m_bShutdownRequested)
-    {
-        Quit();
-        return;
-    }
-
-    // Update timer
-    m_timer.Update();
-    float fElapsed = m_timer.GetDeltaGameTime();
-
-    // Update scene (including particles)
-    m_scene.TransformUpdate(fElapsed);
-    m_scene.Update(pDevice);
-}
-
-void PreviewHost::Draw(usg::GFXDevice* pDevice)
-{
-    if (!m_bInitialized || m_pViewContext == nullptr)
-    {
-        return;
-    }
-
-    usg::Display* pDisplay = pDevice->GetDisplay(0);
-    if (pDisplay == nullptr)
-    {
-        return;
-    }
-
-    pDevice->Begin();
-    usg::GFXContext* pImmContext = pDevice->GetImmediateCtxt();
-    pImmContext->Begin(true);
-
-    // Pre-draw phase
-    m_scene.PreDraw(pImmContext);
-    m_scene.GetLightMgr().ViewShadowRender(pImmContext, &m_scene, m_pViewContext);
-
-    // Begin PostFX scene
-    m_postFX.BeginScene(pImmContext, 0);
-    m_postFX.SetActiveViewContext(m_pViewContext);
-
-    // Draw the scene
-    m_pViewContext->PreDraw(pImmContext, usg::VIEW_CENTRAL);
-    m_pViewContext->DrawScene(pImmContext);
-
-    m_postFX.SetActiveViewContext(nullptr);
-    m_postFX.EndScene();
-
-    // Present to display
-    pImmContext->RenderToDisplay(pDisplay);
-    pDisplay->Present();
-
-    pImmContext->End();
-    pDevice->End();
-}
-
-void PreviewHost::OnMessage(usg::GFXDevice* const pDevice, const uint32 messageID, const void* const pParameters)
-{
-    // Handle window messages
-    switch (messageID)
-    {
-    case 'WSZE':
-        // Window resized
-        SendDiagnostic("info", "Window resized");
-        break;
-
-    case 'WMIN':
-        // Window minimized
-        SendDiagnostic("info", "Window minimized");
-        break;
-    }
-}
-
-void PreviewHost::ProcessIpcInput()
-{
-#ifdef PLATFORM_PC
-    // Non-blocking read from stdin
-    while (_kbhit() || m_inputPos > 0)
-    {
-        int ch = _getch();
-        if (ch == EOF)
+        while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
         {
-            break;
+            if (message.message == WM_QUIT)
+            {
+                m_shutdownRequested = true;
+                break;
+            }
+
+            TranslateMessage(&message);
+            DispatchMessage(&message);
         }
 
+        PumpStdIn();
+        Sleep(8);
+    }
+
+    return 0;
+}
+
+bool PreviewHost::CreatePreviewWindow(HINSTANCE instance)
+{
+    WNDCLASSEXA windowClass = {};
+    windowClass.cbSize = sizeof(windowClass);
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    windowClass.lpfnWndProc = PreviewHost::WindowProc;
+    windowClass.hInstance = instance;
+    windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    windowClass.lpszClassName = kWindowClassName;
+
+    const ATOM registeredClass = RegisterClassExA(&windowClass);
+    if (registeredClass == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+    {
+        return false;
+    }
+
+    m_hwnd = CreateWindowExA(
+        0,
+        kWindowClassName,
+        "Usagi Preview Host",
+        WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        800,
+        600,
+        nullptr,
+        nullptr,
+        instance,
+        this);
+
+    if (m_hwnd == nullptr)
+    {
+        return false;
+    }
+
+    ShowWindow(m_hwnd, SW_HIDE);
+    return true;
+}
+
+LRESULT CALLBACK PreviewHost::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+{
+    PreviewHost* host = reinterpret_cast<PreviewHost*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+    if (message == WM_NCCREATE)
+    {
+        const CREATESTRUCT* createStruct = reinterpret_cast<const CREATESTRUCT*>(lparam);
+        host = reinterpret_cast<PreviewHost*>(createStruct->lpCreateParams);
+        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(host));
+    }
+
+    switch (message)
+    {
+    case WM_SIZE:
+        if (host != nullptr && wparam != SIZE_MINIMIZED)
+        {
+            host->ResizeHostedWindow(LOWORD(lparam), HIWORD(lparam));
+        }
+        break;
+
+    case WM_CLOSE:
+        if (host != nullptr)
+        {
+            host->HandleShutdown();
+            return 0;
+        }
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    }
+
+    return DefWindowProc(hwnd, message, wparam, lparam);
+}
+
+void PreviewHost::PumpStdIn()
+{
+    if (m_stdin == INVALID_HANDLE_VALUE || m_stdin == nullptr)
+    {
+        return;
+    }
+
+    DWORD available = 0;
+    if (m_stdinType == FILE_TYPE_PIPE)
+    {
+        if (!PeekNamedPipe(m_stdin, nullptr, 0, nullptr, &available, nullptr))
+        {
+            const DWORD error = GetLastError();
+            if (error == ERROR_BROKEN_PIPE || error == ERROR_HANDLE_EOF)
+            {
+                m_shutdownRequested = true;
+            }
+            return;
+        }
+
+        if (available == 0)
+        {
+            return;
+        }
+    }
+    else
+    {
+        // The Avalonia client uses redirected pipes. Avoid blocking when launched manually.
+        return;
+    }
+
+    char readBuffer[512];
+    DWORD toRead = std::min<DWORD>(available, static_cast<DWORD>(sizeof(readBuffer)));
+    DWORD bytesRead = 0;
+    if (!ReadFile(m_stdin, readBuffer, toRead, &bytesRead, nullptr))
+    {
+        const DWORD error = GetLastError();
+        if (error == ERROR_BROKEN_PIPE || error == ERROR_HANDLE_EOF)
+        {
+            m_shutdownRequested = true;
+        }
+        return;
+    }
+
+    if (bytesRead == 0)
+    {
+        return;
+    }
+
+    for (DWORD i = 0; i < bytesRead; ++i)
+    {
+        const char ch = readBuffer[i];
         if (ch == '\n' || ch == '\r')
         {
             if (m_inputPos > 0)
             {
                 m_inputBuffer[m_inputPos] = '\0';
-
-                // Parse and handle the command
-                IpcCommandType cmdType = IpcParser::ParseCommandType(m_inputBuffer);
-
-                switch (cmdType)
-                {
-                case IpcCommandType::Init:
-                {
-                    IpcInitCommand cmd;
-                    if (IpcParser::ParseInit(m_inputBuffer, cmd))
-                    {
-                        HandleInit(cmd);
-                    }
-                    break;
-                }
-
-                case IpcCommandType::Shutdown:
-                    HandleShutdown();
-                    break;
-
-                case IpcCommandType::AttachWindow:
-                {
-                    IpcAttachWindowCommand cmd;
-                    if (IpcParser::ParseAttachWindow(m_inputBuffer, cmd))
-                    {
-                        HandleAttachWindow(cmd);
-                    }
-                    break;
-                }
-
-                case IpcCommandType::LoadEntity:
-                {
-                    IpcLoadEntityCommand cmd;
-                    if (IpcParser::ParseLoadEntity(m_inputBuffer, cmd))
-                    {
-                        HandleLoadEntity(cmd);
-                    }
-                    break;
-                }
-
-                case IpcCommandType::LoadParticle:
-                {
-                    IpcLoadParticleCommand cmd;
-                    if (IpcParser::ParseLoadParticle(m_inputBuffer, cmd))
-                    {
-                        HandleLoadParticle(cmd);
-                    }
-                    break;
-                }
-
-                case IpcCommandType::Tick:
-                {
-                    IpcTickCommand cmd;
-                    if (IpcParser::ParseTick(m_inputBuffer, cmd))
-                    {
-                        HandleTick(cmd);
-                    }
-                    break;
-                }
-
-                case IpcCommandType::Pick:
-                {
-                    IpcPickCommand cmd;
-                    if (IpcParser::ParsePick(m_inputBuffer, cmd))
-                    {
-                        HandlePick(cmd);
-                    }
-                    break;
-                }
-
-                case IpcCommandType::SetCameraPosition:
-                {
-                    IpcSetCameraPositionCommand cmd;
-                    if (IpcParser::ParseSetCameraPosition(m_inputBuffer, cmd))
-                    {
-                        HandleSetCameraPosition(cmd);
-                    }
-                    break;
-                }
-
-                default:
-                    SendError("Unknown command type", m_inputBuffer);
-                    break;
-                }
-
+                ProcessLine(m_inputBuffer);
                 m_inputPos = 0;
             }
         }
-        else if (m_inputPos < (int)sizeof(m_inputBuffer) - 1)
+        else if (m_inputPos < static_cast<int>(sizeof(m_inputBuffer)) - 1)
         {
-            m_inputBuffer[m_inputPos++] = (char)ch;
+            m_inputBuffer[m_inputPos++] = ch;
         }
-
-        // Only read one character per frame to avoid blocking
-        break;
+        else
+        {
+            m_inputPos = 0;
+            SendError("IPC command exceeded input buffer");
+        }
     }
-#endif
 }
 
-void PreviewHost::HandleInit(const IpcInitCommand& cmd)
+void PreviewHost::ProcessLine(const char* line)
 {
-    if (cmd.protocolVersion != IPC_PROTOCOL_VERSION)
+    switch (IpcParser::ParseCommandType(line))
     {
-        char msg[256];
-        snprintf(msg, sizeof(msg), "Protocol version mismatch: expected %d, got %d",
-            IPC_PROTOCOL_VERSION, cmd.protocolVersion);
-        SendError(msg);
+    case IpcCommandType::Init:
+    {
+        IpcInitCommand command;
+        if (IpcParser::ParseInit(line, command))
+        {
+            HandleInit(command);
+        }
+        else
+        {
+            SendError("Invalid init command", line);
+        }
+        break;
+    }
+
+    case IpcCommandType::Shutdown:
+        HandleShutdown();
+        break;
+
+    case IpcCommandType::AttachWindow:
+    {
+        IpcAttachWindowCommand command;
+        if (IpcParser::ParseAttachWindow(line, command))
+        {
+            HandleAttachWindow(command);
+        }
+        else
+        {
+            SendError("Invalid attachWindow command", line);
+        }
+        break;
+    }
+
+    case IpcCommandType::LoadEntity:
+    {
+        IpcLoadEntityCommand command;
+        if (IpcParser::ParseLoadEntity(line, command))
+        {
+            HandleLoadEntity(command);
+        }
+        else
+        {
+            SendError("Invalid loadEntity command", line);
+        }
+        break;
+    }
+
+    case IpcCommandType::LoadParticle:
+    {
+        IpcLoadParticleCommand command;
+        if (IpcParser::ParseLoadParticle(line, command))
+        {
+            HandleLoadParticle(command);
+        }
+        else
+        {
+            SendError("Invalid loadParticle command", line);
+        }
+        break;
+    }
+
+    case IpcCommandType::Tick:
+        break;
+
+    case IpcCommandType::Pick:
+    {
+        IpcPickCommand command;
+        if (IpcParser::ParsePick(line, command))
+        {
+            HandlePick(command);
+        }
+        else
+        {
+            SendError("Invalid pick command", line);
+        }
+        break;
+    }
+
+    case IpcCommandType::SetCameraPosition:
+        SendDiagnostic("info", "Camera command accepted by scaffold");
+        break;
+
+    case IpcCommandType::Unknown:
+    default:
+        SendError("Unknown command type", line);
+        break;
+    }
+}
+
+void PreviewHost::HandleInit(const IpcInitCommand& command)
+{
+    if (command.protocolVersion != IPC_PROTOCOL_VERSION)
+    {
+        char message[128];
+        std::snprintf(message, sizeof(message), "Protocol version mismatch: expected %d, got %d",
+            IPC_PROTOCOL_VERSION, command.protocolVersion);
+        SendError(message);
         return;
     }
 
-    SendDiagnostic("info", "Init command received");
-
-    // Already initialized in Init(), just acknowledge
+    m_protocolReady = true;
     SendReady();
 }
 
-void PreviewHost::HandleAttachWindow(const IpcAttachWindowCommand& cmd)
+void PreviewHost::HandleAttachWindow(const IpcAttachWindowCommand& command)
 {
-    m_hwnd = (WindHndl)(uintptr_t)cmd.hwnd;
+    m_parentHwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(command.hwnd));
 
-    char msg[128];
-    snprintf(msg, sizeof(msg), "Window attached: %dx%d", cmd.width, cmd.height);
-    SendDiagnostic("info", msg);
-
-    // TODO: Reconfigure display for new window
-}
-
-void PreviewHost::HandleLoadEntity(const IpcLoadEntityCommand& cmd)
-{
-    SendDiagnostic("info", "Loading entity", cmd.path);
-
-    // TODO: Actually load entity hierarchy
-    // For now, just report success/failure placeholder
-    SendLoaded("entity", cmd.path, false, "Entity loading not yet implemented");
-}
-
-void PreviewHost::HandleLoadParticle(const IpcLoadParticleCommand& cmd)
-{
-    SendDiagnostic("info", "Loading particle", cmd.emitterPath);
-
-    // Clear any existing effect
-    ClearScene(nullptr);
-
-    // Determine which file to use - prefer effect (.pfx) over emitter (.pem)
-    const char* effectName = nullptr;
-    if (cmd.effectPath[0] != '\0')
+    if (m_parentHwnd == nullptr || !IsWindow(m_parentHwnd))
     {
-        effectName = cmd.effectPath;
-    }
-    else if (cmd.emitterPath[0] != '\0')
-    {
-        // If only emitter specified, we need an effect that references it
-        // For now, try loading it as an effect (some emitters have matching effects)
-        effectName = cmd.emitterPath;
-    }
-
-    if (effectName == nullptr || effectName[0] == '\0')
-    {
-        SendLoaded("particle", "", false, "No particle path specified");
+        SendError("attachWindow received an invalid HWND");
         return;
     }
 
-    // Create transform at origin
-    usg::Matrix4x4 mTransform;
-    mTransform.LoadIdentity();
-    mTransform.SetTranslation(usg::Vector3f(0.0f, 0.0f, 0.0f));
+    SetParent(m_hwnd, m_parentHwnd);
+    SetWindowLongPtr(m_hwnd, GWL_STYLE, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS);
+    SetWindowLongPtr(m_hwnd, GWL_EXSTYLE, 0);
+    ResizeHostedWindow(command.width, command.height);
+    SetWindowPos(m_hwnd, nullptr, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    ShowWindow(m_hwnd, SW_SHOW);
 
-    // Try to create the scripted effect
-    // Note: This expects the file to exist as Particle/{name}.pfx in the romfiles
-    m_scene.CreateScriptedEffect(m_activeEffect, mTransform, effectName, usg::Vector3f(0.0f, 0.0f, 0.0f), 1.0f);
-
-    if (m_activeEffect.GetEffect() != nullptr)
-    {
-        m_bHasActiveEffect = true;
-        SendLoaded("particle", effectName, true);
-    }
-    else
-    {
-        m_bHasActiveEffect = false;
-        char errMsg[256];
-        snprintf(errMsg, sizeof(errMsg), "Failed to load particle effect: %s", effectName);
-        SendLoaded("particle", effectName, false, errMsg);
-    }
+    char message[128];
+    std::snprintf(message, sizeof(message), "Attached native preview window: %dx%d", command.width, command.height);
+    SendDiagnostic("info", message);
 }
 
-void PreviewHost::HandleTick(const IpcTickCommand& cmd)
+void PreviewHost::HandleLoadEntity(const IpcLoadEntityCommand& command)
 {
-    // Update simulation with specified delta time
-    // This is handled in Update() using the timer
+    SendLoaded("entity", command.path, false, "Entity preview rendering is not implemented in the scaffold");
 }
 
-void PreviewHost::HandlePick(const IpcPickCommand& cmd)
+void PreviewHost::HandleLoadParticle(const IpcLoadParticleCommand& command)
 {
-    // TODO: Implement picking
-    char msg[128];
-    snprintf(msg, sizeof(msg), "Pick at %d, %d", cmd.x, cmd.y);
-    SendDiagnostic("info", msg);
+    const char* path = command.effectPath[0] != '\0' ? command.effectPath : command.emitterPath;
+    SendLoaded("particle", path, false, "Particle preview rendering is not implemented in the scaffold");
+}
 
-    // For now, no picking support
-    char response[256];
+void PreviewHost::HandlePick(const IpcPickCommand& command)
+{
+    UNREFERENCED_PARAMETER(command);
+
+    char response[128];
     IpcResponse::Picked(response, sizeof(response), nullptr, nullptr);
     SendResponse(response);
-}
-
-void PreviewHost::HandleSetCameraPosition(const IpcSetCameraPositionCommand& cmd)
-{
-    // Update camera position and target
-    m_camera.SetPos(usg::Vector4f(cmd.x, cmd.y, cmd.z, 1.0f));
-    m_camera.SetTarget(usg::Vector4f(cmd.targetX, cmd.targetY, cmd.targetZ, 1.0f));
-
-    char msg[256];
-    snprintf(msg, sizeof(msg), "Camera position: (%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f)",
-        cmd.x, cmd.y, cmd.z, cmd.targetX, cmd.targetY, cmd.targetZ);
-    SendDiagnostic("info", msg);
 }
 
 void PreviewHost::HandleShutdown()
 {
     SendDiagnostic("info", "Shutdown requested");
-    m_bShutdownRequested = true;
+    m_shutdownRequested = true;
+}
+
+void PreviewHost::ResizeHostedWindow(int width, int height)
+{
+    if (m_hwnd == nullptr)
+    {
+        return;
+    }
+
+    MoveWindow(m_hwnd, 0, 0, std::max(width, 1), std::max(height, 1), TRUE);
 }
 
 void PreviewHost::SendResponse(const char* json)
 {
-    fprintf(stdout, "%s\n", json);
-    fflush(stdout);
+    if (m_stdout == INVALID_HANDLE_VALUE || m_stdout == nullptr)
+    {
+        return;
+    }
+
+    DWORD written = 0;
+    WriteFile(m_stdout, json, static_cast<DWORD>(std::strlen(json)), &written, nullptr);
+    WriteFile(m_stdout, "\n", 1, &written, nullptr);
 }
 
 void PreviewHost::SendReady()
 {
     char buffer[256];
-    IpcResponse::Ready(buffer, sizeof(buffer), IPC_PROTOCOL_VERSION, "Usagi Preview Host 1.0");
+    IpcResponse::Ready(buffer, sizeof(buffer), IPC_PROTOCOL_VERSION, kEngineVersion);
     SendResponse(buffer);
 }
 
