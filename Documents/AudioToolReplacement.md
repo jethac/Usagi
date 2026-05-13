@@ -215,11 +215,18 @@ Current implementation status:
 - `Tools/Source/PakFileGen/FileFactory.cpp` now invokes Ruby through an
   explicit `USAGI_RUBY` override when provided, and records audio WAV
   dependencies using the same package-relative name as the loaded WAV resource.
+- `Tools/build/build_config.rb`, `Tools/build/generator_util.rb`, and
+  `Tools/build/game_common_rake.rb` now route audio FSID generation through the
+  managed CLI by default. Set `USAGI_USE_LEGACY_AUDIO_TOOL=1` to use the shipped
+  `FSIDBuilder.exe` during parity checks.
+- `Tools/Tests/AudioToolBuildRules/Run.ps1` verifies the default generated
+  build-rule command, the legacy escape hatch, and a synthetic FSID proto build.
 
-Remaining implementation work before switching project builds:
+Remaining implementation work after switching project builds:
 
-- Decide and implement the escape hatch for keeping the legacy binary available
-  until recovered project audio banks also match.
+- Run the switched builder against recovered project audio banks and keep the
+  `USAGI_USE_LEGACY_AUDIO_TOOL=1` fallback until project parity is proven.
+- Add the artist-facing audio editor UI.
 
 Implemented WAV metadata support:
 
