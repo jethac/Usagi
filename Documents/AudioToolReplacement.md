@@ -208,10 +208,16 @@ Current implementation status:
 - `Tools/Tests/AudioToolBuilder/Run.ps1` verifies the new CLI against the
   legacy golden proto/header fixtures captured from `FSIDBuilder.exe`, and now
   checks normalized YAML and validation failure behavior.
+- `Tools/Tests/AudioToolIntegration/Run.ps1` creates a synthetic external
+  project, normalizes an audio bank, generates FSID proto output, converts the
+  bank through `yml2vpb.rb`, and verifies `PakFileGen.exe` packages the bank and
+  its referenced WAV.
+- `Tools/Source/PakFileGen/FileFactory.cpp` now invokes Ruby through an
+  explicit `USAGI_RUBY` override when provided, and records audio WAV
+  dependencies using the same package-relative name as the loaded WAV resource.
 
 Remaining implementation work before switching project builds:
 
-- Add VPB and PakFileGen integration tests.
 - Decide and implement the escape hatch for keeping the legacy binary available
   until recovered project audio banks also match.
 
