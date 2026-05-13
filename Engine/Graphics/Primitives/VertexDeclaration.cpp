@@ -11,6 +11,7 @@ namespace usg {
 
 static const int MAX_VERTEX_DECLARATIONS = 100;
 static uint32 						guDeclCount = 0;
+static uint32						guLastDeclHit = MAX_VERTEX_DECLARATIONS;
 static VertexDeclaration			guDeclarations[MAX_VERTEX_DECLARATIONS];
 
 VertexDeclaration::VertexDeclaration()
@@ -123,10 +124,16 @@ bool VertexDeclaration::operator==(const VertexDeclaration& rhs)
 //
 uint32 VertexDeclaration::GetDeclId(const VertexDeclaration& decl)
 {
+	if (guLastDeclHit < guDeclCount && guDeclarations[guLastDeclHit] == decl)
+	{
+		return guLastDeclHit;
+	}
+
 	for(uint32 i=0; i<guDeclCount; i++)
 	{
 		if(guDeclarations[i]==decl)
 		{
+			guLastDeclHit = i;
 			return i;
 		}
 	}
@@ -135,6 +142,7 @@ uint32 VertexDeclaration::GetDeclId(const VertexDeclaration& decl)
 	{
 		guDeclarations[guDeclCount] = decl;
 		guDeclCount++;
+		guLastDeclHit = guDeclCount - 1;
 		return (guDeclCount-1);
 	}
 

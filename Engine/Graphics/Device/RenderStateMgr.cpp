@@ -159,6 +159,7 @@ struct RenderStateMgr::PIMPL
 	InputBinding*			inputBindings[MAX_INPUT_BINDING];
 	uint32					uInputBindings;
 	uint32					uDynamicBindingStart;
+	uint32					uLastInputBinding;
 };
 
 RenderStateMgr::RenderStateMgr()
@@ -167,6 +168,7 @@ RenderStateMgr::RenderStateMgr()
 
 	m_pImpl->uInputBindings = 0;
 	m_pImpl->uDynamicBindingStart = 0;
+	m_pImpl->uLastInputBinding = MAX_INPUT_BINDING;
 }
 
 RenderStateMgr::~RenderStateMgr()
@@ -291,10 +293,17 @@ InputBindingHndl RenderStateMgr::GetInputBinding(GFXDevice* pDevice, const Pipel
 
 InputBindingHndl RenderStateMgr::GetInputBindingMultiStream(GFXDevice* pDevice, uint32* puDeclIds, uint32 uBufferCount)
 {
+	if (m_pImpl->uLastInputBinding < m_pImpl->uInputBindings &&
+		m_pImpl->inputBindings[m_pImpl->uLastInputBinding]->IsDecl(puDeclIds, uBufferCount))
+	{
+		return InputBindingHndl(m_pImpl->inputBindings[m_pImpl->uLastInputBinding], m_pImpl->uLastInputBinding);
+	}
+
 	for (uint32 i = 0; i < m_pImpl->uInputBindings; i++)
 	{
 		if (m_pImpl->inputBindings[i]->IsDecl(puDeclIds, uBufferCount))
 		{
+			m_pImpl->uLastInputBinding = i;
 			return InputBindingHndl(m_pImpl->inputBindings[i], i);
 		}
 	}
@@ -305,6 +314,7 @@ InputBindingHndl RenderStateMgr::GetInputBindingMultiStream(GFXDevice* pDevice, 
 		m_pImpl->inputBindings[m_pImpl->uInputBindings] = pNewBinding;
 		uint32 uIndex = m_pImpl->uInputBindings;
 		m_pImpl->uInputBindings++;
+		m_pImpl->uLastInputBinding = uIndex;
 		return InputBindingHndl(m_pImpl->inputBindings[uIndex], uIndex);
 	}
 	else
@@ -455,6 +465,10 @@ void RenderStateMgr::ClearDynamicResources(usg::GFXDevice* pDevice)
 		m_pImpl->inputBindings[i] = NULL;
 	}
 	m_pImpl->uInputBindings = m_pImpl->uDynamicBindingStart;
+	if (m_pImpl->uLastInputBinding >= m_pImpl->uInputBindings)
+	{
+		m_pImpl->uLastInputBinding = MAX_INPUT_BINDING;
+	}
 }
 
 
