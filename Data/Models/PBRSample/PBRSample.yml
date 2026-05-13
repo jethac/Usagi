@@ -1,0 +1,52 @@
+MaterialOverrides:
+  PBRSample_Mat:
+    ShaderPak: Model
+    Effect: PBRDefault
+    Textures:
+      - hint: BaseColor
+        texture: Textures/white_default
+      - hint: Normal
+        texture: Textures/normal_default
+      - hint: MetallicRoughness
+        texture: Textures/white_default
+      - hint: Emissive
+        texture: Textures/black_default
+      - hint: Occlusion
+        texture: Textures/white_default
+    Constants:
+      - set: uPBRMaterial
+        name: baseColorFactor
+        value: [0.8, 0.2, 0.1, 1.0]
+      - set: uPBRMaterial
+        name: metallicFactor
+        value: 0.0
+      - set: uPBRMaterial
+        name: roughnessFactor
+        value: 0.35
+      - set: uPBRMaterial
+        name: emissiveFactor
+        value: [0.0, 0.0, 0.0, 0.0]
+      - set: uPBRMaterial
+        name: occlusionStrength
+        value: 1.0
+      - set: uPBRMaterial
+        name: alpha
+        value: 1.0
+      - set: uPBRMaterial
+        name: alphaCutoff
+        value: 0.5
+      - set: uPBRMaterial
+        name: bBaseColorMap
+        value: false
+      - set: uPBRMaterial
+        name: bNormalMap
+        value: false
+      - set: uPBRMaterial
+        name: bMetallicRoughnessMap
+        value: false
+      - set: uPBRMaterial
+        name: bEmissiveMap
+        value: false
+      - set: uPBRMaterial
+        name: bOcclusionMap
+        value: false
