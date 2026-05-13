@@ -8,6 +8,36 @@
 #include <yaml-cpp/yaml.h>
 #include "FileFactory.h"
 
+namespace
+{
+std::string CommandArgument(const std::string& value)
+{
+	std::string result = "\"";
+	for (char c : value)
+	{
+		if (c == '"')
+		{
+			result += "\\\"";
+		}
+		else
+		{
+			result += c;
+		}
+	}
+
+	result += "\"";
+	return result;
+}
+
+std::string RubyCommand()
+{
+	char szRubyBuffer[MAX_PATH];
+	const DWORD uRubyLength = GetEnvironmentVariable("USAGI_RUBY", szRubyBuffer, MAX_PATH);
+	const char* szRuby = (uRubyLength > 0 && uRubyLength < MAX_PATH) ? szRubyBuffer : "ruby";
+	return CommandArgument(szRuby);
+}
+}
+
 
 FileFactory::PureBinaryEntry::PureBinaryEntry()
 {
@@ -374,13 +404,18 @@ bool FileFactory::LoadYMLVPBFile(const char* szFileName)
 	std::string tempFileName = m_tempDir + relativeNameNoExt + ".vpb";
 	std::string depFileName = tempFileName + ".d";
 
-	char szRubyBuffer[MAX_PATH];
-	const DWORD uRubyLength = GetEnvironmentVariable("USAGI_RUBY", szRubyBuffer, MAX_PATH);
-	const char* szRuby = (uRubyLength > 0 && uRubyLength < MAX_PATH) ? szRubyBuffer : "ruby";
-	command << szRuby << " Usagi\\Tools\\ruby\\yml2vpb.rb -o" << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
+	command << "call " << RubyCommand() << " " << CommandArgument("Usagi\\Tools\\ruby\\yml2vpb.rb")
+		<< " -o" << CommandArgument(tempFileName)
+		<< " --MF " << CommandArgument(depFileName)
+		<< " -RUsagi/_build/ruby -R_build/ruby"
+		<< " -d " << CommandArgument("Data/Components/Defaults.yml")
+		<< " " << CommandArgument(szFileName);
 	CreateDirectory(RemoveFileName(tempFileName).c_str(), 0);
 
-	system(command.str().c_str());
+	if (system(command.str().c_str()) != 0)
+	{
+		return false;
+	}
 
 	PureBinaryEntry* pFileEntry = new PureBinaryEntry;
 	pFileEntry->srcName = szFileName;
@@ -419,13 +454,18 @@ bool FileFactory::LoadYMLAudioFile(const char* szFileName)
 	std::string tempFileName = m_tempDir + relativeNameNoExt + ".vpb";
 	std::string depFileName = tempFileName + ".d";
 
-	char szRubyBuffer[MAX_PATH];
-	const DWORD uRubyLength = GetEnvironmentVariable("USAGI_RUBY", szRubyBuffer, MAX_PATH);
-	const char* szRuby = (uRubyLength > 0 && uRubyLength < MAX_PATH) ? szRubyBuffer : "ruby";
-	command << szRuby << " Usagi\\Tools\\ruby\\yml2vpb.rb -o" << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
+	command << "call " << RubyCommand() << " " << CommandArgument("Usagi\\Tools\\ruby\\yml2vpb.rb")
+		<< " -o" << CommandArgument(tempFileName)
+		<< " --MF " << CommandArgument(depFileName)
+		<< " -RUsagi/_build/ruby -R_build/ruby"
+		<< " -d " << CommandArgument("Data/Components/Defaults.yml")
+		<< " " << CommandArgument(szFileName);
 	CreateDirectory(RemoveFileName(tempFileName).c_str(), 0);
 
-	system(command.str().c_str());
+	if (system(command.str().c_str()) != 0)
+	{
+		return false;
+	}
 
 	PureBinaryEntry* pFileEntry = new PureBinaryEntry;
 	pFileEntry->srcName = szFileName;
