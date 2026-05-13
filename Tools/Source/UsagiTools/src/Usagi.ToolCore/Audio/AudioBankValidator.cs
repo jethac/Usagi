@@ -92,6 +92,10 @@ public static partial class AudioBankValidator
                 {
                     diagnostics.Add(Warning($"{field}.filename", $"Referenced WAV was not found at {wavPath}."));
                 }
+                else
+                {
+                    ValidateWaveMetadata(sound, field, wavPath, diagnostics);
+                }
             }
         }
 
@@ -128,6 +132,36 @@ public static partial class AudioBankValidator
         if (sound.RoomNameCrc != 0 && !roomCrcs.Contains(sound.RoomNameCrc))
         {
             diagnostics.Add(Warning($"{field}.roomNameCRC", $"Room CRC {sound.RoomNameCrc} does not match a room in this bank."));
+        }
+    }
+
+    private static void ValidateWaveMetadata(
+        SoundFileDefinition sound,
+        string field,
+        string wavPath,
+        List<AudioBankDiagnostic> diagnostics)
+    {
+        try
+        {
+            var metadata = WaveMetadataReader.ReadFile(wavPath);
+            if (sound.Loop && !metadata.HasForwardLoop)
+            {
+                diagnostics.Add(Warning($"{field}.loop", $"Looping sound has no forward smpl loop in {wavPath}."));
+            }
+
+            if (metadata.FormatId != 1)
+            {
+                diagnostics.Add(Warning($"{field}.filename", $"WAV format {metadata.FormatId} is not PCM."));
+            }
+
+            if (metadata.ChannelCount == 0 || metadata.SampleRate == 0 || metadata.BitsPerSample == 0)
+            {
+                diagnostics.Add(Warning($"{field}.filename", $"WAV metadata is incomplete for {wavPath}."));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            diagnostics.Add(Warning($"{field}.filename", $"Could not parse WAV metadata for {wavPath}: {ex.Message}"));
         }
     }
 
