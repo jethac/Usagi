@@ -211,10 +211,18 @@ Current implementation status:
 
 Remaining implementation work before switching project builds:
 
-- Add WAV metadata parsing for editor diagnostics.
 - Add VPB and PakFileGen integration tests.
 - Decide and implement the escape hatch for keeping the legacy binary available
   until recovered project audio banks also match.
+
+Implemented WAV metadata support:
+
+- `WaveMetadataReader` parses RIFF/WAVE `fmt `, `data`, and `smpl` chunks.
+- Forward `smpl` loops match `WaveFileReader` semantics, including loop length
+  `end - start + 1`.
+- Validation with `--project-root` now parses referenced WAV files, warns when
+  a looping sound has no forward `smpl` loop, and reports parse/format issues
+  as diagnostics.
 
 The runtime does not need an audio-system rewrite for the replacement editor.
 It does need defects and ambiguities captured as follow-up issues: effect enable
