@@ -70,7 +70,7 @@ def process_data(config, platform, n)
   lua_scripts = build_lua_scripts(config, n)
   data_deps.merge lua_scripts
 
-  emitters = build_emitters(config, n)
+  emitters = build_emitters(config, n, protocol_ruby_classes)
   data_deps.merge emitters
 
   vpb_files = build_vpb_files(config, n, protocol_ruby_classes)
@@ -555,7 +555,7 @@ def build_lua_scripts(config, n)
   targets.values
 end
 
-def build_emitters(config, n)
+def build_emitters(config, n, deps)
   hash = { '/Emitters' => 'pem', '/Effects' => 'pfx' }
 
   output_dir = config.particle_working_dir
@@ -564,10 +564,10 @@ def build_emitters(config, n)
     output_dir = config.particle_out_dir
   end
 
-  pairs = FileList["Data/Particle/**/*.vpb"].map do |input|
+  pairs = FileList["Data/Particle/**/*.{vpb,yml}"].map do |input|
     emitter = File.basename(input)
     ext = hash.map { |k, v| v if File.dirname(input).include?(k) }.compact.first
-    emitter.sub!('vpb', ext) unless ext.nil? || ext.empty?
+    emitter.sub!(/(vpb|yml)$/, ext) unless ext.nil? || ext.empty?
     output = "#{output_dir}/#{emitter}"
 
     [input, output]
@@ -575,7 +575,15 @@ def build_emitters(config, n)
 
   targets = Hash[pairs]
 
-  GeneratorUtil.copy_files(n, targets)
+  targets.each do |input, output|
+    FileUtils.mkdir_p(File.dirname(output))
+    if File.extname(input) == '.yml'
+      n.build('vpb', {output => [input]},
+              {:order_only_deps => deps, :implicit_deps => [config.vpb_converter]})
+    else
+      GeneratorUtil.copy_files(n, {input => output})
+    end
+  end
 
   targets.values
 end
