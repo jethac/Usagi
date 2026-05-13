@@ -1,6 +1,7 @@
 param(
     [switch]$Launch,
-    [int]$SmokeSeconds = 5
+    [switch]$RequireValidation,
+    [int]$SmokeSeconds = 2
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,6 +14,19 @@ $EnvScript = Join-Path $ToolsRoot 'usagi-dev-env.ps1'
 . $EnvScript
 
 $UsagiRoot = $env:USAGI_DIR
+$ValidationSdk = Get-ChildItem $ToolsRoot -Directory -Filter 'VulkanSDK-*' -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending |
+    Where-Object { Test-Path (Join-Path $_.FullName 'Bin\VkLayer_khronos_validation.json') } |
+    Select-Object -First 1
+
+if ($ValidationSdk) {
+    $env:VK_LAYER_PATH = Join-Path $ValidationSdk.FullName 'Bin'
+    $env:PATH = "$env:VK_LAYER_PATH;$env:PATH"
+}
+elseif ($RequireValidation) {
+    throw "VK_LAYER_KHRONOS_validation is not staged under $ToolsRoot."
+}
+
 $RuntimeRoot = Join-Path (Split-Path -Parent $UsagiRoot) '_romfiles\win'
 $EffectsRoot = Join-Path $RuntimeRoot 'Effects'
 $TexturesRoot = Join-Path $RuntimeRoot 'Textures'
@@ -126,3 +140,6 @@ if ($Launch) {
 }
 
 Write-Host "Particle Editor smoke preflight passed: $RuntimeRoot"
+if ($ValidationSdk) {
+    Write-Host "Vulkan validation layer path: $env:VK_LAYER_PATH"
+}
