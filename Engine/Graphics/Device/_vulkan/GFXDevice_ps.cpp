@@ -144,6 +144,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VkDebugString(VkFlags msgFlags, VkDebugRep
 static VKAPI_ATTR VkBool32 VKAPI_CALL VkDebugBreak(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject, size_t location, int32_t msgCode, const char *pLayerPrefix, const char *pMsg, void *pUserData)
 {
 	(void)msgFlags; (void)objType; (void)srcObject; (void)location; (void)pUserData; (void)msgCode;
+	fprintf(stderr, "%s: %s\n", pLayerPrefix, pMsg);
+	fflush(stderr);
 	ASSERT_MSG(false, "%s: %s\n", pLayerPrefix, pMsg);
 	return 1;
 }
@@ -257,6 +259,16 @@ GFXDevice_ps::GFXDevice_ps()
 	m_fLastCommandRecordTimeMS = 0.0f;
 	m_fLastMaxCommandRecordTimeMS = 0.0f;
 	m_uLastSubmittedCommandBuffers = 0;
+	m_drawFence = VK_NULL_HANDLE;
+	m_cmdPool = VK_NULL_HANDLE;
+	m_vkDevice = VK_NULL_HANDLE;
+	m_instance = VK_NULL_HANDLE;
+#ifdef USE_VK_DEBUG_EXTENSIONS
+	for (uint32 i = 0; i < CALLBACK_COUNT; i++)
+	{
+		m_callbacks[i] = VK_NULL_HANDLE;
+	}
+#endif
 }
 
 void GFXDevice_ps::Cleanup(GFXDevice* pParent)
@@ -280,18 +292,32 @@ void GFXDevice_ps::Cleanup(GFXDevice* pParent)
 
 GFXDevice_ps::~GFXDevice_ps()
 {
-	PFN_vkDestroyDebugReportCallbackEXT DestroyReportCallback = VK_NULL_HANDLE;
-	DestroyReportCallback = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(m_instance, "vkDestroyDebugReportCallbackEXT");
-
 #ifdef USE_VK_DEBUG_EXTENSIONS
-	for (uint32 i = 0; i < CALLBACK_COUNT; i++)
+	PFN_vkDestroyDebugReportCallbackEXT DestroyReportCallback = VK_NULL_HANDLE;
+	if (m_instance != VK_NULL_HANDLE)
 	{
-		DestroyReportCallback(m_instance, m_callbacks[i], nullptr);
+		DestroyReportCallback = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(m_instance, "vkDestroyDebugReportCallbackEXT");
+	}
+	if (DestroyReportCallback)
+	{
+		for (uint32 i = 0; i < CALLBACK_COUNT; i++)
+		{
+			if (m_callbacks[i] != VK_NULL_HANDLE)
+			{
+				DestroyReportCallback(m_instance, m_callbacks[i], nullptr);
+			}
+		}
 	}
 #endif
 
-	vkDestroyDevice(m_vkDevice, NULL);
-	vkDestroyInstance(m_instance, NULL);
+	if (m_vkDevice != VK_NULL_HANDLE)
+	{
+		vkDestroyDevice(m_vkDevice, NULL);
+	}
+	if (m_instance != VK_NULL_HANDLE)
+	{
+		vkDestroyInstance(m_instance, NULL);
+	}
 
 
 	if (m_pQueueProps)
@@ -439,7 +465,8 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	vector<const char*> extensions;
 	extensions.push_back("VK_KHR_surface");
 	extensions.push_back("VK_KHR_win32_surface");
-	if (IsInstanceExtensionAvailable(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
+	bool bDebugReportExtensionEnabled = IsInstanceExtensionAvailable(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	if (bDebugReportExtensionEnabled)
 	{
 		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 	}
@@ -526,19 +553,24 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 
 
 #ifdef USE_VK_DEBUG_EXTENSIONS
-	VkDebugReportCallbackCreateInfoEXT callback = {
-		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    // sType
-		NULL,                                                       // pNext
-		VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT,
-		VkDebugString,                                        // pfnCallback
-		NULL                                                        // pUserData
-	};
-	res = CreateDebugReportCallback(m_instance, &callback, nullptr, &m_callbacks[0]);
+	if (bDebugReportExtensionEnabled && CreateDebugReportCallback)
+	{
+		VkDebugReportCallbackCreateInfoEXT callback = {
+			VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    // sType
+			NULL,                                                       // pNext
+			VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT,
+			VkDebugString,                                        // pfnCallback
+			NULL                                                        // pUserData
+		};
+		res = CreateDebugReportCallback(m_instance, &callback, nullptr, &m_callbacks[0]);
+		ASSERT(res == VK_SUCCESS);
 
-	callback.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT;
-	callback.pfnCallback = VkDebugBreak;
-	callback.pUserData = NULL;
-	res = CreateDebugReportCallback(m_instance, &callback, nullptr, &m_callbacks[1]);
+		callback.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT;
+		callback.pfnCallback = VkDebugBreak;
+		callback.pUserData = NULL;
+		res = CreateDebugReportCallback(m_instance, &callback, nullptr, &m_callbacks[1]);
+		ASSERT(res == VK_SUCCESS);
+	}
 #endif
 
 	// Enumerate the available GPUs
@@ -647,8 +679,8 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	device_info.pQueueCreateInfos = &m_queueInfo;
 	device_info.enabledExtensionCount = (uint32)extensions.size();
 	device_info.ppEnabledExtensionNames = extensions.data();
-	device_info.enabledLayerCount = validationLayerCount;
-	device_info.ppEnabledLayerNames = validationLayerNames;
+	device_info.enabledLayerCount = 0;
+	device_info.ppEnabledLayerNames = nullptr;
 	device_info.pEnabledFeatures = &enabledFeatures;
 
 	// Issue with the allocators atm so disabling for now
