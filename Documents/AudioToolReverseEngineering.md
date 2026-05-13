@@ -341,7 +341,14 @@ The reproducible fixture is under
 `Tools/Tests/AudioToolReverseEngineering/FSIDBuilderSmoke`. `Run.ps1`
 generates both proto and header output with the legacy builder, normalizes the
 timestamp and copyright character in the generated proto banner, and compares
-against `expected.proto` and `expected.h`.
+against expected proto/header files. Coverage includes:
+
+- Basic one-sound output.
+- Input order preservation.
+- Leading/trailing whitespace trim.
+- Literal space replacement with underscore.
+- Lowercase name preservation.
+- Signed protobuf output for CRCs above `Int32.MaxValue`.
 
 ### `AudioTool.exe` Smoke Results
 
@@ -356,16 +363,254 @@ Commands were bounded to process launch and dependency behavior only.
 `.NETFramework,Version=v4.5.2` under `<supportedRuntime>`. No custom config
 reads were observed during the bounded smoke.
 
-### Blockers And Next Steps
+## Managed Metadata And IL Findings
 
-- This pass did not recover the exact CRC algorithm. The generated value for
-  `LASER_SHOT` is captured, and `AudioInterop.dll` references
-  `Nito.KitchenSink.CRC.dll`, but the implementation still needs metadata/IL
-  inspection or additional black-box probes.
-- No checked-in project audio bank exists under `Data/VPB/Audio`, so current
-  parity is limited to synthetic YAML.
-- Enum escaping for spaces, punctuation, leading digits, lowercase names, and
-  duplicate names still needs focused black-box coverage.
+Inspection used PowerShell reflection, Windows SDK `ildasm`, and
+`B:\usagi_dev\tools\ilspycmd\ilspycmd.exe`. ILSpy project output was written
+outside the repository under `B:\usagi_dev\tools\logs\usagi-audio-ilspy`.
+
+All primary audio binaries are .NET Framework 4.5.2 managed assemblies:
+
+| Assembly | Version | Entry point | Role |
+|---|---:|---|---|
+| `AudioInterop.dll` | 1.0.0.0 | none | recoverable model, YAML, metadata, FSID/PB writer |
+| `FSIDBuilder.exe` | 1.0.0.0 | `FSIDBuilder.Program.Main(string[] args)` | console builder |
+| `AudioTool.exe` | 1.1.0.3 | `Vitei.AudioTool.Program.Main()` | ATF/WinForms editor shell |
+| `Vitei.FMODInterop.dll` | 1.0.0.0 | none | FMOD wrapper and preview service |
+
+Important assembly references:
+
+- `FSIDBuilder.exe`: `NDesk.Options`, `AudioInterop`.
+- `AudioTool.exe`: `Atf.Core`, `Atf.Gui`, `Atf.Gui.WinForms`,
+  `Vitei.ATFExtensions`, `AudioInterop`, `Vitei.FMODInterop`,
+  `System.ComponentModel.Composition`.
+- `AudioInterop.dll`: `Atf.Core`, `Atf.Gui`, `Atf.Gui.WinForms`,
+  `MediaInfoDotNet`, `Nito.KitchenSink.CRC`, `YamlDotNet`,
+  `Vitei.FMODInterop`, WinForms/design framework assemblies.
+- `Vitei.FMODInterop.dll`: `Atf.Core`,
+  `System.ComponentModel.Composition`, framework assemblies.
+
+Recovered core model types:
+
+- `Vitei.AudioInterop.AudioBankYaml`
+  - `AudioBank AudioBank { get; set; }`
+- `Vitei.AudioInterop.AudioBank`
+  - `List<SoundFileOut> soundFiles { get; set; }`
+- `Vitei.AudioInterop.SoundFileOut`
+  - `enumName`, `filename`, `stream`, `loop`, `volume`, `minDistance`,
+    `maxDistance`, `eType`, `eFalloff`, `pitchRandomisation`, `priority`,
+    `crossfade`, `basePitch`, `dopplerFactor`, `localized`, `crc`
+  - defaults: `volume=1`, `minDistance=1`, `maxDistance=1000`, `eType=1`,
+    `priority=128`, `basePitch=1`
+- `Vitei.AudioInterop.DomNodeAdapters.SoundFileDefinition`
+  - editor fields for name, file, stream, loop, volume, distance, type,
+    falloff, channel count, sample rate, bit depth, bit rate, duration,
+    priority, random pitch, base pitch, doppler, crossfade, and localization
+  - FMOD preview handles: `FMOD.Sound Sound`, `FMOD.Channel Channel`
+- `Vitei.AudioInterop.DomNodeAdapters.AudioBankDefinition`
+  - `IList<SoundFileDefinition> Files`
+
+Visible enum helpers:
+
+- `AudioType.InternalEnum`: `AUDIO_TYPE_MUSIC = 0`,
+  `AUDIO_TYPE_SFX = 1`, `AUDIO_TYPE_UI = 2`
+- `AudioFalloff.InternalEnum`: `AUDIO_FALLOFF_LINEAR = 0`,
+  `AUDIO_FALLOFF_LOGARITHMIC = 1`
+- `ChannelCount.InternalEnum`: `CHANNEL_COUNT_MISSING = 0`,
+  `CHANNEL_COUNT_MONO = 1`, `CHANNEL_COUNT_STEREO = 2`
+
+The legacy managed model does not expose the newer/current runtime fields
+`filterCRC`, `effectCRCs`, `roomNameCRC`, `filters`, `reverbs`, or `rooms`.
+The replacement should still preserve and edit those fields because the open
+runtime schema includes them.
+
+### CRC And FSID Generation
+
+`FSIDBuilder.Program.Main` parses options and delegates to
+`AudioBankDocument`:
+
+- `--proto`: sets `AudioBankDocument.UsagiEnumName`, then calls `WritePB`.
+- default/header path: calls `WriteFSID`.
+
+CRC generation is:
+
+```csharp
+string text = soundFileDefinition.Name.Trim().Replace(' ', '_');
+CRC32 crc = new CRC32();
+crc.Initialize();
+uint value = BitConverter.ToUInt32(crc.ComputeHash(Encoding.UTF8.GetBytes(text)), 0);
+```
+
+`Nito.KitchenSink.CRC.CRC32.Definition.Default` is standard reflected
+IEEE/PKZIP CRC-32:
+
+- polynomial `0x04C11DB7`
+- initializer `0xFFFFFFFF`
+- final xor `0xFFFFFFFF`
+- reflected input bytes
+- reflected result before final xor
+- little-endian hash bytes
+
+Enum normalization is intentionally narrow:
+
+- `Trim()`
+- replace literal space `' '` with underscore `_`
+- preserve case
+- preserve YAML input order
+- do not sanitize tabs, punctuation, leading digits, or duplicates
+
+`WriteFSID` emits:
+
+```text
+#ifndef <ifndef>
+#define <ifndef>
+
+// Generated by Usagi Audio Tool.
+static const unsigned int <enumName> = <crc>;
+...
+static const unsigned int <enumName>_COUNT = <count>;
+
+#endif
+```
+
+`WritePB` emits:
+
+- a time-variable banner
+- `import 'nanopb.proto';`
+- enum type name `UsagiEnumName.Trim().Replace(" ", "")`
+- `option (nanopb_enumopt).long_names = false;`
+- `option (nanopb_enumopt).lua_generate = true;`
+- enum entries as `<normalizedName> = <(int)crc>;`
+- no count entry
+
+The signed cast matters: CRCs above `0x7fffffff` become negative `.proto`
+enum values. Header output remains unsigned.
+
+### YAML And Metadata Behavior
+
+`AudioBankDocument.LoadAudioBank` uses YamlDotNet to read `AudioBankYaml` and
+expects a top-level `AudioBank:` mapping with `soundFiles`. It only replaces
+ERB-style `AudioType` expressions before deserialization:
+
+```text
+<%= AudioType::AUDIO_TYPE_SFX %>
+```
+
+`AudioFalloff` is not converted by that helper. `WriteAudioBank` emits
+defaults and only escapes `eType` back to an `AudioType` ERB token, so `eFalloff`
+stays numeric in legacy output.
+
+`Vitei.AudioInterop.WavMetadata` reads:
+
+- RIFF/WAVE header fields with `BinaryReader`
+- `channels`, `sampleRate`, `fmtAvgBPS`, `bitDepth`
+- `bitRate = fmtAvgBPS * 8`
+- duration through `MediaInfoDotNet.MediaFile.duration`
+- `smpl` chunks through `GTamir.RiffParser`
+
+Recovered `smpl` loop fields are `ID`, `Type`, `Start`, `End`, `Fraction`, and
+`PlayCount`; loop type values include forward `0`, alternating `1`, and
+backward `2`.
+
+`Vitei.FMODInterop.SoundSystem` exposes editor-preview style operations:
+`Initialize`, `Teardown`, `StopAll`, `GetChannelGroup`, `LoadSound`,
+`PlaySound`, and `ForceUpdate`. No FMOD bank/event authoring data model was
+visible.
+
+## Runtime And Build Contract Mapping
+
+`Audio::LoadSoundArchive()` reads `AudioBank` VPB files and iterates
+`soundFiles`, `filters`, and `reverbs`. It does not load `AudioBank.rooms` into
+runtime room state.
+
+Runtime-critical fields:
+
+- `SoundFileDef`: `filename`, `localized`, `loop`, `volume`, `minDistance`,
+  `maxDistance`, `eType`, `eFalloff`, `pitchRandomisation`, `basePitch`,
+  `dopplerFactor`, `priority`, `crc`, `filterCRC`, `effectCRCs`
+- `AudioFilterDef`: `crc`, `enumName`, `eFilter`, `fFrequency`, `fOneOverQ`
+- `ReverbEffectDef`: `effectDef.crc`, `effectDef.eEffectType`, `enumName`,
+  `crc`, `decayTime`, `density`, `reflectionsDelay`, `reflectionsGain`,
+  `reverbDelay`, `reverbGain`, `roomFilterFreq`, `roomFilterHF`,
+  `roomFilterMain`, `roomSize`, `wetDryMix`
+
+Build-critical fields:
+
+- `soundFiles[].enumName`: FSID enum/proto generation
+- `soundFiles[].crc`: generated IDs and runtime lookup
+- `soundFiles[].filename`: VPB/runtime load path and pak dependency discovery
+- `soundFiles[].stream`: pak dependency tag, not current XAudio streaming
+- schema field names/nesting under `AudioBank`: `yml2vpb.rb` compatibility
+
+Preserved but ignored or weakly used by open runtime:
+
+- `soundFiles[].stream` for playback
+- `crossfade`
+- `roomNameCRC`
+- `AudioBank.rooms`
+- `AudioRoomDef.*`
+- reverb/effect data is constructed, but `Audio_ps::EnableEffect()` and
+  `DisableEffect()` are stubs in the XAudio backend
+
+Build flow:
+
+- `build_audio()` scans `Data/VPB/Audio/*.yml`.
+- It runs:
+
+```text
+FSIDBuilder.exe --proto -i="Data/VPB/Audio/<bank>.yml" \
+  -o=<Project>/audio_gen/<bank>.proto \
+  -e=<bank>Audio -g=_CLR_<BANK>_FSID_
+```
+
+- `yml2vpb.rb` converts all `Data/VPB/**/*.yml`, including audio banks, to
+  `_romfiles/<platform>/VPB/**/*.vpb`.
+- The PC data build copies `Data/Audio/*.wav` to `_romfiles/win/Audio`.
+
+PakFileGen audio dependency discovery is different from the PC copy path. It
+identifies YAML under an `Audio` directory as audio YAML, runs `yml2vpb.rb`,
+then reads `AudioBank.soundFiles[].filename` and expects each WAV beside the
+YAML file:
+
+```text
+<directory containing audio YAML>/<filename>.wav
+```
+
+It tags dependencies as `stream` when `stream: true`, otherwise `loaded`.
+
+## Consolidated Next Implementation Requirements
+
+The next `Usagi.ToolCore.Audio` slice can proceed with these requirements:
+
+1. Implement an `AudioBank` YAML model that preserves all current runtime
+   schema fields, even though the legacy managed tool only modeled
+   `soundFiles`.
+2. Implement an `FSIDBuilder.exe`-compatible CLI with `--proto`, `-i`, `-o`,
+   `-e`, and `-g`.
+3. Generate CRCs using standard reflected IEEE/PKZIP CRC-32 over
+   `enumName.Trim().Replace(' ', '_')`.
+4. Preserve legacy output order and signed protobuf enum values.
+5. Generate C++ headers only as a compatibility path; project builds currently
+   use `--proto`.
+6. Validate enum names more strictly than the legacy builder, because legacy
+   output can silently become invalid for punctuation, leading digits, tabs, or
+   duplicates.
+7. Parse WAV metadata for editor diagnostics from `fmt `, `data`, and `smpl`;
+   do not make derived metadata authoritative source.
+8. Add a build integration test covering YAML -> FSID proto -> `yml2vpb.rb` VPB.
+9. Add a PakFileGen compatibility test or explicitly fix the WAV source-path
+   mismatch between `Data/Audio` and audio YAML-adjacent pak discovery.
+
+## Remaining Gaps
+
+- No checked-in project audio bank exists under `Data/VPB/Audio`, so parity is
+  currently limited to synthetic YAML fixtures.
+- Punctuation, leading digits, tabs, and duplicate enum names are intentionally
+  not normalized by the legacy tool. The replacement should validate/reject
+  them rather than trying to preserve broken output.
 - `AudioTool.exe` was not manually exercised beyond startup. File-open and
   settings behavior should be tested only if needed for replacement
   requirements.
+- Historical project use of `filterCRC`, `effectCRCs`, `roomNameCRC`, and rooms
+  is still unknown because those fields are not represented in the legacy
+  managed tool model.
