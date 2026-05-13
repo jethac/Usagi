@@ -225,6 +225,11 @@ Current implementation status:
   parity for a project-shaped legacy-compatible bank, then records the expected
   limitation that `FSIDBuilder.exe` rejects current full-schema YAML containing
   fields such as `filterCRC`.
+- `Tools/Source/UsagiTools/src/Usagi.ToolShell/AudioEditorTab.cs` adds the
+  first artist-facing audio bank editor to the Avalonia tool shell. It can open
+  and save audio-bank YAML, edit sound-file runtime fields, validate through
+  `AudioBankValidator`, and export FSID proto/header files from the same managed
+  generator used by builds.
 
 No original game audio bank data is available in this workspace. Usagi was only
 used for one shipped game, and that source/data is not present, so parity must be
@@ -235,7 +240,9 @@ Remaining implementation work after switching project builds:
 
 - Keep `USAGI_USE_LEGACY_AUDIO_TOOL=1` only as a legacy-compatible input escape
   hatch. It cannot process normalized/current full-schema audio YAML.
-- Add the artist-facing audio editor UI.
+- Expand the artist-facing audio editor beyond the first sound-file editor:
+  add sound add/duplicate/remove flows, WAV browsing/metadata display, CRC
+  refresh helpers, filter/reverb/room editing, and playback preview.
 
 Implemented WAV metadata support:
 
