@@ -13,7 +13,8 @@ namespace Usagi.ToolShell;
 public enum EditorMode
 {
     Entities,
-    Particles
+    Particles,
+    Audio
 }
 
 public sealed class MainWindow : Window
@@ -25,6 +26,7 @@ public sealed class MainWindow : Window
     private readonly TextBox _output = new();
     private readonly PreviewPane _previewPane = new();
     private readonly ParticleEditorTab _particleTab = new();
+    private readonly AudioEditorTab _audioTab = new();
     private readonly WorkspaceSettings _settings;
 
     // Layout containers
@@ -36,6 +38,7 @@ public sealed class MainWindow : Window
     private MenuItem _saveItem = null!;
     private MenuItem _entityModeItem = null!;
     private MenuItem _particleModeItem = null!;
+    private MenuItem _audioModeItem = null!;
 
     private UsagiProject? _project;
     private EditableEntityDocument? _document;
@@ -53,6 +56,7 @@ public sealed class MainWindow : Window
         Content = BuildLayout();
 
         _particleTab.DocumentChanged += OnParticleDocChanged;
+        _audioTab.DocumentChanged += OnAudioDocChanged;
 
         Opened += (_, _) => InitializeProject();
         _assetList.SelectionChanged += (_, _) => LoadSelectedAsset();
@@ -62,6 +66,12 @@ public sealed class MainWindow : Window
     }
 
     private void OnParticleDocChanged()
+    {
+        UpdateTitle();
+        UpdateEditMenuState();
+    }
+
+    private void OnAudioDocChanged()
     {
         UpdateTitle();
         UpdateEditMenuState();
@@ -78,6 +88,7 @@ public sealed class MainWindow : Window
             (KeyModifiers.Control | KeyModifiers.Shift, Key.Z) => DoSync(Redo),
             (KeyModifiers.Control, Key.D1) => DoSync(() => SwitchMode(EditorMode.Entities)),
             (KeyModifiers.Control, Key.D2) => DoSync(() => SwitchMode(EditorMode.Particles)),
+            (KeyModifiers.Control, Key.D3) => DoSync(() => SwitchMode(EditorMode.Audio)),
             _ => false
         };
         e.Handled = handled;
@@ -189,11 +200,13 @@ public sealed class MainWindow : Window
         {
             EditorMode.Entities => _entityContent,
             EditorMode.Particles => _particleTab,
+            EditorMode.Audio => _audioTab,
             _ => _entityContent
         };
 
         _entityModeItem.Icon = mode == EditorMode.Entities ? new TextBlock { Text = "\u2713" } : null;
         _particleModeItem.Icon = mode == EditorMode.Particles ? new TextBlock { Text = "\u2713" } : null;
+        _audioModeItem.Icon = mode == EditorMode.Audio ? new TextBlock { Text = "\u2713" } : null;
 
         UpdateTitle();
         UpdateEditMenuState();
@@ -295,10 +308,17 @@ public sealed class MainWindow : Window
         };
         _particleModeItem.Click += (_, _) => SwitchMode(EditorMode.Particles);
 
+        _audioModeItem = new MenuItem
+        {
+            Header = "_Audio Editor",
+            InputGesture = new KeyGesture(Key.D3, KeyModifiers.Control)
+        };
+        _audioModeItem.Click += (_, _) => SwitchMode(EditorMode.Audio);
+
         var viewMenu = new MenuItem
         {
             Header = "_View",
-            ItemsSource = new Control[] { _entityModeItem, _particleModeItem }
+            ItemsSource = new Control[] { _entityModeItem, _particleModeItem, _audioModeItem }
         };
 
         return new Menu { ItemsSource = new[] { fileMenu, editMenu, viewMenu } };
@@ -389,6 +409,7 @@ public sealed class MainWindow : Window
         UpdateTitle();
         _previewPane.SetProject(project);
         _particleTab.SetProject(project);
+        _audioTab.SetProject(project);
 
         _settings.AddRecentProject(project.RootPath);
         _settings.Save();
@@ -445,9 +466,15 @@ public sealed class MainWindow : Window
     private void UpdateTitle()
     {
         var projectName = _project is not null ? Path.GetFileName(_project.RootPath) : "No Project";
-        var modeName = _mode == EditorMode.Particles ? " [Particles]" : "";
+        var modeName = _mode switch
+        {
+            EditorMode.Particles => " [Particles]",
+            EditorMode.Audio => " [Audio]",
+            _ => ""
+        };
         var dirty = (_mode == EditorMode.Entities && _document?.IsDirty == true) ||
-                    (_mode == EditorMode.Particles && _particleTab.IsDirty) ? "*" : "";
+                    (_mode == EditorMode.Particles && _particleTab.IsDirty) ||
+                    (_mode == EditorMode.Audio && _audioTab.IsDirty) ? "*" : "";
         Title = $"Usagi Tools - {projectName}{modeName}{dirty}";
     }
 
@@ -461,11 +488,19 @@ public sealed class MainWindow : Window
             _undoItem.Header = _document?.History.UndoDescription is { } undoDesc ? $"_Undo {undoDesc}" : "_Undo";
             _redoItem.Header = _document?.History.RedoDescription is { } redoDesc ? $"_Redo {redoDesc}" : "_Redo";
         }
-        else
+        else if (_mode == EditorMode.Particles)
         {
             _undoItem.IsEnabled = _particleTab.CanUndo;
             _redoItem.IsEnabled = _particleTab.CanRedo;
             _saveItem.IsEnabled = _particleTab.IsDirty;
+            _undoItem.Header = "_Undo";
+            _redoItem.Header = "_Redo";
+        }
+        else
+        {
+            _undoItem.IsEnabled = false;
+            _redoItem.IsEnabled = false;
+            _saveItem.IsEnabled = _audioTab.IsDirty;
             _undoItem.Header = "_Undo";
             _redoItem.Header = "_Redo";
         }
@@ -552,7 +587,7 @@ public sealed class MainWindow : Window
         {
             _document?.History.Undo();
         }
-        else
+        else if (_mode == EditorMode.Particles)
         {
             _particleTab.Undo();
         }
@@ -564,7 +599,7 @@ public sealed class MainWindow : Window
         {
             _document?.History.Redo();
         }
-        else
+        else if (_mode == EditorMode.Particles)
         {
             _particleTab.Redo();
         }
@@ -575,6 +610,12 @@ public sealed class MainWindow : Window
         if (_mode == EditorMode.Particles)
         {
             _particleTab.Save();
+            return;
+        }
+
+        if (_mode == EditorMode.Audio)
+        {
+            _audioTab.Save();
             return;
         }
 
