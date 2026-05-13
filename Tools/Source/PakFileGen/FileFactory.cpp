@@ -374,7 +374,10 @@ bool FileFactory::LoadYMLVPBFile(const char* szFileName)
 	std::string tempFileName = m_tempDir + relativeNameNoExt + ".vpb";
 	std::string depFileName = tempFileName + ".d";
 
-	command << "Usagi\\Tools\\ruby\\yml2vpb.rb -o" << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
+	char szRubyBuffer[MAX_PATH];
+	const DWORD uRubyLength = GetEnvironmentVariable("USAGI_RUBY", szRubyBuffer, MAX_PATH);
+	const char* szRuby = (uRubyLength > 0 && uRubyLength < MAX_PATH) ? szRubyBuffer : "ruby";
+	command << szRuby << " Usagi\\Tools\\ruby\\yml2vpb.rb -o" << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
 	CreateDirectory(RemoveFileName(tempFileName).c_str(), 0);
 
 	system(command.str().c_str());
@@ -416,7 +419,10 @@ bool FileFactory::LoadYMLAudioFile(const char* szFileName)
 	std::string tempFileName = m_tempDir + relativeNameNoExt + ".vpb";
 	std::string depFileName = tempFileName + ".d";
 
-	command << "Usagi\\Tools\\ruby\\yml2vpb.rb -o" << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
+	char szRubyBuffer[MAX_PATH];
+	const DWORD uRubyLength = GetEnvironmentVariable("USAGI_RUBY", szRubyBuffer, MAX_PATH);
+	const char* szRuby = (uRubyLength > 0 && uRubyLength < MAX_PATH) ? szRubyBuffer : "ruby";
+	command << szRuby << " Usagi\\Tools\\ruby\\yml2vpb.rb -o" << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
 	CreateDirectory(RemoveFileName(tempFileName).c_str(), 0);
 
 	system(command.str().c_str());
@@ -444,14 +450,25 @@ bool FileFactory::LoadYMLAudioFile(const char* szFileName)
 			bool bStream = false;
 			std::string fileName = RemoveFileName(szFileName) + (*it)["filename"].as<std::string>();
 			fileName += ".wav";
-			LoadWavFile(fileName.c_str());
+			if (!LoadWavFile(fileName.c_str()))
+			{
+				return false;
+			}
 
 			if ((*it)["stream"].IsDefined())
 			{
 				bStream = (*it)["stream"].as<bool>();
 			}
 
-			pFileEntry->AddDependency(fileName, bStream ? "stream" : "loaded");
+			std::string dependencyName = fileName;
+			if (dependencyName.size() > m_rootDir.size() &&
+				_strnicmp(dependencyName.c_str(), m_rootDir.c_str(), m_rootDir.size()) == 0 &&
+				(dependencyName[m_rootDir.size()] == '/' || dependencyName[m_rootDir.size()] == '\\'))
+			{
+				dependencyName = dependencyName.substr(m_rootDir.size() + 1);
+			}
+
+			pFileEntry->AddDependency(dependencyName, bStream ? "stream" : "loaded");
 		}
 	}
 
@@ -572,5 +589,3 @@ std::string FileFactory::RemoveFileName(const std::string& fileName)
 	std::string out = fileName.substr(0, fileName.find_last_of("\\/"));
 	return out;
 }
-
-
