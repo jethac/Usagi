@@ -21,15 +21,19 @@ static HRESULT	g_hResult;
 #ifdef ASSERT
 #undef ASSERT
 #endif
-inline void ASSERT(bool condition)
+inline void USG_ASSERT(bool condition, const char* expression, const char* file, int line, const char* function)
 {
 	if (!condition)
 	{
 		ShowCursor(TRUE);
+		fprintf(stderr, "ASSERT failed: %s\n  at %s:%d in %s\n", expression, file, line, function);
+		fflush(stderr);
 
  		__debugbreak();
 	}
 }
+
+#define ASSERT(condition) USG_ASSERT((condition), #condition, __FILE__, __LINE__, __FUNCTION__)
 
 #define ASSERT_RETURN( condition ) \
 	{ASSERT( condition ); \
