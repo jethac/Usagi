@@ -22,6 +22,7 @@ VertexBuffer_ps::~VertexBuffer_ps()
 void VertexBuffer_ps::Init(GFXDevice* pDevice, const void* const pVerts, uint32 uDataSize, GPUUsage eUpdateType, GPULocation eLocation)
 {
 	m_uBufferCount = eUpdateType == GPU_USAGE_STATIC ? 1 : GFX_NUM_DYN_BUFF;
+	m_uBufferSize = uDataSize;
 	glGenBuffers(m_uBufferCount, m_VBO);
 	for(uint32 i = 0; i < m_uBufferCount; i++)
 	{
@@ -38,6 +39,7 @@ void VertexBuffer_ps::CleanUp(GFXDevice* pDevice)
 		glDeleteBuffers(m_uBufferCount, m_VBO);
 	}
 	m_uBufferCount = 0;
+	m_uBufferSize = 0;
 }
 
 
@@ -57,10 +59,20 @@ void VertexBuffer_ps::UnlockData(GFXDevice* pDevice, void* pData, uint32 uSize)
 
 void VertexBuffer_ps::SetContents(GFXDevice* pDevice, const void* const pData, uint32 uSize)
 {
+	SetContents(pDevice, pData, 0, uSize, true);
+}
+
+void VertexBuffer_ps::SetContents(GFXDevice* pDevice, const void* const pData, uint32 uOffset, uint32 uSize, bool bAdvanceBuffer)
+{
+	ASSERT(uOffset + uSize <= m_uBufferSize);
+
 	// Could consider using glMapBufferRange and avoiding these copies, but we shouldn't be updating many VBOs
-	m_uActiveVBO = (m_uActiveVBO + 1) % m_uBufferCount;
+	if (bAdvanceBuffer)
+	{
+		m_uActiveVBO = (m_uActiveVBO + 1) % m_uBufferCount;
+	}
 	glBindBuffer(GL_ARRAY_BUFFER, m_VBO[m_uActiveVBO]);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, uSize, pData);
+	glBufferSubData(GL_ARRAY_BUFFER, uOffset, uSize, pData);
 	//glBindBuffer(GL_ARRAY_BUFFER, 0);
 	CHECK_OGL_ERROR();
 }

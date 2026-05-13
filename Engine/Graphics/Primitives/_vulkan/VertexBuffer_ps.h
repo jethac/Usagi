@@ -21,6 +21,7 @@ public:
 	void Init(GFXDevice* pDevice, const void* const pVerts, uint32 uDataSize, GPUUsage eUpdateType, GPULocation eLocation);
 	void Cleanup(GFXDevice* pDevice);
 	void SetContents(GFXDevice* pDevice, const void* const pData, uint32 uVertCount);
+	void SetContents(GFXDevice* pDevice, const void* const pData, uint32 uOffset, uint32 uSize, bool bAdvanceBuffer);
 
 	void*	LockData(GFXDevice* pDevice, uint32 uElements);
 	void	UnlockData(GFXDevice* pDevice, void* pData, uint32 uElements);

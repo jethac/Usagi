@@ -22,6 +22,7 @@ public:
 	void Init(GFXDevice* pDevice, const void* const pVerts, uint32 uDataSize, GPUUsage eUpdateType, GPULocation eLocation);
 	void CleanUp(GFXDevice* pDevice);
 	void SetContents(GFXDevice* pDevice, const void* const pData, uint32 uSize);
+	void SetContents(GFXDevice* pDevice, const void* const pData, uint32 uOffset, uint32 uSize, bool bAdvanceBuffer);
 
 	GLuint GetBuffer() const { return m_VBO[m_uActiveVBO]; }
 
@@ -30,6 +31,7 @@ public:
 private:
 	
 	GLuint						m_VBO[GFX_NUM_DYN_BUFF];
+	uint32						m_uBufferSize;
 	uint32						m_uActiveVBO;
 	uint32						m_uBufferCount;
 };

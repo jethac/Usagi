@@ -118,7 +118,28 @@ void VertexBuffer_ps::UnlockData(GFXDevice* pDevice, void* pData, uint32 uElemen
 
 void VertexBuffer_ps::SetContents(GFXDevice* pDevice, const void* const pData, uint32 uSize)
 {
-	void* pDest = LockData(pDevice, uSize);
+	SetContents(pDevice, pData, 0, uSize, true);
+}
+
+void VertexBuffer_ps::SetContents(GFXDevice* pDevice, const void* const pData, uint32 uOffset, uint32 uSize, bool bAdvanceBuffer)
+{
+	ASSERT(uOffset + uSize <= m_uBufferSize);
+
+	if (bAdvanceBuffer)
+	{
+		m_uActiveVBO = (m_uActiveVBO + 1) % m_uBufferCount;
+	}
+
+	void* pDest;
+	if(m_uBufferCount > 1)
+	{
+		pDest = ((uint8*)m_memoryAlloc.GetMappedMemory() + (m_uBufferSize * m_uActiveVBO) + uOffset);
+	}
+	else
+	{
+		VkResult err = vkMapMemory(pDevice->GetPlatform().GetVKDevice(), m_memoryAlloc.GetMemory(), m_memoryAlloc.GetMemOffset() + uOffset, uSize, 0, &pDest);
+		ASSERT(!err);
+	}
 
 	memcpy(pDest, pData, uSize);
 

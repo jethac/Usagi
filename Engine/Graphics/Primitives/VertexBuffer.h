@@ -56,6 +56,7 @@ public:
 	uint32 GetCount() const { return m_uVertCount; }
 	// Specify zero to copy the entire buffer
 	void SetContents(GFXDevice* pDevice, const void* const pData, uint32 uVertCount = 0);
+	void SetContentsAtOffset(GFXDevice* pDevice, const void* const pData, uint32 uStartVert, uint32 uVertCount, bool bAdvanceBuffer = true);
 	void LockData(GFXDevice* pDevice, uint32 uVertCount, Lock& lockOut);
 	void Unlock(Lock& lock);
 
@@ -87,7 +88,15 @@ inline void VertexBuffer::SetContents(GFXDevice* pDevice, const void* const pDat
 	ASSERT(m_bStatic == false);
 	ASSERT(uVertCount <= m_uVertCount);
 	uVertCount = uVertCount > 0 ?  uVertCount : m_uVertCount;
-	m_platform.SetContents(pDevice, pData, m_uVertSize*uVertCount);
+	SetContentsAtOffset(pDevice, pData, 0, uVertCount);
+}
+
+inline void VertexBuffer::SetContentsAtOffset(GFXDevice* pDevice, const void* const pData, uint32 uStartVert, uint32 uVertCount, bool bAdvanceBuffer)
+{
+	ASSERT(m_bStatic == false);
+	ASSERT(uStartVert <= m_uVertCount);
+	ASSERT(uVertCount <= (m_uVertCount - uStartVert));
+	m_platform.SetContents(pDevice, pData, m_uVertSize*uStartVert, m_uVertSize*uVertCount, bAdvanceBuffer);
 }
 
 } // namespace usg
