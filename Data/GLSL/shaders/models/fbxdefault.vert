@@ -28,6 +28,7 @@ void main(void)
 {
 	vec4 vWorldPos	= vec4(ao_position, 1.0);
 	vWorldPos = ApplyWorldTransform(vWorldPos, uVSMaterial.iBoneCount);
+	vWorldPos = ApplyInstanceTransform(vWorldPos);
 
 	vec4 vTmp = vec4(0.0, 0.0, 1.0, 1.0);
 
@@ -54,17 +55,20 @@ void main(void)
 #ifndef SHADOW_PASS
 	// Transform the normal into world space
 	vec3 vNormal		= ApplyWorldTransform(vec4( ao_normal, 0.0 ), uVSMaterial.iBoneCount).xyz;
+	vNormal				= ApplyInstanceTransform(vec4(vNormal, 0.0)).xyz;
 	vec3 vViewNormal	= (vec4( vNormal, 0.0 ) * mViewMat).xyz;
 
 #ifdef HAS_BUMP
 	if(uVSMaterial.bBumpMap)
 	{
 		vec3 vTangent		= ApplyWorldTransform(vec4( ao_tangent, 0.0 ), uVSMaterial.iBoneCount).xyz;
+		vTangent			= ApplyInstanceTransform(vec4(vTangent, 0.0)).xyz;
 		vec3 vViewTangent	= (vec4( vTangent, 0.0 ) * mViewMat).xyz;
 		vo_vTangent = vViewTangent;
 	//	if(uVSMaterial.bBinormal)
 		{
 			vec3 vBinormal		= ApplyWorldTransform(vec4( ao_binormal, 0.0 ), uVSMaterial.iBoneCount).xyz;
+			vBinormal			= ApplyInstanceTransform(vec4(vBinormal, 0.0)).xyz;
 			vo_vBinormal	= (vec4( vBinormal, 0.0 ) * mViewMat).xyz;
 		}
 	/*	else

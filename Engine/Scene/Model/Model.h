@@ -7,6 +7,7 @@
 
 
 #include "Engine/Maths/Matrix4x4.h"
+#include "Engine/Graphics/Primitives/VertexBuffer.h"
 #include "Engine/Scene/TransformNode.h"
 #include "Engine/Scene/Model/Skeleton.h"
  
@@ -31,6 +32,7 @@ public:
 
 	// bAutoTransform - Scene nodes are parented and automatically updated, set this to false when using the component system
 	bool Load( GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char* szFileName, bool bDynamic = false, bool bFastMem = true, bool bAutoTransform = true, bool bPerBoneCulling = true );
+	bool LoadInstanced(GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char* szFileName, const Matrix4x4* pInstanceTransforms, uint32 uInstanceCount, bool bFastMem = true, bool bAutoTransform = true, bool bPerBoneCulling = true);
 	void Cleanup(GFXDevice* pDevice);
 	void InitDynamics(GFXDevice* pDevice, Scene* pScene, uint32 uMesh);
 	// Note that AddToScene is dependent on a GPU update, to remove a model from the systems use ForceRemoveFromScene
@@ -90,8 +92,12 @@ public:
 
 	const ConstantSet& GetSkinnedBones() const { return m_skinnedBones; }
 	const ConstantSet& GetRigidBones() const { return m_staticBones;  }
+	bool IsInstanced() const { return m_bInstanced; }
+	uint32 GetInstanceCount() const { return m_uInstanceCount; }
+	const VertexBuffer* GetInstanceBuffer() const { return &m_instanceBuffer; }
 
 private:
+	bool LoadInt(GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char* szFileName, bool bDynamic, bool bFastMem, bool bAutoTransform, bool bPerBoneCulling, const Matrix4x4* pInstanceTransforms, uint32 uInstanceCount);
 	void AddToSceneInt(GFXDevice* pDevice);
 	void AddDepthMesh(GFXDevice* pDevice, bool bAdd);
 	void UpdateRenderMaskInt();
@@ -102,6 +108,7 @@ private:
 
 	ConstantSet				m_skinnedBones;
 	ConstantSet				m_staticBones;
+	VertexBuffer			m_instanceBuffer;
 
 	ModelResHndl			m_pResource;
 	
@@ -124,7 +131,9 @@ private:
 
 	MaterialInfo*			m_pOverrideMaterials;
 	bool					m_bDynamic;
+	bool					m_bInstanced;
 	uint32					m_uMeshCount;
+	uint32					m_uInstanceCount;
 
 	Scene* m_pScene;
 };

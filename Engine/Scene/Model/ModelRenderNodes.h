@@ -130,6 +130,7 @@ namespace usg {
 		uint8						m_uOverrides;
 		uint8						m_uReqOverrides;
 		bool						m_bCanHaveShadow;
+		uint32						m_uInstanceCount;
 
 		uint8						m_uLod;
 	};

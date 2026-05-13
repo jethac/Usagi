@@ -5,7 +5,9 @@
 #include "Engine/Core/Utility.h"
 #include "Engine/Core/File/File.h"
 #include "Engine/Scene/Scene.h"
+#include "Engine/Maths/Matrix4x3.h"
 #include "Engine/Memory/Mem.h"
+#include "Engine/Memory/ScratchObj.h"
 #include "Engine/Resource/ResourceMgr.h"
 #include "Engine/Resource/ModelResourceMesh.h"
 #include "Engine/Graphics/Device/GFXContext.h"
@@ -35,6 +37,8 @@ Model::Model()
 	m_fAlpha			= 1.0f;
 	m_bShouldBeVisible	= true;
 	m_depthRenderMask	= RenderMask::RENDER_MASK_NONE;
+	m_bInstanced		= false;
+	m_uInstanceCount	= 0;
 }
 
 
@@ -76,7 +80,20 @@ Model::Model(GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char
 
 bool Model::Load( GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char* szFileName, bool bDynamic, bool bFastMem, bool bAutoTransform, bool bPerBoneCulling)
 {
+	return LoadInt(pDevice, pScene, pResMgr, szFileName, bDynamic, bFastMem, bAutoTransform, bPerBoneCulling, nullptr, 0);
+}
+
+bool Model::LoadInstanced(GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char* szFileName, const Matrix4x4* pInstanceTransforms, uint32 uInstanceCount, bool bFastMem, bool bAutoTransform, bool bPerBoneCulling)
+{
+	ASSERT(pInstanceTransforms != nullptr);
+	ASSERT(uInstanceCount > 0);
+	return LoadInt(pDevice, pScene, pResMgr, szFileName, false, bFastMem, bAutoTransform, bPerBoneCulling, pInstanceTransforms, uInstanceCount);
+}
+
+bool Model::LoadInt(GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const char* szFileName, bool bDynamic, bool bFastMem, bool bAutoTransform, bool bPerBoneCulling, const Matrix4x4* pInstanceTransforms, uint32 uInstanceCount)
+{
 	uint32 uRenderMask = RenderMask::RENDER_MASK_ALL;
+	const bool bInstanced = pInstanceTransforms != nullptr && uInstanceCount > 0;
 	// TODO: Support cleanup or reuse?
 	ASSERT(m_pScene == NULL);
 
@@ -90,9 +107,24 @@ bool Model::Load( GFXDevice* pDevice, Scene* pScene, ResourceMgr* pResMgr, const
 #if defined(DEBUG_BUILD) && defined(MODEL_DEBUG)
 	DEBUG_PRINT( "Model::Load, %s\n", szFileName );
 #endif
-	m_pResource = pResMgr->GetModel( pDevice, szFileName, bFastMem );
+	m_pResource = bInstanced
+		? pResMgr->GetModelAsInstance(pDevice, szFileName)
+		: pResMgr->GetModel(pDevice, szFileName, bFastMem);
 
-	ASSERT(!m_pResource->IsInstanceModel());
+	ASSERT(m_pResource->IsInstanceModel() == bInstanced);
+	m_bInstanced = bInstanced;
+	m_uInstanceCount = uInstanceCount;
+
+	if (m_bInstanced)
+	{
+		Matrix4x3* pInstanceData = nullptr;
+		ScratchObj<Matrix4x3> scratchInstances(pInstanceData, m_uInstanceCount, 16);
+		for (uint32 i = 0; i < m_uInstanceCount; i++)
+		{
+			pInstanceData[i] = pInstanceTransforms[i];
+		}
+		m_instanceBuffer.Init(pDevice, pInstanceData, sizeof(Matrix4x3), m_uInstanceCount, "ModelInstanceTransforms", GPU_USAGE_STATIC, GPU_LOCATION_STANDARD);
+	}
 
 	m_uMeshCount = m_pResource->GetMeshCount();
 	m_meshArray = vnew(usg::ALLOC_GEOMETRY_DATA) RenderMesh*[m_pResource->GetMeshCount()];
@@ -166,6 +198,12 @@ void Model::Cleanup(GFXDevice* pDevice)
 	SetInUse(false);
 	m_skinnedBones.Cleanup(pDevice);
 	m_staticBones.Cleanup(pDevice);
+	if (m_bInstanced)
+	{
+		m_instanceBuffer.Cleanup(pDevice);
+		m_bInstanced = false;
+		m_uInstanceCount = 0;
+	}
 	if (m_pSkeleton)
 	{
 		m_pSkeleton->Cleanup(pDevice);

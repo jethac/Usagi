@@ -41,6 +41,7 @@ Model::RenderMesh::RenderMesh() : RenderNodeEx()
 	m_uReqOverrides = 0;
 	m_bCanHaveShadow = false;
 	m_pMeshResource = nullptr;
+	m_uInstanceCount = 1;
 	for (uint32 i = 0; i < OVERRIDE_COUNT; i++)
 	{
 		m_pOverridesConstants[i] = NULL;
@@ -60,6 +61,11 @@ void Model::RenderMesh::Init(GFXDevice* pDevice, Scene* pScene, const ModelResou
 	const char* pszName = pModel->GetResource()->GetName().c_str();
 	SetVertexBuffer(0, &pMesh->vertexBuffer);
 	SetIndexBuffer(&pMesh->primitive.indexBuffer);
+	m_uInstanceCount = pModel->IsInstanced() ? pModel->GetInstanceCount() : 1;
+	if (pModel->IsInstanced())
+	{
+		SetVertexBuffer(2, pModel->GetInstanceBuffer());
+	}
 
 	//	SetMaterial(&pMesh->material);
 	m_pszName = pszName;
@@ -189,7 +195,7 @@ bool Model::RenderMesh::Draw(GFXContext* pContext, RenderContext& renderContext)
 		pContext->SetVertexBuffer(m_vertexBuffer[i].pBuffer, m_vertexBuffer[i].uIndex);
 	}
 
-	pContext->DrawIndexed(m_pIndexBuffer);
+	pContext->DrawIndexedEx(m_pIndexBuffer, 0, m_pIndexBuffer->GetIndexCount(), m_uInstanceCount);
 
 	pContext->EndGPUTag();
 
@@ -248,4 +254,3 @@ bool Model::RenderMesh::SetScale(float fScale, CustomEffectRuntime& customFX)
 
 
 }
-

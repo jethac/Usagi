@@ -2,12 +2,19 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-$ToolsRoot = Join-Path (Split-Path -Parent $PSScriptRoot) '..\..\..\tools'
+$WorktreeRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel).Trim()
+$RepoParent = Split-Path -Parent $WorktreeRoot
+$ToolsRoot = Join-Path $RepoParent 'tools'
+if (-not (Test-Path (Join-Path $ToolsRoot 'usagi-dev-env.ps1'))) {
+    $ToolsRoot = Join-Path (Split-Path -Parent $RepoParent) 'tools'
+}
 $ToolsRoot = [System.IO.Path]::GetFullPath($ToolsRoot)
 $EnvScript = Join-Path $ToolsRoot 'usagi-dev-env.ps1'
 . $EnvScript
 
-$RepoRoot = $env:USAGI_DIR
+$BootstrapUsagiDir = $env:USAGI_DIR
+$RepoRoot = $WorktreeRoot
+$env:USAGI_DIR = $RepoRoot
 $BuildRoot = Join-Path $ToolsRoot 'test-build\ModelInstancing'
 $TempRoot = Join-Path $BuildRoot 'TempUsagi'
 $OutRoot = Join-Path $BuildRoot 'out'
@@ -90,19 +97,29 @@ foreach ($Expected in @(
 }
 
 $RubyPbDir = Join-Path $RepoRoot '_build\ruby'
-if (-not (Test-Path $RubyPbDir)) {
+if ((-not (Test-Path (Join-Path $RubyPbDir 'Engine\Maths\Maths.pb.rb'))) -and $BootstrapUsagiDir) {
+    $BootstrapRubyPbDir = Join-Path $BootstrapUsagiDir '_build\ruby'
+    if (Test-Path (Join-Path $BootstrapRubyPbDir 'Engine\Maths\Maths.pb.rb')) {
+        $RubyPbDir = $BootstrapRubyPbDir
+    }
+}
+if (-not (Test-Path (Join-Path $RubyPbDir 'Engine\Maths\Maths.pb.rb'))) {
     Push-Location $RepoRoot
     try {
         rake platform=win build=debug,release projects
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
     }
     finally {
         Pop-Location
     }
+    $RubyPbDir = Join-Path $RepoRoot '_build\ruby'
 }
 
 Push-Location $RepoRoot
 try {
-    ruby -I _build/ruby Tools/ruby/maya2pb.rb -o $InstancePbOut $InstancesOut
+    ruby -I $RubyPbDir Tools/ruby/maya2pb.rb -o $InstancePbOut $InstancesOut
 }
 finally {
     Pop-Location
@@ -115,6 +132,29 @@ if (-not (Test-Path $InstancePbOut)) {
 }
 if ((Get-Item $InstancePbOut).Length -le 0) {
     throw "maya2pb produced an empty InstanceSet binary: $InstancePbOut"
+}
+
+$ModelResource = Get-Content (Join-Path $RepoRoot 'Engine\Resource\ModelResource.cpp') -Raw
+if ($ModelResource -notmatch 'INSTANCE_TRANSFORM_ATTRIB_ID\s*=\s*11') {
+    throw 'Runtime instance model resources no longer reserve the instance transform attribute binding.'
+}
+if ($ModelResource -notmatch 'bindings\[pipelineState\.uInputBindingCount\]\.Init\(g_instanceElements,\s*2,\s*VERTEX_INPUT_RATE_INSTANCE,\s*1\)') {
+    throw 'Runtime instance model resources no longer declare an instance-rate transform stream.'
+}
+
+$ModelHeader = Get-Content (Join-Path $RepoRoot 'Engine\Scene\Model\Model.h') -Raw
+if ($ModelHeader -notmatch 'LoadInstanced') {
+    throw 'Model runtime no longer exposes an instanced load entry point.'
+}
+
+$ModelRenderNodes = Get-Content (Join-Path $RepoRoot 'Engine\Scene\Model\ModelRenderNodes.cpp') -Raw
+if ($ModelRenderNodes -notmatch 'DrawIndexedEx\([^;]+m_uInstanceCount') {
+    throw 'Model render nodes no longer draw with the loaded instance count.'
+}
+
+$ModelShader = Get-Content (Join-Path $RepoRoot 'Data\GLSL\shaders\includes\model_transform.inc') -Raw
+if ($ModelShader -notmatch 'ao_instanceTransform') {
+    throw 'Model shaders no longer consume per-instance transforms.'
 }
 
 Write-Host "Model instancing smoke passed: $InstancesOut -> $InstancePbOut"

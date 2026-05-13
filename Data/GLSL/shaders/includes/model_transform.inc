@@ -59,5 +59,10 @@ vec4 ApplyWorldTransform(in vec4 vVertex, in int iBoneCount)
 
 #endif
 
+vec4 ApplyInstanceTransform(in vec4 vVertex)
+{
+	return vec4(vVertex * ao_instanceTransform, vVertex.w);
+}
+
 
 #endif

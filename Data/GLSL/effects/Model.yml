@@ -12,6 +12,7 @@ CustomEffects:
       - { index: 7, name: ao_uv1, hint: "uv1", type: vec2, default: [0.0, 0.0] }
       - { index: 8, name: ao_uv2, hint: "uv2", type: vec2, default: [0.0, 0.0] }
       - { index: 9, name: ao_uv3, hint: "uv3", type: vec2, default: [0.0, 0.0] }
+      - { index: 11, name: ao_instanceTransform, hint: "instancetransform", type: mat3x4, default: [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0 ] }
     Samplers:
       - { index: 0, hint: "DiffuseColor", default: "Textures/white_default" }
       - { index: 1, hint: "NormalMap", default: "Textures/normal_default", defines: "HAS_BUMP !SHADOW_PASS" }
@@ -59,6 +60,7 @@ CustomEffects:
       - { index: 7, name: ao_uv1, hint: "uv1", type: vec2, default: [0.0, 0.0] }
       - { index: 8, name: ao_uv2, hint: "uv2", type: vec2, default: [0.0, 0.0] }
       - { index: 9, name: ao_uv3, hint: "uv3", type: vec2, default: [0.0, 0.0] }
+      - { index: 11, name: ao_instanceTransform, hint: "instancetransform", type: mat3x4, default: [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0 ] }
     Samplers:
       - { index: 0, hint: "BaseColor", default: "Textures/white_default" }
       - { index: 1, hint: "NormalMap", default: "Textures/normal_default", defines: "HAS_BUMP !SHADOW_PASS" }

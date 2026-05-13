@@ -34,11 +34,13 @@ static uint32 g_uAttribId[usg::exchange::_VertexAttribute_count] =
 	10
 };
 
+static const uint32 INSTANCE_TRANSFORM_ATTRIB_ID = 11;
+
 // Instance's vertex declaration
 static const VertexElement g_instanceElements[]  =
 {
 	{
-		9,	// szInditifier
+		INSTANCE_TRANSFORM_ATTRIB_ID,
 		0,				// uOffset
 		VE_FLOAT,		// eType;
 		12,				// uCount;
@@ -46,6 +48,12 @@ static const VertexElement g_instanceElements[]  =
 	},
 	VERTEX_DATA_END()
 };
+
+static bool IsInstanceTransformAttribute(const CustomEffectDecl::Attribute* pAttrib)
+{
+	return pAttrib->uIndex == INSTANCE_TRANSFORM_ATTRIB_ID
+		&& strcmp(pAttrib->name, "ao_instanceTransform") == 0;
+}
 
 
 
@@ -366,6 +374,11 @@ memsize ModelResource::InitInputBindings(usg::GFXDevice* pDevice, const exchange
 					continue;
 				}
 
+				if (m_bInstance && IsInstanceTransformAttribute(attrib))
+				{
+					continue;
+				}
+
 				GetSingleAttributeDeclDefault(attrib, uDataSize, pElement);
 				pElement->uAttribId += j;
 				pElement++;
@@ -381,6 +394,12 @@ memsize ModelResource::InitInputBindings(usg::GFXDevice* pDevice, const exchange
 		*pElement = VERTEX_ELEMENT_CAP;	// Cap off the declaration
 		bindings[1].Init(pStaticElements, (uint32)1, VERTEX_INPUT_RATE_INSTANCE, (uint32)(-1));
 		m_meshArray[m_uMeshCount].renderSets[RenderState].singleVerts.Init(pDevice, singleAttribScratch.GetRawData(), uDataSize, 1, pMaterial->renderPasses[RenderState].effectName, GPU_USAGE_CONST_REG);
+		pipelineState.uInputBindingCount++;
+	}
+
+	if (m_bInstance)
+	{
+		bindings[pipelineState.uInputBindingCount].Init(g_instanceElements, 2, VERTEX_INPUT_RATE_INSTANCE, 1);
 		pipelineState.uInputBindingCount++;
 	}
 
