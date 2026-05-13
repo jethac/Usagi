@@ -23,16 +23,18 @@ optparser.add_option("--dist", dest="distance", type="float")
 
 (options, args) = optparser.parse_args()
 
+def fail( message ):
+    sys.stderr.write( message )
+    return 1
+
 def convert_manifest( args ):
-    if len( args ) == 0:
-        sys.stderr.write('ERROR: Need input path.\n')
-        return
+    if len( args ) != 2:
+        return fail( 'ERROR: Expected input level and manifest output path.\n' )
 
     # Early out if the specified level file doesn't exist.
     levelPath = args[0]
     if not os.path.isfile(levelPath):
-        sys.stderr.write("ERROR: Specified level file doesn't exist.\n")
-        return
+        return fail( "ERROR: Specified level file doesn't exist: %s\n" % levelPath )
 
     # Check if the manifest exists, and if it does compare the modification
     # times of the level and the manifest.
@@ -47,11 +49,12 @@ def convert_manifest( args ):
     # Early out if the manifest is newer than the level - it doesn't need
     # to be regenerated.
     if not manifestWrite:
-        return
+        return 0
 
     # Make the directory if it doesn't exist?
-    if not os.path.exists(os.path.dirname(manifestPath)):
-        os.makedirs(os.path.dirname(manifestPath))
+    manifestDir = os.path.dirname(manifestPath)
+    if manifestDir != '' and not os.path.exists(manifestDir):
+        os.makedirs(manifestDir)
 
     # Open the manifest for writing (and overwrite if exists).
     with open(manifestPath, 'w') as mf:
@@ -85,6 +88,10 @@ def convert_manifest( args ):
             mf.write("%s%s\t" % (baseName, suffixPosition))
             mf.write("%s%s\n" % (baseName, suffixInstances))
 
+    if not os.path.isfile( manifestPath ):
+        return fail( "ERROR: Level manifest conversion did not produce expected output: %s\n" % manifestPath )
+
+    return 0
 
 if __name__ == "__main__":
-    convert_manifest(args)
+    sys.exit( convert_manifest(args) )
