@@ -694,12 +694,18 @@ ModelResHndl ResourceMgr::_GetModel(GFXDevice* pDevice, const char* szModelName,
 	ProcessCompletedResourceLoads();
 
 	usg::string u8Name = m_modelDir + szModelName;
-	ModelResHndl pModel = m_pImpl->resources.GetResourceHndl(u8Name.c_str(), ResourceType::MODEL);
+	usg::string resourceName = u8Name;
+	if (bInstance)
+	{
+		resourceName += "#instance";
+	}
+
+	ModelResHndl pModel = m_pImpl->resources.GetResourceHndl(resourceName.c_str(), ResourceType::MODEL);
 	if(!pModel)
 	{
 		m_pImpl->resources.StartLoad();
 		ModelResource* pNC = vnew(ALLOC_RESOURCE_MGR) ModelResource;
-		pNC->Load(pDevice, u8Name.c_str(), bInstance, bFastMem);
+		pNC->Load(pDevice, u8Name.c_str(), bInstance, bFastMem, resourceName.c_str());
 		pModel = m_pImpl->resources.AddResource(pNC);
 	}
 	return pModel;

@@ -140,12 +140,12 @@ ModelResource::~ModelResource()
 }
 
 
-bool ModelResource::Load( GFXDevice* pDevice, const char* szFileName, bool bInstance, bool bFastMem )
+bool ModelResource::Load( GFXDevice* pDevice, const char* szFileName, bool bInstance, bool bFastMem, const char* szResourceName )
 {
 	m_bNeedsRootNode = false;
 	m_uBoneNodes = 0;
 
-	m_bInstance = false;// bInstance;
+	m_bInstance = bInstance;
 	string path = szFileName;
 	str::TruncateToPath(path);
 
@@ -185,7 +185,7 @@ bool ModelResource::Load( GFXDevice* pDevice, const char* szFileName, bool bInst
 	}
 
 	m_name = szFileName;
-	SetupHash( m_name.c_str() );
+	SetupHash(szResourceName ? szResourceName : m_name.c_str());
 	SetupMeshes( path, pDevice, p, bFastMem );
 	SetupSkeleton( p );
 
