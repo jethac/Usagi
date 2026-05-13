@@ -209,6 +209,23 @@ namespace
 			"Sphere intersection rejects separated spheres");
 		return ok;
 	}
+
+	bool TestAABBSphereYRadiusBoundaries()
+	{
+		usg::AABB box;
+		box.SetCentreRadii(usg::Vector3f(0.0f, 0.0f, 0.0f), usg::Vector3f(1.0f, 1.0f, 1.0f));
+
+		bool ok = true;
+		ok &= Expect(box.IntersectBox(usg::Sphere(usg::Vector3f(0.0f, 1.5f, 0.0f), 0.5f)),
+			"AABB sphere intersection expands Y bounds by sphere radius");
+		ok &= Expect(!box.IntersectBox(usg::Sphere(usg::Vector3f(0.0f, 1.6f, 0.0f), 0.5f)),
+			"AABB sphere intersection rejects Y separation beyond radius");
+		ok &= Expect(box.ContainedInBox(usg::Sphere(usg::Vector3f(0.0f, 0.5f, 0.0f), 0.5f)),
+			"AABB sphere containment shrinks Y bounds by sphere radius");
+		ok &= Expect(!box.ContainedInBox(usg::Sphere(usg::Vector3f(0.0f, 0.6f, 0.0f), 0.5f)),
+			"AABB sphere containment rejects Y overlap outside shrunken bounds");
+		return ok;
+	}
 }
 
 int main()
@@ -223,6 +240,7 @@ int main()
 	ok &= TestQuaternionAngleAxis();
 	ok &= TestAABBPointAccumulation();
 	ok &= TestSphereIntersectionBoundary();
+	ok &= TestAABBSphereYRadiusBoundaries();
 
 	if (!ok)
 	{
