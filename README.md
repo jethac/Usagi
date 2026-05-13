@@ -71,7 +71,7 @@ Progress is likely to be slow, work is being done by ex-staff as Vitei have grac
 
 More detailed information is available in the [wiki](https://github.com/vitei/Usagi/wiki).  
 
-External project setup and build workflow notes are available in [Documents/ExternalProjectWorkflow.md](Documents/ExternalProjectWorkflow.md). Performance baseline notes are available in [Documents/PerformanceBaselines.md](Documents/PerformanceBaselines.md), and model instancing notes are available in [Documents/ModelInstancing.md](Documents/ModelInstancing.md).
+External project setup and build workflow notes are available in [Documents/ExternalProjectWorkflow.md](Documents/ExternalProjectWorkflow.md). Performance baseline notes are available in [Documents/PerformanceBaselines.md](Documents/PerformanceBaselines.md), model instancing notes are available in [Documents/ModelInstancing.md](Documents/ModelInstancing.md), and release readiness notes are available in [Documents/ReleaseReadiness.md](Documents/ReleaseReadiness.md).
 
 
 Getting up and running
