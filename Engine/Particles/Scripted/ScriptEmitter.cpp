@@ -585,6 +585,11 @@ namespace usg
 		{
 			const usg::particles::TextureData& texData = m_emissionDef.textureData[i];
 			const usg::particles::TextureAnimation& texAnim = texData.textureAnim;
+			const uint32 uPatternCount = texData.uPatternRepeatHor * texData.uPatternRepeatVer;
+			if (texData.uPatternRepeatHor == 0 || texData.uPatternRepeatVer == 0 || (texAnim.eTexMode != usg::particles::TEX_MODE_FIT_TO_TIME && texAnim.animIndex_count == 0))
+			{
+				continue;
+			}
 
 			uint32 patternIdx = 0;
 			switch(texAnim.eTexMode)
@@ -596,7 +601,8 @@ namespace usg
 				patternIdx = Math::Rand();
 				break;
 			case usg::particles::TEX_MODE_FIT_TO_TIME:
-				patternIdx = (uint32)(((m_fEffectTime - pOut->fLifeStart) * pOut->fInvLife) * (texData.uPatternRepeatHor * texData.uPatternRepeatVer) );
+				patternIdx = (uint32)(((m_fEffectTime - pOut->fLifeStart) * pOut->fInvLife) * uPatternCount);
+				patternIdx = Math::Min(patternIdx, uPatternCount - 1);
 				break;
 			case usg::particles::TEX_MODE_FLIPBOOK_LOOP:
 				patternIdx = (uint32)(m_fEffectTime *texData.textureAnim.fAnimTimeScale*60.f);
@@ -647,7 +653,7 @@ namespace usg
 		Particle::ScriptedMetaData* pData = (Particle::ScriptedMetaData*)pMetaData;
 		for(uint32 i=0; i<m_emissionDef.textureData_count; i++)
 		{
-			if( m_emissionDef.textureData[i].textureAnim.bRandomOffset )
+			if( m_emissionDef.textureData[i].textureAnim.bRandomOffset && m_emissionDef.textureData[i].textureAnim.animIndex_count > 0 )
 			{
 				pData->uRandom[i] = Math::Rand()%m_emissionDef.textureData[i].textureAnim.animIndex_count;
 			}
@@ -709,7 +715,11 @@ namespace usg
 		out.vUVOffset = Vector2f(0.0f, 0.0f);
 
 		// If the texture has multiple images pick the first one to use
-		if(m_emissionDef.textureData[0].textureAnim.eTexMode == usg::particles::TEX_MODE_NONE && m_emissionDef.textureData[0].textureAnim.bRandomOffset)
+		if(m_emissionDef.textureData_count > 0
+			&& m_emissionDef.textureData[0].textureAnim.eTexMode == usg::particles::TEX_MODE_NONE
+			&& m_emissionDef.textureData[0].textureAnim.bRandomOffset
+			&& m_emissionDef.textureData[0].uPatternRepeatHor > 0
+			&& m_emissionDef.textureData[0].uPatternRepeatVer > 0)
 		{
 			uint32 uPatternIdx = Math::Rand()%(m_emissionDef.textureData[0].uPatternRepeatHor*m_emissionDef.textureData[0].uPatternRepeatVer);
 			uint32 uNoX = uPatternIdx % m_emissionDef.textureData[0].uPatternRepeatHor;
@@ -820,4 +830,3 @@ namespace usg
 	}
 
 }
-
