@@ -2,6 +2,7 @@
 #include "Engine/Maths/AABB.h"
 #include "Engine/Maths/Matrix4x4.h"
 #include "Engine/Maths/Quaternionf.h"
+#include "Engine/Maths/Sphere.h"
 
 #include <cmath>
 #include <cstdio>
@@ -142,6 +143,72 @@ namespace
 		ok &= ExpectVector(usg::Math::HermiteDerivative(p0, v0, p1, v1, 1.0f), v1, "HermiteDerivative returns v1 at t=1");
 		return ok;
 	}
+
+	bool TestMatrixScaleAndQuickInverse()
+	{
+		usg::Matrix4x4 scale;
+		scale.MakeScale(3.0f, 4.0f, -2.0f);
+
+		bool ok = true;
+		ok &= ExpectVector(scale.TransformVec3(usg::Vector3f(2.0f, -3.0f, 4.0f), 0.0f),
+			usg::Vector3f(6.0f, -12.0f, -8.0f),
+			"scale transform applies axis scale to directions");
+
+		usg::Matrix4x4 transform = usg::Matrix4x4::Identity();
+		transform.SetTranslation(2.0f, -3.0f, 5.0f);
+		usg::Matrix4x4 inverse;
+		transform.GetQuickInverse(inverse);
+
+		const usg::Vector3f source(1.0f, 2.0f, 3.0f);
+		const usg::Vector3f transformed = transform.TransformVec3(source);
+		ok &= ExpectVector(inverse.TransformVec3(transformed), source,
+			"quick inverse restores pure translated points");
+		return ok;
+	}
+
+	bool TestQuaternionAngleAxis()
+	{
+		const usg::Quaternionf quarterTurn(usg::Vector3f::Z_AXIS, usg::Math::pi_over_2);
+		usg::Vector3f axis;
+		float angle = 0.0f;
+		quarterTurn.GetAngleAxis(axis, angle);
+
+		bool ok = true;
+		ok &= ExpectVector(axis, usg::Vector3f::Z_AXIS, "GetAngleAxis returns source axis for normalized axis quaternion");
+		ok &= Expect(NearlyEqual(angle, usg::Math::pi_over_2), "GetAngleAxis returns source angle");
+		return ok;
+	}
+
+	bool TestAABBPointAccumulation()
+	{
+		usg::AABB box;
+		box.Invalidate();
+		box.Apply(usg::Vector3f(-1.0f, 2.0f, 0.5f));
+		box.Apply(usg::Vector3f(3.0f, -2.0f, 4.0f));
+
+		usg::Vector3f centre;
+		usg::Vector3f radii;
+		box.GetCentreRadii(centre, radii);
+
+		bool ok = true;
+		ok &= ExpectVector(box.GetMin(), usg::Vector3f(-1.0f, -2.0f, 0.5f), "AABB Apply tracks minimum point");
+		ok &= ExpectVector(box.GetMax(), usg::Vector3f(3.0f, 2.0f, 4.0f), "AABB Apply tracks maximum point");
+		ok &= ExpectVector(centre, usg::Vector3f(1.0f, 0.0f, 2.25f), "AABB Apply updates centre");
+		ok &= ExpectVector(radii, usg::Vector3f(2.0f, 2.0f, 1.75f), "AABB Apply updates radii");
+		return ok;
+	}
+
+	bool TestSphereIntersectionBoundary()
+	{
+		const usg::Sphere origin(usg::Vector3f(0.0f, 0.0f, 0.0f), 2.0f);
+
+		bool ok = true;
+		ok &= Expect(origin.Intersect(usg::Sphere(usg::Vector3f(3.0f, 0.0f, 0.0f), 1.0f)),
+			"Sphere intersection includes tangent boundary");
+		ok &= Expect(!origin.Intersect(usg::Sphere(usg::Vector3f(3.01f, 0.0f, 0.0f), 1.0f)),
+			"Sphere intersection rejects separated spheres");
+		return ok;
+	}
 }
 
 int main()
@@ -152,6 +219,10 @@ int main()
 	ok &= TestAABBContainmentAndLerp();
 	ok &= TestScalarWrapHelpers();
 	ok &= TestHermiteEndpoints();
+	ok &= TestMatrixScaleAndQuickInverse();
+	ok &= TestQuaternionAngleAxis();
+	ok &= TestAABBPointAccumulation();
+	ok &= TestSphereIntersectionBoundary();
 
 	if (!ok)
 	{
