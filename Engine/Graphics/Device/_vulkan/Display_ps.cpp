@@ -38,6 +38,7 @@ Display_ps::Display_ps()
 {
 	m_swapChain = VK_NULL_HANDLE;
 	m_imageAcquired = VK_NULL_HANDLE;
+	m_renderComplete = VK_NULL_HANDLE;
 	m_swapChainImageFormat = VK_FORMAT_UNDEFINED;
 	m_swapChainColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 	m_uActiveImage = 0;
@@ -45,6 +46,7 @@ Display_ps::Display_ps()
 	m_bWindowResized = false;
 	m_bRTShouldLoad = false;
 	m_bHDR = false;
+	m_bFirstSwap = true;
 	m_eVsync = VSYNC_MODE_MAILBOX;
 }
 
@@ -97,6 +99,12 @@ void Display_ps::Cleanup(usg::GFXDevice* pDevice)
 	{
 		vkDestroySemaphore(pDevice->GetPlatform().GetVKDevice(), m_imageAcquired, nullptr);
 		m_imageAcquired = VK_NULL_HANDLE;
+	}
+
+	if (m_renderComplete != VK_NULL_HANDLE)
+	{
+		vkDestroySemaphore(pDevice->GetPlatform().GetVKDevice(), m_renderComplete, nullptr);
+		m_renderComplete = VK_NULL_HANDLE;
 	}
 }
 
@@ -153,6 +161,8 @@ void Display_ps::Initialise(usg::GFXDevice* pDevice, WindHndl hndl)
 	semaphoreCreateInfo.flags = 0;
 
 	res = vkCreateSemaphore(devicePS.GetVKDevice(), &semaphoreCreateInfo, nullptr, &m_imageAcquired);
+	ASSERT(res == VK_SUCCESS);
+	res = vkCreateSemaphore(devicePS.GetVKDevice(), &semaphoreCreateInfo, nullptr, &m_renderComplete);
 	ASSERT(res == VK_SUCCESS);
 
 	usg::RenderPassDecl rpDecl;
@@ -579,8 +589,7 @@ void Display_ps::Present()
 
 void Display_ps::SwapBuffers(GFXDevice* pDevice)
 {
-	static bool bFirst = true;
-	if (!bFirst)
+	if (!m_bFirstSwap)
 	{
 		VkPresentInfoKHR presentInfo = {};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -588,12 +597,8 @@ void Display_ps::SwapBuffers(GFXDevice* pDevice)
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &m_swapChain;
 		presentInfo.pImageIndices = &m_uActiveImage;
-		// Check if a wait semaphore has been specified to wait for before presenting the image
-	/*	if (m_presentComplete != VK_NULL_HANDLE)
-		{
-			presentInfo.pWaitSemaphores = &m_presentComplete;
-			presentInfo.waitSemaphoreCount = 1;
-		}*/
+		presentInfo.pWaitSemaphores = &m_renderComplete;
+		presentInfo.waitSemaphoreCount = 1;
 		VkResult res = vkQueuePresentKHR(pDevice->GetPlatform().GetQueue(), &presentInfo);
 		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || m_bWindowResized)
 		{
@@ -604,7 +609,7 @@ void Display_ps::SwapBuffers(GFXDevice* pDevice)
 	{
 		RecreateSwapChain(pDevice);
 	}
-	bFirst = false;
+	m_bFirstSwap = false;
 
 	vkAcquireNextImageKHR(pDevice->GetPlatform().GetVKDevice(), m_swapChain, UINT64_MAX, m_imageAcquired, (VkFence)nullptr, &m_uActiveImage);
 }

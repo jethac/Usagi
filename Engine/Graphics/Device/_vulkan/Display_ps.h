@@ -37,6 +37,7 @@ public:
 	void TransferRect(GFXContext* pContext, RenderTarget* pTarget, const GFXBounds& srcBounds, const GFXBounds& dstBounds);
 	void SwapBuffers(GFXDevice* pDevice);
 	VkSemaphore& GetImageAcquired() { return m_imageAcquired; }
+	VkSemaphore& GetRenderComplete() { return m_renderComplete; }
 	VkImage GetActiveImage() const { return m_pSwapchainImages[m_uActiveImage]; }
 	bool HasHDRSupport() const { return m_bHDR; }
 	bool ExpectsSRGBNonlinearOutput() const { return m_swapChainColorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR; }
@@ -68,6 +69,7 @@ private:
 	VkSurfaceKHR		m_surface;
 	VkSwapchainKHR		m_swapChain;
 	VkSemaphore			m_imageAcquired;
+	VkSemaphore			m_renderComplete;
 	VkFormat			m_swapChainImageFormat;
 	VkColorSpaceKHR		m_swapChainColorSpace;
 	uint32				m_uSwapChainImageCount;
@@ -79,6 +81,7 @@ private:
 	bool				m_bWindowResized;
 	bool				m_bRTShouldLoad;
 	bool				m_bHDR;
+	bool				m_bFirstSwap;
 };
 
 inline bool Display_ps::GetActualDimensions(uint32 & xOut, uint32 & yOut, bool bOrient)
