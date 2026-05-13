@@ -71,15 +71,17 @@ def processLevelXmlSubLevels( lvl, sublvl, outputPath, targetDirs, format ):
 
     saveYaml( outputPath, root )
 
+def fail( message ):
+    sys.stderr.write( message )
+    return 1
+
 def main( args ):
-    if len( args ) == 0:
-        sys.stderr.write('ERROR: Need input path.\n')
-        return
+    if len( args ) != 4:
+        return fail( 'ERROR: Expected input level and three output paths.\n' )
     inputPath = args[0]
 
     if not os.path.isfile(inputPath):
-        sys.stderr.write("ERROR: Specified level file doesn't exist.\n")
-        return
+        return fail( "ERROR: Specified level file doesn't exist: %s\n" % inputPath )
     outputPath = args[1]
 
     outputPath_positions = args[2]
@@ -114,10 +116,9 @@ def main( args ):
 
         # Use the name of the input level to extract the name of the
         # sublevel. Early out if we can't do this.
-        sublevelRegexMatches = re.compile(inputBasename + "_(.*).yml").match(os.path.basename(outputPath))
-        if len(sublevelRegexMatches.groups()) != 1:
-            sys.stderr.write("ERROR: Couldn't unpack sublevel name from requested output filenames (should be of form, levelname_sublevelname.yml).\n")
-            return
+        sublevelRegexMatches = re.compile(re.escape(inputBasename) + "_(.*).yml").match(os.path.basename(outputPath))
+        if sublevelRegexMatches is None or len(sublevelRegexMatches.groups()) != 1:
+            return fail( "ERROR: Couldn't unpack sublevel name from requested output filenames (should be of form, levelname_sublevelname.yml).\n" )
         sublevelName = sublevelRegexMatches.group(1)    
 
         # Convert instances.
@@ -154,5 +155,11 @@ def main( args ):
         if not yamlTree is None:
             saveYaml( outputPath_instances, yamlTree )
 
+    for path in ( outputPath, outputPath_positions, outputPath_instances ):
+        if not os.path.isfile( path ):
+            return fail( "ERROR: Level conversion did not produce expected output: %s\n" % path )
+
+    return 0
+
 if __name__ == "__main__":
-    main(args)
+    sys.exit( main(args) )
