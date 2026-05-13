@@ -5,12 +5,7 @@
 
 require 'yaml'
 require 'optparse'
-
-require_relative 'tracker'
-
-require_relative 'lib/entity_util'
-require 'Engine/AI/BehaviorTree/BehaviorCommon.pb.rb'
-require 'Tank/AI/TankBehaviorCommon.pb.rb'
+require 'fileutils'
 
 ### CONVERTER CLASS
 
@@ -19,13 +14,19 @@ class BehaviorTreeConverter
     NUL = "\0"
   end
 
+  VALID_BEHAVIOR_TYPES = ["Composite", "Decorator", "Action"]
+
   def run(input, output)
-    content = File.open(input, 'r')
-    yaml = YAML.load(content)
-    @@pb_file = File.open(output, 'wb')
-    @@pb_file.binmode
-    parse_tree(yaml)
-    @@pb_file.close
+    yaml = File.open(input, 'r') { |content| YAML.load(content) }
+    validate_tree(yaml)
+    load_converter_dependencies
+    File.open(output, 'wb') do |pb_file|
+      @@pb_file = pb_file
+      @@pb_file.binmode
+      parse_tree(yaml)
+    end
+  ensure
+    @@pb_file = nil
   end
 
   def parse_tree(behaviorTree)
@@ -88,6 +89,36 @@ class BehaviorTreeConverter
   # Some behaviors or decorators will have associated data alongside logic (eg: distance measurements, min/max angles etc)
   def get_behavior_data
     @@current_bh["data"]
+  end
+
+  def validate_tree(behaviorTree)
+    raise "YAML root must be a sequence of behavior entries" unless behaviorTree.is_a?(Array)
+
+    behaviorTree.each_with_index do |behavior, index|
+      raise "Behavior entry #{index} must be a map" unless behavior.is_a?(Hash)
+      current = behavior["Behavior"]
+      raise "Behavior entry #{index} must contain a Behavior map" unless current.is_a?(Hash)
+
+      type = current["type"]
+      raise "Behavior entry #{index} has invalid type #{type.inspect}" unless VALID_BEHAVIOR_TYPES.include?(type)
+      raise "Behavior entry #{index} is missing name" if current["name"].nil? || current["name"].to_s.empty?
+
+      if type == "Composite"
+        raise "Composite behavior #{current["name"]} is missing numChildren" if current["numChildren"].nil?
+        raise "Parallel behavior #{current["name"]} is missing numSuccess" if current["name"] == "Parallel" && current["numSuccess"].nil?
+      end
+
+      if current["hasData"] == true && !current["data"].is_a?(Hash)
+        raise "Behavior #{current["name"]} declares hasData but data is not a map"
+      end
+    end
+  end
+
+  def load_converter_dependencies
+    require_relative 'tracker'
+    require_relative 'lib/entity_util'
+    require 'Engine/AI/BehaviorTree/BehaviorCommon.pb.rb'
+    require 'Tank/AI/TankBehaviorCommon.pb.rb'
   end
 
   def add_composite
@@ -166,16 +197,34 @@ optparser = OptionParser.new do |opts|
     puts opts
     exit
   end
+
+  opts.on('--MF file', 'Write dependencies file for Ninja') do |f|
+    $options[:depfile] = f
+  end
 end
 
-Tracker::addDepfileOption($options, optparser)
+def create_output_parent_dir(output)
+  parent = File.dirname(output)
+  return if parent.nil? || parent == "."
+  raise "Output parent exists and is not a directory: #{parent}" if File.exist?(parent) && !File.directory?(parent)
+  FileUtils.mkdir_p(parent)
+end
 
-optparser.parse!
-raise "ERROR: No input file specified!" if ARGV.length != 1
+begin
+  optparser.parse!
+  raise "No input file specified" if ARGV.length == 0
+  raise "Expected exactly one input file, got #{ARGV.length}" if ARGV.length != 1
+  raise "No output file specified" if !$options[:output] || $options[:output].empty?
 
-Tracker::writeDependenciesFile($options, $options[:output]) if $options.has_key?(:output)
+  SRC = ARGV[0]
+  raise "Input file does not exist: #{SRC}" unless File.file?(SRC)
+  create_output_parent_dir($options[:output])
 
-SRC = ARGV[0]
+  BehaviorTreeConverter.new().run(SRC, $options[:output])
+  Tracker::writeDependenciesFile($options, $options[:output])
+rescue OptionParser::ParseError, LoadError, StandardError => e
+  warn "#{File.basename($0)}: ERROR: #{e.message}"
+  exit 1
+end
 
-BehaviorTreeConverter.new().run(SRC, $options[:output])
 #BehaviorTreeConverter.new().run("C:\\Users\\Olof\\Desktop\\behaviorTree.yml", "C:\\Users\\Olof\\Desktop\\behaviorTree.pb")

@@ -4,14 +4,7 @@
 #Converts a XML file to a binary behavior tree file
 
 require 'optparse'
-
-require 'nokogiri'
-
-require_relative 'tracker'
-
-require_relative 'lib/entity_util'
-require 'Engine/AI/BehaviorTree/BehaviorCommon.pb.rb'
-require 'Tank/AI/TankBehaviorCommon.pb.rb'
+require 'fileutils'
 
 ### CONVERTER CLASS
 
@@ -19,12 +12,29 @@ class XMLBehaviorTreeConverter
   class Constants
     NUL = "\0"
   end
+
+  VALID_BEHAVIOR_TYPES = ["composite", "decorator", "tankdecorator", "behavior", "tankbehavior"]
+
   def run(input, output)
-    @@xml = Nokogiri::XML(File.open(input, 'r'))
-    @@pb_file = File.open(output, "wb")
-    @@pb_file.binmode
-    parse_tree(@@xml)
-    @@pb_file.close
+    require 'nokogiri'
+    @@xml = File.open(input, 'r') { |file| Nokogiri::XML(file) { |config| config.strict } }
+    validate_tree(@@xml)
+    load_converter_dependencies
+    File.open(output, "wb") do |pb_file|
+      @@pb_file = pb_file
+      @@pb_file.binmode
+      parse_tree(@@xml)
+    end
+  ensure
+    @@pb_file = nil
+    @@xml = nil
+  end
+
+  def load_converter_dependencies
+    require_relative 'tracker'
+    require_relative 'lib/entity_util'
+    require 'Engine/AI/BehaviorTree/BehaviorCommon.pb.rb'
+    require 'Tank/AI/TankBehaviorCommon.pb.rb'
   end
 
   def parse_tree(xml)
@@ -60,8 +70,21 @@ class XMLBehaviorTreeConverter
     when "tankbehavior"
       # puts "behavior"
       add_action(current)
+    else
+      raise "Invalid behavior node type #{type.inspect} for #{current.name}"
     end
 
+  end
+
+  def validate_tree(xml)
+    raise "XML document is empty" if xml.root.nil?
+
+    start_nodes = xml.xpath("//*[@start='true']")
+    raise "XML behavior tree must contain one start='true' node" if start_nodes.empty?
+    raise "XML behavior tree contains multiple start='true' nodes" if start_nodes.length > 1
+
+    behavior_nodes = xml.xpath("//*[starts-with(name(), 'composite_') or starts-with(name(), 'decorator_') or starts-with(name(), 'tankdecorator_') or starts-with(name(), 'behavior_') or starts-with(name(), 'tankbehavior_')]")
+    raise "XML behavior tree contains no behavior nodes" if behavior_nodes.empty?
   end
 
   def add_composite(current)
@@ -286,6 +309,7 @@ class XMLBehaviorTreeConverter
       |child|
       name = child["toState"]
       childNode = xml.xpath("//*[@name='" + name + "']")
+      raise "Transition references missing node: #{name}" if childNode.empty?
       childNodes.push(childNode.first)
     }
 
@@ -327,15 +351,32 @@ optparser = OptionParser.new do |opts|
     puts opts
     exit
   end
+
+  opts.on('--MF file', 'Write dependencies file for Ninja') do |f|
+    $options[:depfile] = f
+  end
 end
 
-Tracker::addDepfileOption($options, optparser)
+def create_output_parent_dir(output)
+  parent = File.dirname(output)
+  return if parent.nil? || parent == "."
+  raise "Output parent exists and is not a directory: #{parent}" if File.exist?(parent) && !File.directory?(parent)
+  FileUtils.mkdir_p(parent)
+end
 
-optparser.parse!
-raise "ERROR: No input file specified!" if ARGV.length != 1
+begin
+  optparser.parse!
+  raise "No input file specified" if ARGV.length == 0
+  raise "Expected exactly one input file, got #{ARGV.length}" if ARGV.length != 1
+  raise "No output file specified" if !$options[:output] || $options[:output].empty?
 
-Tracker::writeDependenciesFile($options, $options[:output]) if $options.has_key?(:output)
+  SRC = ARGV[0]
+  raise "Input file does not exist: #{SRC}" unless File.file?(SRC)
+  create_output_parent_dir($options[:output])
 
-SRC = ARGV[0]
-
-XMLBehaviorTreeConverter.new().run(SRC, $options[:output])
+  XMLBehaviorTreeConverter.new().run(SRC, $options[:output])
+  Tracker::writeDependenciesFile($options, $options[:output])
+rescue OptionParser::ParseError, LoadError, StandardError => e
+  warn "#{File.basename($0)}: ERROR: #{e.message}"
+  exit 1
+end
