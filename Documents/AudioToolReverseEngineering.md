@@ -186,3 +186,186 @@ inside the repository.
 - The next implementation task for `Usagi.ToolCore.Audio` can proceed without
   guessing at builder output behavior.
 
+## Worker A Findings - Binary Inventory And Smoke
+
+Captured on 2026-05-13 from worktree
+`B:\usagi_dev\worktrees\audio-tool-re`, branch `codex/audio-tool-re`.
+`Tools/AudioTool/**` was treated as read-only. Scratch captures were written
+under `B:\usagi_dev\tools\audio-tool-re-smoke`.
+
+### Complete File Inventory
+
+All files had `LastWriteTimeUtc` `2026-05-13 11:27:05`. Managed/native
+classification was determined from PE metadata where practical; file versions
+come from Windows version resources. The shipped `.config` files target
+`.NETFramework,Version=v4.5.2` for the two executables.
+
+| File | Size | Kind | Arch | File version |
+|---|---:|---|---|---|
+| `Atf.Core.dll` | 322560 | managed assembly | AnyCPU | 1.0.0.0 |
+| `Atf.Gui.dll` | 1076224 | managed assembly | AnyCPU | 1.0.0.0 |
+| `Atf.Gui.OpenGL.dll` | 100352 | managed assembly | AnyCPU | 1.0.0.0 |
+| `Atf.Gui.WinForms.dll` | 2029568 | managed assembly | AnyCPU | 1.0.0.0 |
+| `Atf.IronPython.dll` | 8192 | managed assembly | AnyCPU | 1.0.0.0 |
+| `AudioInterop.dll` | 75776 | managed assembly | AnyCPU | 1.0.0.0 |
+| `AudioInterop.dll.config` | 415 | config | n/a | n/a |
+| `AudioTool.exe` | 32768 | managed executable | AnyCPU | 1.0.0.0 |
+| `AudioTool.exe.config` | 184 | config | n/a | n/a |
+| `AudioTool.vshost.exe` | 22696 | managed executable | AnyCPU | 14.0.23107.0 |
+| `AudioTool.vshost.exe.config` | 184 | config | n/a | n/a |
+| `AudioTool.vshost.exe.manifest` | 479 | manifest | n/a | n/a |
+| `Bespoke.Common.dll` | 20480 | managed assembly | AnyCPU | 5.0.0.0 |
+| `Bespoke.Common.Osc.dll` | 22528 | managed assembly | AnyCPU | 0.0.0.0 |
+| `DDSUtils.dll` | 475136 | managed/mixed-mode PE | AnyCPU/CLR | n/a |
+| `fmod.dll` | 1516544 | native PE | x86 | 1.10.0 (build 90329) |
+| `fmod64.dll` | 1750016 | native PE | x64 | 1.10.0 (build 90329) |
+| `fmodL.dll` | 1694720 | native PE | x86 | 1.10.0 (build 90329) |
+| `fmodL64.dll` | 1953280 | native PE | x64 | 1.10.0 (build 90329) |
+| `FSIDBuilder.exe` | 26624 | managed executable | AnyCPU | 1.0.0.0 |
+| `FSIDBuilder.exe.config` | 184 | config | n/a | n/a |
+| `FSIDBuilder.vshost.exe` | 22696 | managed executable | AnyCPU | 14.0.23107.0 |
+| `FSIDBuilder.vshost.exe.config` | 184 | config | n/a | n/a |
+| `FSIDBuilder.vshost.exe.manifest` | 479 | manifest | n/a | n/a |
+| `IronPython.dll` | 1798656 | managed assembly | AnyCPU | 2.7.3.1000 |
+| `IronPython.xml` | 400499 | XML docs | n/a | n/a |
+| `ja/Atf.Gui.WinForms.resources.dll` | 23040 | managed satellite assembly | AnyCPU | 1.0.0.0 |
+| `libcrashreport_net.dll` | 32768 | managed assembly | AnyCPU | 1.1.4444.20746 |
+| `MediaInfo.dll` | 4721488 | native PE | x86 | 0.7.81.0 |
+| `MediaInfoDotNet.dll` | 31744 | managed assembly | AnyCPU | 0.7.4694.29125 |
+| `MediaInfoDotNet.xml` | 37800 | XML docs | n/a | n/a |
+| `Microsoft.Dynamic.dll` | 1044480 | managed assembly | AnyCPU | 1.1.0.21 |
+| `Microsoft.Dynamic.xml` | 362156 | XML docs | n/a | n/a |
+| `Microsoft.Scripting.dll` | 143872 | managed assembly | AnyCPU | 1.1.0.21 |
+| `Microsoft.Scripting.xml` | 201897 | XML docs | n/a | n/a |
+| `NDesk.Options.dll` | 22016 | managed assembly | AnyCPU | 0.2.1.0 |
+| `Nito.KitchenSink.CRC.dll` | 10752 | managed assembly | AnyCPU | 1.1.0.0 |
+| `Nito.KitchenSink.CRC.xml` | 21893 | XML docs | n/a | n/a |
+| `protobuf-net.dll` | 197632 | managed assembly | AnyCPU | 2.0.0.668 |
+| `protobuf-net.xml` | 159532 | XML docs | n/a | n/a |
+| `README.ja.txt` | 390 | Shift-JIS text/readme | n/a | n/a |
+| `SharpDX.Direct2D1.dll` | 426496 | managed assembly | AnyCPU | 2.6.3 |
+| `SharpDX.dll` | 567808 | managed assembly | AnyCPU | 2.6.3 |
+| `SharpDX.DXGI.dll` | 116224 | managed assembly | AnyCPU | 2.6.3 |
+| `Tao.Cg.dll` | 61440 | managed assembly | AnyCPU | 1.4.1.1 |
+| `Tao.DevIl.dll` | 40960 | managed assembly | AnyCPU | 1.6.8.2 |
+| `Tao.OpenGl.dll` | 1175552 | managed assembly | AnyCPU | 2.1.0.7 |
+| `Tao.Platform.Windows.dll` | 57344 | managed assembly | AnyCPU | n/a |
+| `Vitei.ATFExtensions.dll` | 37888 | managed assembly | AnyCPU | 1.0.0.0 |
+| `Vitei.FMODInterop.dll` | 99328 | managed assembly | AnyCPU | 1.0.0.0 |
+| `WeifenLuo.WinFormsUI.Docking.dll` | 426496 | managed assembly | AnyCPU | 2.3.2.0 |
+| `YamlDotNet.dll` | 136704 | managed assembly | AnyCPU | 0.0.0 |
+| `YamlDotNet.xml` | 192968 | XML docs | n/a | n/a |
+
+Managed dependency highlights:
+
+- `FSIDBuilder.exe` uses `AudioInterop.dll`, `NDesk.Options.dll`, and
+  framework assemblies.
+- `AudioTool.exe` uses ATF WinForms shell assemblies, `AudioInterop.dll`,
+  `Vitei.ATFExtensions.dll`, `WeifenLuo.WinFormsUI.Docking.dll`, and framework
+  WinForms assemblies.
+- `AudioInterop.dll` references `Atf.Core`, `Atf.Gui`, `Atf.Gui.WinForms`,
+  `MediaInfoDotNet`, `Nito.KitchenSink.CRC`, `Vitei.FMODInterop`,
+  `YamlDotNet`, and framework WinForms/design assemblies.
+- `Vitei.FMODInterop.dll` is managed and references `Atf.Core`,
+  `System.ComponentModel.Composition`, and `mscorlib`; native FMOD is supplied
+  separately by the `fmod*.dll` files.
+- `AudioInterop.dll.config` contains a binding redirect for `Tao.OpenGl`
+  `0.0.0.0-2.1.0.7` to `2.1.0.7`.
+
+Native dependency highlights from `dumpbin /dependents`:
+
+- `fmod.dll`, `fmod64.dll`, `fmodL.dll`, and `fmodL64.dll` import
+  `WS2_32.dll`, `WINMM.dll`, `MSACM32.dll`, `KERNEL32.dll`, `USER32.dll`,
+  `ADVAPI32.dll`, and `ole32.dll`.
+- `MediaInfo.dll` imports `KERNEL32.dll`.
+- `DDSUtils.dll` imports `MSVCR80.dll`, `KERNEL32.dll`, `USER32.dll`,
+  `msvcm80.dll`, `MSVCP80.dll`, and `mscoree.dll`.
+- `libcrashreport_net.dll` imports `mscoree.dll`.
+
+### `FSIDBuilder.exe` Smoke Results
+
+All commands were run from `B:\usagi_dev\tools\audio-tool-re-smoke` with the
+tool path
+`B:\usagi_dev\worktrees\audio-tool-re\Tools\AudioTool\FSIDBuilder.exe`.
+
+| Case | Command | Exit code | Result |
+|---|---|---:|---|
+| Help | `FSIDBuilder.exe --help` | 0 | Printed usage and options to stdout. |
+| No args | `FSIDBuilder.exe` | -532462766 | Unhandled `System.IO.FileNotFoundException: No input file specified.` |
+| Unknown option | `FSIDBuilder.exe --bogus` | -532462766 | Unknown option was ignored, then failed as no input file. |
+| Missing input | `FSIDBuilder.exe -i does-not-exist.yml -o missing.proto -p` | -532462766 | Unhandled `System.IO.FileNotFoundException: Input file not found.` |
+| Missing output | `FSIDBuilder.exe -i minimal-legacy.yml -p` | -532462766 | Unhandled `System.ArgumentException: The path is not of a legal form.` |
+| Malformed YAML | `FSIDBuilder.exe -i malformed.yml -o malformed.proto -p` | -532462766 | Unhandled `YamlDotNet.Core.YamlException` from `AudioBankDocument.LoadAudioBank`. |
+| Valid proto | `FSIDBuilder.exe -i minimal-legacy.yml -o minimal.proto -e TestAudio -g _CLR_TEST_AUDIO_FSID_ -p` | 0 | Generated protobuf enum output; no stdout/stderr. |
+| Valid header | `FSIDBuilder.exe -i minimal-legacy.yml -o minimal.h -e TestAudio -g _CLR_TEST_AUDIO_FSID_` | 0 | Generated C++ header output; no stdout/stderr. |
+
+`--help` output:
+
+```text
+Usage: fsidbuilder [OPTIONS]
+Build a .fsid file from an AudioBank .yml file.
+
+Options:
+  -i, --input=VALUE          audio bank (.yml) to load.
+  -o, --output=VALUE         output file to generate.
+  -e, --enumName=VALUE       name of enum count constant to use
+  -g, --ifndefName=VALUE     name of #ifndef guard to use
+  -p, --proto                generate a protocol buffer file instead of a C++
+                               header
+  -h, --help                 show this message and exit
+```
+
+Synthetic valid input findings:
+
+- The legacy YAML model for `AudioInterop.dll` deserializes
+  `Vitei.AudioInterop.AudioBankYaml` with `AudioBank.soundFiles` only.
+- `SoundFileOut` contains `enumName`, `filename`, `stream`, `loop`, `volume`,
+  `minDistance`, `maxDistance`, `eType`, `eFalloff`, `pitchRandomisation`,
+  `priority`, `crossfade`, `basePitch`, `dopplerFactor`, `localized`, and
+  `crc`.
+- `eType` and `eFalloff` must be integer values in legacy YAML. Supplying
+  symbolic proto names such as `AUDIO_TYPE_SFX` causes a YAML
+  `System.FormatException`.
+- Runtime-era fields `filterCRC`, `effectCRCs`, `roomNameCRC`, `filters`,
+  `reverbs`, and `rooms` are not part of the recovered legacy
+  `AudioInterop.AudioBank` metadata observed in this smoke pass.
+- Input order is preserved in generated enum output. A two-entry bank with
+  `Z_LAST` before `A_FIRST` generated `Z_LAST` first.
+- CRCs are generated from `enumName`, not from the source YAML `crc` value. The
+  fixture input sets `crc: 0`; generated `LASER_SHOT` is `615283986`.
+- Proto enum values are written as signed decimal integers. If the generated
+  32-bit CRC is above `Int32.MaxValue`, proto output can be negative; header
+  output uses `static const unsigned int`.
+
+The reproducible fixture is under
+`Tools/Tests/AudioToolReverseEngineering/FSIDBuilderSmoke`. `Run.ps1`
+generates both proto and header output with the legacy builder, normalizes the
+timestamp and copyright character in the generated proto banner, and compares
+against `expected.proto` and `expected.h`.
+
+### `AudioTool.exe` Smoke Results
+
+Commands were bounded to process launch and dependency behavior only.
+
+| Case | Command | Exit code | Result |
+|---|---|---:|---|
+| Original launch from scratch cwd | `Start-Process AudioTool.exe` from `B:\usagi_dev\tools\audio-tool-re-smoke\audiotool` | killed after 5 seconds | Process did not exit within five seconds, produced no stdout/stderr, and created no files in the scratch cwd. This is consistent with a GUI startup path. |
+| Isolated launch missing dependencies | copy only `AudioTool.exe` and `AudioTool.exe.config`, then launch from isolated scratch dir | -532462766 | Unhandled `System.IO.FileNotFoundException`: could not load `Atf.Core, Version=1.0.0.0`. |
+
+`AudioTool.exe.config` and `FSIDBuilder.exe.config` only specify
+`.NETFramework,Version=v4.5.2` under `<supportedRuntime>`. No custom config
+reads were observed during the bounded smoke.
+
+### Blockers And Next Steps
+
+- This pass did not recover the exact CRC algorithm. The generated value for
+  `LASER_SHOT` is captured, and `AudioInterop.dll` references
+  `Nito.KitchenSink.CRC.dll`, but the implementation still needs metadata/IL
+  inspection or additional black-box probes.
+- No checked-in project audio bank exists under `Data/VPB/Audio`, so current
+  parity is limited to synthetic YAML.
+- Enum escaping for spaces, punctuation, leading digits, lowercase names, and
+  duplicate names still needs focused black-box coverage.
+- `AudioTool.exe` was not manually exercised beyond startup. File-open and
+  settings behavior should be tested only if needed for replacement
+  requirements.
