@@ -1208,7 +1208,7 @@ void FbxLoad::ReadMeshRecursive(Cmdl& cmdl, FbxNode* pNode, bool bStatic)
 		{
 		case FbxNodeAttribute::eMesh:
 
-			FbxMesh* pMesh = (FbxMesh*)pNode;
+			FbxMesh* pMesh = pNode->GetMesh();
 			if (pMesh->GetDeformerCount(FbxDeformer::eSkin) == 0)
 			{
 				FbxNode* pParent = pNode;
@@ -2510,7 +2510,6 @@ void FbxLoad::AddMaterials(Cmdl& cmdl, FbxNode* pNode, bool bSkinned)
 		cmdl.AddMaterial(pNewMaterial);
 	}
 }
-
 
 
 
