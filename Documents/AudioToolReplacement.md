@@ -3,7 +3,8 @@
 This document defines the replacement scope for the binary-only audio tooling in
 `Tools/AudioTool`. It is based on the runtime contract in `Engine/Audio`, the
 audio protobufs, the project build rules, `Tools/Source/PakFileGen`, and the
-remaining shipped binaries.
+remaining shipped binaries. The focused binary-analysis work is tracked in
+[AudioToolReverseEngineering.md](AudioToolReverseEngineering.md).
 
 ## Current Runtime Contract
 
