@@ -138,6 +138,10 @@ void ComponentEntity::Activate()
 	{
 		m_uComponentBitfield[i] = 0;
 	}
+	for (uint32 i = 0; i < SYSTEM_BITFIELD_SIZE; i++)
+	{
+		m_uSystemBitfield[i] = 0;
+	}
     
 	m_bChanged = false;
 	m_bChildrenChanged = false;
@@ -173,6 +177,7 @@ void ComponentEntity::SetParent(ComponentEntity* pParent)
 void ComponentEntity::SetSystem(uint32 uSysIndex, GenericInputOutputs *pSys)
 {
 	AssertStructureMutationAllowed();
+	ASSERT(uSysIndex < MAX_SYSTEM_TYPES);
 	uint32 uSysID = GetSystemIDFromIndex(uSysIndex);
 	if(pSys == nullptr)
 	{
@@ -186,12 +191,34 @@ void ComponentEntity::SetSystem(uint32 uSysIndex, GenericInputOutputs *pSys)
 		ASSERT(!m_pSystems.Exists(uSysID));
 		m_pSystems.Insert(uSysID, pSys);
 	}
+	SetSystemBit(uSysIndex, pSys != nullptr);
 	SetChanged();
 }
 
 GenericInputOutputs* ComponentEntity::GetSystem(uint32 uSysIndex) const
 {
 	return m_pSystems.Get(GetSystemIDFromIndex(uSysIndex));
+}
+
+bool ComponentEntity::HasSystem(uint32 uSysIndex) const
+{
+	ASSERT(uSysIndex < MAX_SYSTEM_TYPES);
+	return (m_uSystemBitfield[uSysIndex / BITFIELD_LENGTH] & (1 << (uSysIndex % BITFIELD_LENGTH))) != 0;
+}
+
+void ComponentEntity::SetSystemBit(uint32 uSysIndex, bool bValue)
+{
+	ASSERT(uSysIndex < MAX_SYSTEM_TYPES);
+	uint32& uBitfield = m_uSystemBitfield[uSysIndex / BITFIELD_LENGTH];
+	const uint32 uMask = 1 << (uSysIndex % BITFIELD_LENGTH);
+	if (bValue)
+	{
+		uBitfield |= uMask;
+	}
+	else
+	{
+		uBitfield &= ~uMask;
+	}
 }
 
 void ComponentEntity::SetComponentPendingDelete()

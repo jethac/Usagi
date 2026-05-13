@@ -68,6 +68,7 @@ namespace usg
 		void SetParent(ComponentEntity* pParent);
 		void SetSystem(uint32 uSysIndex, GenericInputOutputs *pSys);
 		GenericInputOutputs* GetSystem(uint32 uSysIndex) const;
+		bool HasSystem(uint32 uSysIndex) const;
 
 		static void BeginSystemExecution();
 		static void EndSystemExecution();
@@ -201,6 +202,9 @@ namespace usg
 		StringPointerHash<GenericInputOutputs*> m_pSystems;
 		bool             m_bActive;
 		uint32           m_uComponentBitfield[BITFIELD_SIZE];
+		static const uint32 MAX_SYSTEM_TYPES = 512;
+		static const uint32 SYSTEM_BITFIELD_SIZE = (MAX_SYSTEM_TYPES / BITFIELD_LENGTH) + 1;
+		uint32           m_uSystemBitfield[SYSTEM_BITFIELD_SIZE];
 
 		// Statics
 		static FastPool<ComponentEntity>*		g_pPool;
@@ -219,6 +223,7 @@ namespace usg
 
 		void LinkComponent(ComponentType *pComp);
 		void UnlinkComponent(ComponentType *pComp);
+		void SetSystemBit(uint32 uSysIndex, bool bValue);
 	};
 
 	inline std::atomic<uint32>& ComponentEntity::SystemExecutionDepth()

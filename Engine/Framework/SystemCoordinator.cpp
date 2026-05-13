@@ -46,6 +46,7 @@ namespace usg
 		usg::hash_map<uint32, usg::vector<SignalRunner>> signalRunners;
 		usg::hash_map<uint32, usg::vector<SignalExecutionBatch>> signalExecutionBatches;
 		usg::hash_map<uint32, ProtocolBufferReaderData> protocolBufferReaders;
+		usg::vector<uint32> activeSystemIndices;
 		uint32 uSignalDispatchDepth = 0;
 
 		void Clear()
@@ -56,6 +57,7 @@ namespace usg
 			componentHashLookUp.clear();
 			signalRunners.clear();
 			signalExecutionBatches.clear();
+			activeSystemIndices.clear();
 			uSignalDispatchDepth = 0;
 		}
 	};
@@ -543,6 +545,7 @@ void SystemCoordinator::UpdateSystemList()
 	SystemData* pData = m_pSystemData;
 	KeyIndex* pKey = m_pSystemKeyBuffer;
 	const size_t uSystemCount = m_pInternalData->systemHelpers.size();
+	m_pInternalData->activeSystemIndices.clear();
 	for (sint32 i = 0; i < (sint32)uSystemCount; i++)
 	{
 		if (!pData->bSystemActive)
@@ -553,6 +556,10 @@ void SystemCoordinator::UpdateSystemList()
 				bCanBeRun &= (pKey[j].uCmpValue & pActiveSystems[pKey[j].uIndex]) == pKey[j].uCmpValue;
 			}
 			pData->bSystemActive = bCanBeRun;
+		}
+		if (pData->bSystemActive)
+		{
+			m_pInternalData->activeSystemIndices.push_back((uint32)i);
 		}
 		pKey += pData->uKeyCount;
 		pData++;
@@ -571,53 +578,34 @@ void SystemCoordinator::UpdateEntityIO(ComponentEntity* e)
 		UpdateSystemList();
 		ComponentStats::ClearFlagsDirty();
 	}
-	uint32 uCurrentlyRunningSystems[16];
-	usg::MemSet(&uCurrentlyRunningSystems, 0, sizeof(uCurrentlyRunningSystems));
-	StringPointerHash<GenericInputOutputs*>& systems = e->GetSystems();
-	for (StringPointerHash<GenericInputOutputs*>::Iterator it = systems.Begin(); !it.IsEnd(); ++it)
-	{
-		const uint32 uKey = it.GetKey().Get();
-		const uint32 uIndex = uKey - 1;
-		uCurrentlyRunningSystems[uIndex / 32] |= (1<<(uIndex%32));
-	}
-
 	e->SetOnCollisionMask(0);
 
-	SystemData* pData = m_pSystemData;
-	KeyIndex* pKey = m_pSystemKeyBuffer;
-	uint32 uSystemCount = (uint32)m_pInternalData->systemHelpers.size();
-
 	bool bEntityHasRequiredComponents = true;
-	for (uint32 i=0; i<uSystemCount; i++)
+	for (uint32 activeSystemIndex : m_pInternalData->activeSystemIndices)
 	{
-		if(pData->bSystemActive)
+		ASSERT(activeSystemIndex < m_pInternalData->systemHelpers.size());
+		SystemData* pData = &m_pSystemData[activeSystemIndex];
+		const SystemHelper& helper = m_pInternalData->systemHelpers[activeSystemIndex];
+		uint32* pEntityCmp = e->GetRawComponentBitfield();
+
+		bEntityHasRequiredComponents = true;
+		for (uint32 j = 0; j < pData->uKeyCount; j++)
 		{
-			const SystemHelper& helper = m_pInternalData->systemHelpers[i];
-			uint32* pEntityCmp = e->GetRawComponentBitfield();
-
-			bEntityHasRequiredComponents = true;
-			for (uint32 j = 0; j < pData->uKeyCount; j++)
-			{
-				bEntityHasRequiredComponents &= (pKey[j].uCmpValue & pEntityCmp[pKey[j].uIndex]) == pKey[j].uCmpValue;
-			}
-
-			const uint32 uIndex = helper.systemTypeID;
-			ASSERT(uIndex / 32 < ARRAY_SIZE(uCurrentlyRunningSystems));
-			const bool bEntityIsCurrentlyRunning = (uCurrentlyRunningSystems[uIndex / 32] & (1 << (uIndex % 32))) != 0;
-
-			if (bEntityIsCurrentlyRunning || bEntityHasRequiredComponents)
-			{
-				ComponentGetter componentGetter(e);
-				const bool bIsRunning = helper.UpdateInputOutputs(componentGetter, bEntityHasRequiredComponents, bEntityIsCurrentlyRunning);
-				if (helper.bIsCollisionListener && bIsRunning)
-				{
-					e->SetOnCollisionMask(e->GetOnCollisionMask() | helper.uOnCollisionMask);
-				}
-			}
+			const KeyIndex& key = pData->pKeys[j];
+			bEntityHasRequiredComponents &= (key.uCmpValue & pEntityCmp[key.uIndex]) == key.uCmpValue;
 		}
 
-		pKey += pData->uKeyCount;
-		pData++;
+		const bool bEntityIsCurrentlyRunning = e->HasSystem(helper.systemTypeID);
+
+		if (bEntityIsCurrentlyRunning || bEntityHasRequiredComponents)
+		{
+			ComponentGetter componentGetter(e);
+			const bool bIsRunning = helper.UpdateInputOutputs(componentGetter, bEntityHasRequiredComponents, bEntityIsCurrentlyRunning);
+			if (helper.bIsCollisionListener && bIsRunning)
+			{
+				e->SetOnCollisionMask(e->GetOnCollisionMask() | helper.uOnCollisionMask);
+			}
+		}
 	}
 }
 
