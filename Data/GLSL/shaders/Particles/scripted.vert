@@ -50,7 +50,7 @@ BUFFER_LAYOUT(1,  UBO_CUSTOM_3_ID) uniform Custom3
 // Input attributes
 ATTRIB_LOC(0) in vec3 ao_position;
 ATTRIB_LOC(1) in vec2 ao_size;
-ATTRIB_LOC(2) in vec2 ao_uvOffset;
+ATTRIB_LOC(2) in vec4 ao_uvOffset;
 ATTRIB_LOC(3) in vec3 ao_velocity;    // Motion of the particle
 ATTRIB_LOC(4) in float ao_colorId;
 ATTRIB_LOC(5) in vec2 ao_life;        // Particle life time (x: birth, y: lifetime).
@@ -217,7 +217,7 @@ vec3 CalculatePosition(float fLifeTime)
 vec4 CalculateUVCoords(float lifetime, int index)
 {
     vec4 uvRange;
-    uvRange.xy = ao_uvOffset;
+    uvRange.xy = index == 0 ? ao_uvOffset.xy : ao_uvOffset.zw;
     uvRange.zw = vUVScale[index];
 
     return uvRange;

@@ -2,13 +2,15 @@
 #include "../includes/global_3d.inc"
 
 SAMPLER_LOC(1, 0) uniform sampler2D sampler0;	// Particle texture
+SAMPLER_LOC(1, 1) uniform sampler2D sampler1;	// Particle texture layer
 SAMPLER_LOC(0, 14) uniform sampler2D sampler14;	// Linear depth texture
 
 
 BUFFER_LAYOUT(1, UBO_MATERIAL_1_ID) uniform Material1
 {
     float    fAlphaRef;
-    float	 fDepthFade;
+	 float	 fDepthFade;
+    float    fTexture1Blend;
 };
 
 in GeometryData
@@ -40,7 +42,9 @@ void main(void)
 	}
 
 
-	vec4 vTex 		=  texture(sampler0, geometryData.vo_vTexcoord[0]);
+	vec4 vTex0 		=  texture(sampler0, geometryData.vo_vTexcoord[0]);
+	vec4 vTex1 		=  texture(sampler1, geometryData.vo_vTexcoord[1]);
+	vec4 vTex		=  mix(vTex0, vTex0 * vTex1, fTexture1Blend);
 	vec4 vOut = vTex * geometryData.vo_vColor;
 	vOut.a *= zFade;
 

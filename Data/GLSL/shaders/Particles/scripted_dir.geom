@@ -36,7 +36,7 @@ void CreateVertex(int ii, vec2 scale, vec3 vPos)
     geometryData.vo_vColor = vo_vColor[ii];
     // TODO: Multiple images in the same texture
     geometryData.vo_vTexcoord[0] = (vec2(scale.x, 1.0 - scale.y) * vo_vUVRange[ii][0].zw) + vo_vUVRange[ii][0].xy;
-    geometryData.vo_vTexcoord[1] = (vec2(scale.x, 1.0 - scale.y) * vo_vUVRange[ii][0].zw) + vo_vUVRange[ii][0].xy;
+    geometryData.vo_vTexcoord[1] = (vec2(scale.x, 1.0 - scale.y) * vo_vUVRange[ii][1].zw) + vo_vUVRange[ii][1].xy;
 
     vec4 vEyePos    = pos * mViewMat;
     

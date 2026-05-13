@@ -18,7 +18,7 @@ namespace usg
 		struct ScriptedParticle
 		{
 			Vector3f	vPos;
-			Vector2f	vUVOffset;
+			Vector2f	vUVOffset[particles::EmitterEmission::textureData_max_count];
 			Vector2f	vSizeBase;
 			Vector3f	vVelocity;
 			float32		fColorIndex;
@@ -53,7 +53,7 @@ namespace usg
 		static const VertexElement g_scriptedParticleVertexElements[] =
 		{
 			VERTEX_DATA_ELEMENT_NAME(0, ScriptedParticle, vPos, VE_FLOAT, 3, false),
-			VERTEX_DATA_ELEMENT_NAME(2, ScriptedParticle, vUVOffset, VE_FLOAT, 2, false),
+			VERTEX_DATA_ELEMENT_NAME(2, ScriptedParticle, vUVOffset[0], VE_FLOAT, 2 * particles::EmitterEmission::textureData_max_count, false),
 			VERTEX_DATA_ELEMENT_NAME(1, ScriptedParticle, vSizeBase, VE_FLOAT, 2, false),
 			VERTEX_DATA_ELEMENT_NAME(3, ScriptedParticle, vVelocity, VE_FLOAT, 3, false),
 			VERTEX_DATA_ELEMENT_NAME(4, ScriptedParticle, fColorIndex, VE_FLOAT, 1, false),
@@ -100,6 +100,7 @@ namespace usg
 		{
 			float		fAlphaRef;
 			float		fDepthFade;
+			float		fTexture1Blend;
 		};
 
 
@@ -143,12 +144,14 @@ namespace usg
 		{
 			SHADER_CONSTANT_ELEMENT(ScriptedParticleFragment, fAlphaRef, CT_FLOAT, 1),
 			SHADER_CONSTANT_ELEMENT(ScriptedParticleFragment, fDepthFade, CT_FLOAT, 1),
+			SHADER_CONSTANT_ELEMENT(ScriptedParticleFragment, fTexture1Blend, CT_FLOAT, 1),
 			SHADER_CONSTANT_END()
 		};
 
 		static const DescriptorDeclaration g_scriptedDescriptorDecl[] =
 		{
 			DESCRIPTOR_ELEMENT(0,							DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
+			DESCRIPTOR_ELEMENT(1,							DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
 			DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL,	DESCRIPTOR_TYPE_CONSTANT_BUFFER,		1, SHADER_FLAG_VERTEX),
 			DESCRIPTOR_ELEMENT(SHADER_CONSTANT_CUSTOM_3,	DESCRIPTOR_TYPE_CONSTANT_BUFFER,		1, SHADER_FLAG_VERTEX),
 			DESCRIPTOR_ELEMENT(SHADER_CONSTANT_CUSTOM_0,	DESCRIPTOR_TYPE_CONSTANT_BUFFER,		1, SHADER_FLAG_VERTEX),

@@ -227,14 +227,23 @@ namespace usg
 			}
 		}
 
+		SamplerDecl decl;
+		decl.SetClamp(SAMP_WRAP_CLAMP);
+
 		TextureHndl pTextures[particles::EmitterEmission::textureData_max_count] = {};
 		for (uint32 i = 0; i < m_emissionDef.textureData_count; i++)
 		{
-			SamplerDecl decl;
-			decl.SetClamp(SAMP_WRAP_CLAMP);
 			pTextures[i] = ResourceMgr::Inst()->GetTexture(pDevice, m_emissionDef.textureData[i].name);
 			m_material.SetTexture(i, pTextures[i], pDevice->GetSampler(decl));
 		}
+		for (uint32 i = m_emissionDef.textureData_count; i < particles::EmitterEmission::textureData_max_count; i++)
+		{
+			if (pTextures[0])
+			{
+				m_material.SetTexture(i, pTextures[0], pDevice->GetSampler(decl));
+			}
+		}
+
 		if (m_emissionDef.textureData_count > 0 && pTextures[0] && HasValidTexturePattern(m_emissionDef.textureData[0]))
 		{
 			float fWidth = (float)pTextures[0]->GetWidth() / (float)m_emissionDef.textureData[0].uPatternRepeatHor;
@@ -328,7 +337,7 @@ namespace usg
 			res.particleAlpha.fEndAlpha, 0.0f);
 		pMaterialSettings->vAlphaTiming.Assign( res.particleAlpha.fFinishInTime, res.particleAlpha.fOutStartTiming );
 
-		for (uint32 i = 0; i < m_emissionDef.textureData_count; i++)
+		for (uint32 i = 0; i < particles::EmitterEmission::textureData_max_count; i++)
 		{
 			pMaterialSettings->vUVScale[i] = m_vUVScale[i];
 		}
@@ -360,6 +369,7 @@ namespace usg
 		Particle::ScriptedParticleFragment* pFrag = m_fragConsts.Lock<Particle::ScriptedParticleFragment>();
 		pFrag->fAlphaRef  = res.blend.alphaTestFunc == usg::ALPHA_TEST_ALWAYS ? -1.0f : res.blend.alphaTestReference;
 		pFrag->fDepthFade = res.fSoftFadeDistance;
+		pFrag->fTexture1Blend = m_emissionDef.textureData_count > 1 ? 1.0f : 0.0f;
 		m_fragConsts.Unlock();
 		m_fragConsts.UpdateData(pDevice);
 
@@ -639,15 +649,15 @@ namespace usg
 
 			if (texAnim.eTexMode != usg::particles::TEX_MODE_RANDOM_IMAGE)
 			{
-				pOut->vUVOffset.x = m_vUVScale[i].x * uNoX;
-				pOut->vUVOffset.y = m_vUVScale[i].y * uNoY;
+				pOut->vUVOffset[i].x = m_vUVScale[i].x * uNoX;
+				pOut->vUVOffset[i].y = m_vUVScale[i].y * uNoY;
 			}
 			else
 			{
 				if (fPartElapsed == 0.0f || (uint32)(fPartElapsed* texData.textureAnim.fAnimTimeScale * 60.f) != (uint32)(fNextElapsed* texData.textureAnim.fAnimTimeScale * 60.f))
 				{
-					pOut->vUVOffset.x = m_vUVScale[i].x * uNoX;
-					pOut->vUVOffset.y = m_vUVScale[i].y * uNoY;
+					pOut->vUVOffset[i].x = m_vUVScale[i].x * uNoX;
+					pOut->vUVOffset[i].y = m_vUVScale[i].y * uNoY;
 				}
 			}
 		}
@@ -729,21 +739,26 @@ namespace usg
 		}
 		
 		out.vSizeBase = Vector2f(m_fParticleAspect*fScaleValue, fScaleValue);
-		out.vUVOffset = Vector2f(0.0f, 0.0f);
-
-		// If the texture has multiple images pick the first one to use
-		if(m_emissionDef.textureData_count > 0
-			&& m_emissionDef.textureData[0].textureAnim.eTexMode == usg::particles::TEX_MODE_NONE
-			&& m_emissionDef.textureData[0].textureAnim.bRandomOffset
-			&& m_emissionDef.textureData[0].uPatternRepeatHor > 0
-			&& m_emissionDef.textureData[0].uPatternRepeatVer > 0)
+		for (uint32 i = 0; i < particles::EmitterEmission::textureData_max_count; i++)
 		{
-			uint32 uPatternIdx = Math::Rand()%(m_emissionDef.textureData[0].uPatternRepeatHor*m_emissionDef.textureData[0].uPatternRepeatVer);
-			uint32 uNoX = uPatternIdx % m_emissionDef.textureData[0].uPatternRepeatHor;
-			uint32 uNoY = (uPatternIdx / m_emissionDef.textureData[0].uPatternRepeatHor);
+			out.vUVOffset[i] = Vector2f(0.0f, 0.0f);
+		}
 
-			out.vUVOffset.x = m_vUVScale[0].x * uNoX;
-			out.vUVOffset.y = m_vUVScale[0].y * uNoY;
+		for (uint32 i = 0; i < m_emissionDef.textureData_count; i++)
+		{
+			// If the texture has multiple images pick the first one to use
+			if(m_emissionDef.textureData[i].textureAnim.eTexMode == usg::particles::TEX_MODE_NONE
+				&& m_emissionDef.textureData[i].textureAnim.bRandomOffset
+				&& m_emissionDef.textureData[i].uPatternRepeatHor > 0
+				&& m_emissionDef.textureData[i].uPatternRepeatVer > 0)
+			{
+				uint32 uPatternIdx = Math::Rand()%(m_emissionDef.textureData[i].uPatternRepeatHor*m_emissionDef.textureData[i].uPatternRepeatVer);
+				uint32 uNoX = uPatternIdx % m_emissionDef.textureData[i].uPatternRepeatHor;
+				uint32 uNoY = (uPatternIdx / m_emissionDef.textureData[i].uPatternRepeatHor);
+
+				out.vUVOffset[i].x = m_vUVScale[i].x * uNoX;
+				out.vUVOffset[i].y = m_vUVScale[i].y * uNoY;
+			}
 		}
 
 		out.fColorIndex = GetColorIndex();
