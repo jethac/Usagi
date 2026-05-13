@@ -113,6 +113,35 @@ namespace
 		ok &= ExpectVector(radii, usg::Vector3f(1.5f, 1.5f, 1.5f), "AABB lerp interpolates radii");
 		return ok;
 	}
+
+	bool TestScalarWrapHelpers()
+	{
+		bool ok = true;
+		ok &= Expect(NearlyEqual(usg::Math::WrapValue(370.0f, 0.0f, 360.0f), 10.0f),
+			"WrapValue wraps values above range");
+		ok &= Expect(NearlyEqual(usg::Math::WrapValue(-10.0f, 0.0f, 360.0f), 350.0f),
+			"WrapValue wraps values below range");
+		ok &= Expect(NearlyEqual(usg::Math::MatchLoopingValue(5.0f, 355.0f, 0.0f, 360.0f), 365.0f),
+			"MatchLoopingValue moves low value near high match");
+		ok &= Expect(NearlyEqual(usg::Math::MatchLoopingValue(355.0f, 5.0f, 0.0f, 360.0f), -5.0f),
+			"MatchLoopingValue moves high value near low match");
+		return ok;
+	}
+
+	bool TestHermiteEndpoints()
+	{
+		const usg::Vector3f p0(1.0f, 2.0f, 3.0f);
+		const usg::Vector3f v0(4.0f, 5.0f, 6.0f);
+		const usg::Vector3f p1(7.0f, 8.0f, 9.0f);
+		const usg::Vector3f v1(-1.0f, -2.0f, -3.0f);
+
+		bool ok = true;
+		ok &= ExpectVector(usg::Math::Hermite(p0, v0, p1, v1, 0.0f), p0, "Hermite returns p0 at t=0");
+		ok &= ExpectVector(usg::Math::Hermite(p0, v0, p1, v1, 1.0f), p1, "Hermite returns p1 at t=1");
+		ok &= ExpectVector(usg::Math::HermiteDerivative(p0, v0, p1, v1, 0.0f), v0, "HermiteDerivative returns v0 at t=0");
+		ok &= ExpectVector(usg::Math::HermiteDerivative(p0, v0, p1, v1, 1.0f), v1, "HermiteDerivative returns v1 at t=1");
+		return ok;
+	}
 }
 
 int main()
@@ -121,6 +150,8 @@ int main()
 	ok &= TestMatrixTranslationUsesVectorW();
 	ok &= TestQuaternionAxisRotation();
 	ok &= TestAABBContainmentAndLerp();
+	ok &= TestScalarWrapHelpers();
+	ok &= TestHermiteEndpoints();
 
 	if (!ok)
 	{
