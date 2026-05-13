@@ -420,9 +420,18 @@ def level_tuples(config)
 
   inputs.each do |i|
     manifest = "#{config.working_dir}/#{i}".sub(/\.lvl$/, '_manifest.txt')
+    unless File.exist?(manifest)
+      abort("Missing level manifest '#{manifest}' for '#{i}'. Regenerate it with Tools/python/lvl2vhir/lvl2manifest.py before building levels.")
+    end
+
     manifestlines = IO.readlines(manifest)
-    manifestlines.each do |line|
-      files = line.chomp.split(/\t/).map do |f|
+    manifestlines.each_with_index do |line, line_index|
+      outputs = line.chomp.split(/\t/, -1)
+      if outputs.length != 3 || outputs.any?(&:empty?)
+        abort("Malformed level manifest '#{manifest}' line #{line_index + 1} for '#{i}': expected hierarchy, position, and instance outputs.")
+      end
+
+      files = outputs.map do |f|
         f = "#{config.working_dir}/Data/Levels/#{f}"
       end
       tuples.push ([i, files[0], files[1], files[2]])
