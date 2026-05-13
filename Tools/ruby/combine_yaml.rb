@@ -55,8 +55,6 @@ if $input
   input_files = IO.readlines($input).map{|f| f.gsub('\\', '/').chomp }.reject(&:empty?)
 end
 
-abort "combine_yaml: no input files specified" if input_files.empty?
-
 def load_yaml_file(filename)
   abort "combine_yaml: input file not found: #{filename}" if !File.file?(filename)
 
