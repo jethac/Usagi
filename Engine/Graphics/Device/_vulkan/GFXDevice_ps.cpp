@@ -217,8 +217,10 @@ void GFXDevice_ps::Cleanup(GFXDevice* pParent)
 	}
 	m_deferredContexts.clear();
 
-	vkDestroyCommandPool(m_vkDevice, m_cmdPool, NULL);
 	vkDeviceWaitIdle(m_vkDevice);
+	CleanupTransferSubmissions(m_pendingTransferSubmissions);
+	CleanupTransferSubmissions(m_inFlightTransferSubmissions);
+	vkDestroyCommandPool(m_vkDevice, m_cmdPool, NULL);
 	// Cleanup any requested destroys before destroying the device
 	CleanupDestroyRequests();
 
@@ -294,6 +296,31 @@ void GFXDevice_ps::CleanupDestroyRequests(uint32 uMaxFrameId)
 			break;
 		}
 	}
+}
+
+void GFXDevice_ps::CleanupTransferSubmissions(usg::vector<TransferSubmission>& submissions)
+{
+	for (auto& submission : submissions)
+	{
+		if (submission.stagingMemory != VK_NULL_HANDLE)
+		{
+			vkFreeMemory(m_vkDevice, submission.stagingMemory, nullptr);
+		}
+		if (submission.stagingBuffer != VK_NULL_HANDLE)
+		{
+			vkDestroyBuffer(m_vkDevice, submission.stagingBuffer, nullptr);
+		}
+		if (submission.bFreeCommandBuffer && submission.commandBuffer != VK_NULL_HANDLE)
+		{
+			vkFreeCommandBuffers(m_vkDevice, m_cmdPool, 1, &submission.commandBuffer);
+		}
+		if (submission.semaphore != VK_NULL_HANDLE)
+		{
+			vkDestroySemaphore(m_vkDevice, submission.semaphore, nullptr);
+		}
+	}
+
+	submissions.clear();
 }
 
 void GetHMDExtensionsForType(IHeadMountedDisplay* pHmd, IHeadMountedDisplay::ExtensionType eType, vector<const char*>& extensions)
@@ -762,6 +789,8 @@ void GFXDevice_ps::Begin()
 		do {
 			res = vkWaitForFences(m_vkDevice, 1, &m_drawFence, VK_TRUE, 100000);
 		} while (res == VK_TIMEOUT);
+		CriticalSection::ScopedLock lock(m_criticalSection);
+		CleanupTransferSubmissions(m_inFlightTransferSubmissions);
 	}
 	vkResetFences(m_vkDevice, 1, &m_drawFence);
 	bFirst = false;
@@ -811,9 +840,21 @@ void GFXDevice_ps::End()
 	usg::vector<VkSemaphore> signalSemaphores;
 	usg::vector<VkPipelineStageFlags> waitStageMasks;
 	const uint32 uDisplayCount = m_pParent->GetValidDisplayCount();
+	uint32 uPendingTransferCount = 0;
 	waitSemaphores.reserve(uDisplayCount);
 	signalSemaphores.reserve(uDisplayCount);
 	waitStageMasks.reserve(uDisplayCount);
+	{
+		CriticalSection::ScopedLock lock(m_criticalSection);
+		uPendingTransferCount = (uint32)m_pendingTransferSubmissions.size();
+		waitSemaphores.reserve(waitSemaphores.size() + uPendingTransferCount);
+		waitStageMasks.reserve(waitStageMasks.size() + uPendingTransferCount);
+		for (uint32 i = 0; i < uPendingTransferCount; ++i)
+		{
+			waitSemaphores.push_back(m_pendingTransferSubmissions[i].semaphore);
+			waitStageMasks.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		}
+	}
 	for (uint32 i = 0; i < uDisplayCount; ++i)
 	{
 		Display* pDisplay = m_pParent->GetDisplay(i);
@@ -838,6 +879,15 @@ void GFXDevice_ps::End()
 	VkResult res = vkQueueSubmit(m_queue[QUEUE_TYPE_GRAPHICS], 1, &submitInfo, m_drawFence);
 	m_queueSubmitTimer.Stop();
 	ASSERT(res == VK_SUCCESS);
+	if (res == VK_SUCCESS)
+	{
+		CriticalSection::ScopedLock lock(m_criticalSection);
+		for (uint32 i = 0; i < uPendingTransferCount; ++i)
+		{
+			m_inFlightTransferSubmissions.push_back(m_pendingTransferSubmissions[i]);
+		}
+		m_pendingTransferSubmissions.erase(m_pendingTransferSubmissions.begin(), m_pendingTransferSubmissions.begin() + uPendingTransferCount);
+	}
 }
 
  
@@ -1125,6 +1175,54 @@ void GFXDevice_ps::FlushCommandBuffer(VkCommandBuffer commandBuffer, bool free)
 	if (free)
 	{
 		vkFreeCommandBuffers(m_vkDevice, m_cmdPool, 1, &commandBuffer);
+	}
+}
+
+void GFXDevice_ps::SubmitTransferCommandBuffer(VkCommandBuffer commandBuffer, bool free, VkBuffer stagingBuffer, VkDeviceMemory stagingMemory)
+{
+	if (commandBuffer == VK_NULL_HANDLE)
+	{
+		return;
+	}
+
+	VkResult res = vkEndCommandBuffer(commandBuffer);
+	ASSERT(res == VK_SUCCESS);
+
+	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	semaphoreCreateInfo.pNext = NULL;
+	semaphoreCreateInfo.flags = 0;
+
+	TransferSubmission submission = {};
+	submission.commandBuffer = commandBuffer;
+	submission.stagingBuffer = stagingBuffer;
+	submission.stagingMemory = stagingMemory;
+	submission.bFreeCommandBuffer = free;
+
+	res = vkCreateSemaphore(m_vkDevice, &semaphoreCreateInfo, nullptr, &submission.semaphore);
+	ASSERT(res == VK_SUCCESS);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &submission.semaphore;
+
+	res = vkQueueSubmit(m_queue[QUEUE_TYPE_TRANSFER], 1, &submitInfo, VK_NULL_HANDLE);
+	ASSERT(res == VK_SUCCESS);
+
+	if (res == VK_SUCCESS)
+	{
+		CriticalSection::ScopedLock lock(m_criticalSection);
+		m_pendingTransferSubmissions.push_back(submission);
+	}
+	else
+	{
+		if (submission.semaphore != VK_NULL_HANDLE)
+		{
+			vkDestroySemaphore(m_vkDevice, submission.semaphore, nullptr);
+		}
 	}
 }
 

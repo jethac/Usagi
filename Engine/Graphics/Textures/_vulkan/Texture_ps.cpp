@@ -824,11 +824,7 @@ bool Texture_ps::LoadWithGLI(GFXDevice* pDevice, const char* szFileName)
 		m_imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		SetImageLayout(copyCmd,	m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_imageLayout, subresourceRange);
 
-		devicePS.FlushCommandBuffer(copyCmd, true);
-
-		// Clean up staging resources
-		vkFreeMemory(device, stagingMemory, nullptr);
-		vkDestroyBuffer(device, stagingBuffer, nullptr);
+		devicePS.SubmitTransferCommandBuffer(copyCmd, true, stagingBuffer, stagingMemory);
 
 		// The image view
 		VkImageViewCreateInfo view = {};

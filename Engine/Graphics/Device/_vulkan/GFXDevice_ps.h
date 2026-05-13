@@ -76,6 +76,7 @@ public:
 
 	VkCommandBuffer CreateCommandBuffer(VkCommandBufferLevel level, bool begin);
 	void FlushCommandBuffer(VkCommandBuffer commandBuffer, bool free);
+	void SubmitTransferCommandBuffer(VkCommandBuffer commandBuffer, bool free, VkBuffer stagingBuffer = VK_NULL_HANDLE, VkDeviceMemory stagingMemory = VK_NULL_HANDLE);
 	VkQueue GetQueue() { return m_queue[QUEUE_TYPE_GRAPHICS]; }
 	const VkPhysicalDeviceProperties* GetPhysicalProperties(uint32 uGPU = 0);
 
@@ -125,6 +126,8 @@ private:
 		RESOURCE_FRAME_BUFFER
 	};
 
+	struct TransferSubmission;
+	void CleanupTransferSubmissions(usg::vector<TransferSubmission>& submissions);
 
 	// FIXME: Refactor to use the resource manager when we stop supporting platforms that precompile into one unit
 	struct Shader
@@ -161,6 +164,15 @@ private:
 		} resource;
 	};
 
+	struct TransferSubmission
+	{
+		VkSemaphore		semaphore;
+		VkCommandBuffer	commandBuffer;
+		VkBuffer		stagingBuffer;
+		VkDeviceMemory	stagingMemory;
+		bool			bFreeCommandBuffer;
+	};
+
 
 	CriticalSection						m_criticalSection;
 	usg::queue<DestroyRequest>			m_destroyQueue;
@@ -191,6 +203,8 @@ private:
 	VkAllocationCallbacks				m_allocCallbacks;
 	ProfilingTimer						m_queueSubmitTimer;
 	usg::vector<VkCommandBuffer>		m_frameCommandBuffers;
+	usg::vector<TransferSubmission>	m_pendingTransferSubmissions;
+	usg::vector<TransferSubmission>	m_inFlightTransferSubmissions;
 	usg::vector<GFXContext*>			m_deferredContexts;
 
 	DisplaySettings						m_diplayInfo[MAX_DISPLAY_COUNT];
