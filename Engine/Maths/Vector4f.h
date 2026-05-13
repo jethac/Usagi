@@ -381,13 +381,21 @@ inline Vector4f Vector4f::operator-() const
 // Linearly interpolate between two vectors based on interpolation value t
 inline void Lerp(const Vector4f &v1, const Vector4f &v2, Vector4f &vOut, float t)
 {
-	vOut = (v1 + ((v2 - v1) * t));
+	vOut.Assign(
+		Math::Lerp(v1.x, v2.x, t),
+		Math::Lerp(v1.y, v2.y, t),
+		Math::Lerp(v1.z, v2.z, t),
+		Math::Lerp(v1.w, v2.w, t));
 }
 
 // Some occassions we won't have access to the destination vector
 inline Vector4f Lerp(const Vector4f &v1, const Vector4f &v2, float t)
 {
-	return (v1 + ((v2 - v1) * t));
+	return Vector4f(
+		Math::Lerp(v1.x, v2.x, t),
+		Math::Lerp(v1.y, v2.y, t),
+		Math::Lerp(v1.z, v2.z, t),
+		Math::Lerp(v1.w, v2.w, t));
 }
 
 }

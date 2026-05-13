@@ -69,6 +69,17 @@ namespace
 		return ok;
 	}
 
+	bool ExpectVector4(const usg::Vector4f& value, const usg::Vector4f& expected, const char* szMessage)
+	{
+		const bool ok = NearlyEqual(value.x, expected.x) && NearlyEqual(value.y, expected.y) && NearlyEqual(value.z, expected.z) && NearlyEqual(value.w, expected.w);
+		if (!ok)
+		{
+			printf("FAILED: %s got=(%.6f, %.6f, %.6f, %.6f) expected=(%.6f, %.6f, %.6f, %.6f)\n",
+				szMessage, value.x, value.y, value.z, value.w, expected.x, expected.y, expected.z, expected.w);
+		}
+		return ok;
+	}
+
 	bool TestMatrixTranslationUsesVectorW()
 	{
 		usg::Matrix4x4 transform = usg::Matrix4x4::Identity();
@@ -112,6 +123,21 @@ namespace
 		midpoint.GetCentreRadii(centre, radii);
 		ok &= ExpectVector(centre, usg::Vector3f(1.5f, 2.5f, 3.5f), "AABB lerp interpolates centre");
 		ok &= ExpectVector(radii, usg::Vector3f(1.5f, 1.5f, 1.5f), "AABB lerp interpolates radii");
+		return ok;
+	}
+
+	bool TestVector4LerpInterpolatesW()
+	{
+		const usg::Vector4f start(0.0f, 2.0f, 4.0f, 0.0f);
+		const usg::Vector4f end(10.0f, 12.0f, 14.0f, 1.0f);
+		const usg::Vector4f expected(5.0f, 7.0f, 9.0f, 0.5f);
+
+		bool ok = true;
+		ok &= ExpectVector4(usg::Lerp(start, end, 0.5f), expected, "Vector4f Lerp return overload interpolates w");
+
+		usg::Vector4f out;
+		usg::Lerp(start, end, out, 0.5f);
+		ok &= ExpectVector4(out, expected, "Vector4f Lerp out-param overload interpolates w");
 		return ok;
 	}
 
@@ -234,6 +260,7 @@ int main()
 	ok &= TestMatrixTranslationUsesVectorW();
 	ok &= TestQuaternionAxisRotation();
 	ok &= TestAABBContainmentAndLerp();
+	ok &= TestVector4LerpInterpolatesW();
 	ok &= TestScalarWrapHelpers();
 	ok &= TestHermiteEndpoints();
 	ok &= TestMatrixScaleAndQuickInverse();
