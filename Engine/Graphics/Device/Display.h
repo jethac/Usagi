@@ -58,6 +58,7 @@ public:
 
 	void SetVSyncMode(VSyncMode eVsync) { m_platform.SetVSyncMode(eVsync); }
 	bool HasHDRSupport() const { return m_platform.HasHDRSupport(); }
+	bool ExpectsSRGBNonlinearOutput() const { return m_platform.ExpectsSRGBNonlinearOutput(); }
 
 	Display_ps& GetPlatform() { return m_platform; }
 	WindHndl GetHandle() const { return m_window; }

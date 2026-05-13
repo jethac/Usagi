@@ -35,6 +35,7 @@ public:
     void Resize(GFXDevice* pDevice);
     void Minimized(usg::GFXDevice* pDevice) {}
 	void SetDirty() { m_bDirty = true; }
+	bool ExpectsSRGBNonlinearOutput() const { return true; }
 	
 	//RenderTarget &GetRenderTarget() { return m_renderTarget; }
 

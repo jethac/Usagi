@@ -16,6 +16,7 @@
 #include "Engine/Scene/SceneConstantSets.h"
 #include "Engine/PostFX/PostFXSys.h"
 #include "Engine/Graphics/StandardVertDecl.h"
+#include "Engine/Graphics/Device/Display.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/Device/GFXContext.h"
 #include API_HEADER(Engine/Graphics/Device, GFXDevice_ps.h)
@@ -789,7 +790,13 @@ void PostFXSys_ps::EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags)
 		m_pSSAO->SetEnabled((uEffectFlags & PostFXSys::EFFECT_SSAO) != 0);
 	if (m_pDisplayColorTransform)
 	{
-		m_pDisplayColorTransform->SetEnabled((uEffectFlags & (PostFXSys::EFFECT_FINAL_TARGET_HDR | PostFXSys::EFFECT_OFFSCREEN_TARGET)) == 0);
+		bool bDisplayEncodeEnabled = (uEffectFlags & (PostFXSys::EFFECT_FINAL_TARGET_HDR | PostFXSys::EFFECT_OFFSCREEN_TARGET)) == 0;
+		Display* pDisplay = pDevice->GetDisplay(0);
+		if (pDisplay)
+		{
+			bDisplayEncodeEnabled = bDisplayEncodeEnabled && pDisplay->ExpectsSRGBNonlinearOutput();
+		}
+		m_pDisplayColorTransform->SetEnabled(bDisplayEncodeEnabled);
 	}
 
 	m_renderPasses.SetDeferredEnabled(m_pDeferredShading && (uEffectFlags & PostFXSys::EFFECT_DEFERRED_SHADING) != 0);
