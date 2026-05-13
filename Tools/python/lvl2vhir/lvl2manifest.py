@@ -1,9 +1,14 @@
 import sys, os, os.path, subprocess
+from optparse import Option, OptionParser
+
+if sys.version_info[0] != 2:
+    sys.stderr.write("ERROR: lvl2manifest.py requires Python 2.7; run through tools/usagi-dev-env.ps1 or put B:/usagi_dev/tools/python-2.7.14-x64 first on PATH.\n")
+    sys.exit(1)
+
 import LevelEditor
 import Level2Yaml
 import Level2Instances
 import yaml
-from optparse import Option, OptionParser
 
 class MultipleOption(Option):
     ACTIONS = Option.ACTIONS + ("extend",)
