@@ -189,6 +189,28 @@ public sealed partial class FsidBuilderTests
     }
 
     [Fact]
+    public void WriteAudioBankYaml_EmitsExplicitEmptySequences()
+    {
+        var bank = AudioBankYamlParser.Parse("""
+            AudioBank:
+              soundFiles:
+                - enumName: EMPTY_REFS
+                  filename: empty_refs
+                  effectCRCs: []
+              filters: []
+              reverbs: []
+              rooms: []
+            """);
+
+        var yaml = AudioBankYamlWriter.Write(bank);
+
+        Assert.Contains("effectCRCs: []", yaml, StringComparison.Ordinal);
+        Assert.Contains("  filters: []", yaml, StringComparison.Ordinal);
+        Assert.Contains("  reverbs: []", yaml, StringComparison.Ordinal);
+        Assert.Contains("  rooms: []", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ValidateAudioBank_AcceptsConsistentFullSchema()
     {
         var bank = AudioBankYamlParser.Parse(FullAudioBankYaml);

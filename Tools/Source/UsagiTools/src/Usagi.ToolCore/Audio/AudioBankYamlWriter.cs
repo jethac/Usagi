@@ -18,6 +18,12 @@ public static class AudioBankYamlWriter
 
     private static void WriteSoundFiles(StringBuilder writer, IReadOnlyCollection<SoundFileDefinition> soundFiles)
     {
+        if (soundFiles.Count == 0)
+        {
+            writer.AppendLine("  soundFiles: []");
+            return;
+        }
+
         writer.AppendLine("  soundFiles:");
         foreach (var sound in soundFiles)
         {
@@ -45,6 +51,12 @@ public static class AudioBankYamlWriter
 
     private static void WriteFilters(StringBuilder writer, IReadOnlyCollection<AudioFilterDefinition> filters)
     {
+        if (filters.Count == 0)
+        {
+            writer.AppendLine("  filters: []");
+            return;
+        }
+
         writer.AppendLine("  filters:");
         foreach (var filter in filters)
         {
@@ -58,6 +70,12 @@ public static class AudioBankYamlWriter
 
     private static void WriteReverbs(StringBuilder writer, IReadOnlyCollection<ReverbEffectDefinition> reverbs)
     {
+        if (reverbs.Count == 0)
+        {
+            writer.AppendLine("  reverbs: []");
+            return;
+        }
+
         writer.AppendLine("  reverbs:");
         foreach (var reverb in reverbs)
         {
@@ -81,6 +99,12 @@ public static class AudioBankYamlWriter
 
     private static void WriteRooms(StringBuilder writer, IReadOnlyCollection<AudioRoomDefinition> rooms)
     {
+        if (rooms.Count == 0)
+        {
+            writer.AppendLine("  rooms: []");
+            return;
+        }
+
         writer.AppendLine("  rooms:");
         foreach (var room in rooms)
         {
@@ -94,6 +118,12 @@ public static class AudioBankYamlWriter
     private static void WriteUIntList(StringBuilder writer, string name, IReadOnlyCollection<uint> values, int indent)
     {
         var spaces = new string(' ', indent);
+        if (values.Count == 0)
+        {
+            writer.Append(spaces).Append(name).AppendLine(": []");
+            return;
+        }
+
         writer.Append(spaces).Append(name).AppendLine(":");
         foreach (var value in values)
         {
