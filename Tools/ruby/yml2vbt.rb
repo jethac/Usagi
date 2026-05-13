@@ -15,6 +15,11 @@ class BehaviorTreeConverter
   end
 
   VALID_BEHAVIOR_TYPES = ["Composite", "Decorator", "Action"]
+  DEFAULT_PROJECT_BEHAVIOR_PROTO = 'Tank/AI/TankBehaviorCommon.pb.rb'
+
+  def initialize(options = {})
+    @options = options
+  end
 
   def run(input, output)
     yaml = File.open(input, 'r') { |content| YAML.load(content) }
@@ -71,13 +76,15 @@ class BehaviorTreeConverter
 
   def parse_behavior_data(name)
     behaviorData = get_behavior_data
-    sub = name.split("_")
-    bh = find_bt_pb(sub[1]).new
+    sub = name.split("_", 2)
+    data_type = sub[1]
+    raise "Can not infer behavior data protobuf type from #{name}" if data_type.nil? || data_type.empty?
+    bh = resolve_bt_pb(data_type, "data for #{name}").new
     behaviorData.each {
       |key,value|
       # some of the data we have are protobuf classes
       if value.is_a? String
-        data = find_bt_pb(value) if value.is_a?String
+        data = resolve_bt_pb(value, "data field #{key}") if value.is_a?String
         bh.attributes = { key.to_sym => data }
       else
         bh.attributes = { key.to_sym => value }
@@ -118,15 +125,45 @@ class BehaviorTreeConverter
     require_relative 'tracker'
     require_relative 'lib/entity_util'
     require 'Engine/AI/BehaviorTree/BehaviorCommon.pb.rb'
-    require 'Tank/AI/TankBehaviorCommon.pb.rb'
+    require_project_behavior_proto(DEFAULT_PROJECT_BEHAVIOR_PROTO, true) if @options.fetch(:use_default_project_behavior_proto, true)
+    @options.fetch(:project_behavior_protos, []).each do |proto|
+      require_project_behavior_proto(proto, false)
+    end
+  end
+
+  def require_project_behavior_proto(proto, optional)
+    require proto
+  rescue LoadError => e
+    raise e unless optional && missing_required_feature?(e, proto)
+  end
+
+  def missing_required_feature?(error, feature)
+    error.respond_to?(:path) && error.path == feature ||
+      error.message.include?(" -- #{feature}") ||
+      error.message.include?("such file -- #{feature}")
+  end
+
+  def resolve_bt_pb(pb_type, context = nil)
+    pb = find_bt_pb(pb_type)
+    return pb unless pb.nil?
+
+    raise unresolved_pb_message(pb_type, context)
+  rescue NameError
+    raise unresolved_pb_message(pb_type, context)
+  end
+
+  def unresolved_pb_message(pb_type, context)
+    message = "Could not resolve behavior tree protobuf type '#{pb_type}'"
+    message += " for #{context}" if context
+    message + ". Add --project-behavior-proto for project-specific behavior data."
   end
 
   def add_composite
     className = get_behavior_name
     composite_header = Usg::Ai::CompositeHeader.new
-    composite_type = find_bt_pb("CompositeType_" + className)
+    composite_type = resolve_bt_pb("CompositeType_" + className, "composite #{className}")
     composite_header.compositeType = composite_type
-    composite = find_bt_pb(className + "Header").new({:numChildren => get_num_children})
+    composite = resolve_bt_pb(className + "Header", "composite #{className}").new({:numChildren => get_num_children})
     if className == "Parallel"
       composite.numSuccess = get_num_success
     end
@@ -142,7 +179,7 @@ class BehaviorTreeConverter
 
     #then we need to find out what type of decorator this is
     className = get_behavior_name
-    dec_type = find_bt_pb(className)
+    dec_type = resolve_bt_pb(className, "decorator #{className}")
     dec_header = Usg::Ai::DecoratorHeader.new
     dec_header.decoratorHeader = dec_type
     @@pb_file.print(dec_header.serialize_to_string + Constants::NUL)
@@ -161,7 +198,7 @@ class BehaviorTreeConverter
 
     #then we need to find out what type of action this is
     className = get_behavior_name
-    bh_type = find_bt_pb(className)
+    bh_type = resolve_bt_pb(className, "action #{className}")
     bh_header = Usg::Ai::BehaviorHeader.new
     bh_header.behaviorType = bh_type
     @@pb_file.print(bh_header.serialize_to_string + Constants::NUL)
@@ -185,12 +222,28 @@ class BehaviorTreeConverter
 end
 
 ### THE ACTUAL SCRIPT
-$options = {}
+$options = {
+  load_paths: [],
+  project_behavior_protos: [],
+  use_default_project_behavior_proto: true
+}
 
 optparser = OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options] infile"
+  opts.on( '-I dir', 'Add a Ruby load path before requiring protobuf bindings' ) do |dir|
+    $options[:load_paths] << dir
+  end
+
   opts.on( '-o file', 'Specifies the filename to output' ) do |f|
     $options[:output] = f
+  end
+
+  opts.on( '--project-behavior-proto require', 'Require a project behavior protobuf Ruby binding' ) do |feature|
+    $options[:project_behavior_protos] << feature
+  end
+
+  opts.on( '--no-default-project-behavior-proto', 'Do not optionally require the legacy Tank behavior binding' ) do
+    $options[:use_default_project_behavior_proto] = false
   end
 
   opts.on( '-h', '--help', 'Display this screen' ) do
@@ -210,6 +263,13 @@ def create_output_parent_dir(output)
   FileUtils.mkdir_p(parent)
 end
 
+def configure_load_paths(load_paths)
+  load_paths.each do |dir|
+    raise "Load path does not exist: #{dir}" unless File.directory?(dir)
+    $LOAD_PATH.unshift(dir) unless $LOAD_PATH.include?(dir)
+  end
+end
+
 begin
   optparser.parse!
   raise "No input file specified" if ARGV.length == 0
@@ -218,9 +278,10 @@ begin
 
   SRC = ARGV[0]
   raise "Input file does not exist: #{SRC}" unless File.file?(SRC)
+  configure_load_paths($options[:load_paths])
   create_output_parent_dir($options[:output])
 
-  BehaviorTreeConverter.new().run(SRC, $options[:output])
+  BehaviorTreeConverter.new($options).run(SRC, $options[:output])
   Tracker::writeDependenciesFile($options, $options[:output])
 rescue OptionParser::ParseError, LoadError, StandardError => e
   warn "#{File.basename($0)}: ERROR: #{e.message}"

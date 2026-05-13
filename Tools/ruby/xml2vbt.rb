@@ -13,7 +13,21 @@ class XMLBehaviorTreeConverter
     NUL = "\0"
   end
 
-  VALID_BEHAVIOR_TYPES = ["composite", "decorator", "tankdecorator", "behavior", "tankbehavior"]
+  DEFAULT_PROJECT_BEHAVIOR_PROTO = 'Tank/AI/TankBehaviorCommon.pb.rb'
+  DEFAULT_BEHAVIOR_TYPE_PREFIXES = {
+    "behavior_" => "BehaviorType_",
+    "tankbehavior_" => "TankBehaviorType_"
+  }
+  DEFAULT_DECORATOR_TYPE_PREFIXES = {
+    "decorator_" => "DecoratorType_",
+    "tankdecorator_" => "TankDecoratorType_"
+  }
+
+  def initialize(options = {})
+    @options = options
+    @behavior_type_prefixes = DEFAULT_BEHAVIOR_TYPE_PREFIXES.merge(options.fetch(:behavior_type_prefixes, {}))
+    @decorator_type_prefixes = DEFAULT_DECORATOR_TYPE_PREFIXES.merge(options.fetch(:decorator_type_prefixes, {}))
+  end
 
   def run(input, output)
     require 'nokogiri'
@@ -34,7 +48,46 @@ class XMLBehaviorTreeConverter
     require_relative 'tracker'
     require_relative 'lib/entity_util'
     require 'Engine/AI/BehaviorTree/BehaviorCommon.pb.rb'
-    require 'Tank/AI/TankBehaviorCommon.pb.rb'
+    require_project_behavior_proto(DEFAULT_PROJECT_BEHAVIOR_PROTO, true) if @options.fetch(:use_default_project_behavior_proto, true)
+    @options.fetch(:project_behavior_protos, []).each do |proto|
+      require_project_behavior_proto(proto, false)
+    end
+  end
+
+  def require_project_behavior_proto(proto, optional)
+    require proto
+  rescue LoadError => e
+    raise e unless optional && missing_required_feature?(e, proto)
+  end
+
+  def missing_required_feature?(error, feature)
+    error.respond_to?(:path) && error.path == feature ||
+      error.message.include?(" -- #{feature}") ||
+      error.message.include?("such file -- #{feature}")
+  end
+
+  def resolve_bt_pb(pb_type, context = nil)
+    pb = find_bt_pb(pb_type)
+    return pb unless pb.nil?
+
+    raise unresolved_pb_message(pb_type, context)
+  rescue NameError
+    raise unresolved_pb_message(pb_type, context)
+  end
+
+  def resolve_bt_pb_enum(pb_type, context = nil)
+    pb = find_bt_pb_enum(pb_type)
+    return pb unless pb.nil?
+
+    raise unresolved_pb_message(pb_type, context)
+  rescue NameError
+    raise unresolved_pb_message(pb_type, context)
+  end
+
+  def unresolved_pb_message(pb_type, context)
+    message = "Could not resolve behavior tree protobuf type '#{pb_type}'"
+    message += " for #{context}" if context
+    message + ". Add --project-behavior-proto for project-specific behavior data."
   end
 
   def parse_tree(xml)
@@ -55,23 +108,17 @@ class XMLBehaviorTreeConverter
     type = get_behavior_type(current)
 
     case type
-    when "composite"
+    when :composite
       # puts "composite"
       add_composite(current)
-    when "decorator"
+    when :decorator
       # puts "decorator"
       add_decorator(current)
-    when "tankdecorator"
-      # puts "decorator"
-      add_decorator(current)
-    when "behavior"
-      # puts "behavior"
-      add_action(current)
-    when "tankbehavior"
+    when :behavior
       # puts "behavior"
       add_action(current)
     else
-      raise "Invalid behavior node type #{type.inspect} for #{current.name}"
+      raise "Unrecognized XML behavior node prefix for #{current.name}. Add --behavior-prefix or --decorator-prefix for project-specific XML behavior nodes."
     end
 
   end
@@ -83,8 +130,8 @@ class XMLBehaviorTreeConverter
     raise "XML behavior tree must contain one start='true' node" if start_nodes.empty?
     raise "XML behavior tree contains multiple start='true' nodes" if start_nodes.length > 1
 
-    behavior_nodes = xml.xpath("//*[starts-with(name(), 'composite_') or starts-with(name(), 'decorator_') or starts-with(name(), 'tankdecorator_') or starts-with(name(), 'behavior_') or starts-with(name(), 'tankbehavior_')]")
-    raise "XML behavior tree contains no behavior nodes" if behavior_nodes.empty?
+    behavior_nodes = xml.xpath("//*").select { |node| get_behavior_type(node) != nil }
+    raise "XML behavior tree contains no recognized behavior nodes. Add --behavior-prefix or --decorator-prefix for project-specific XML behavior nodes." if behavior_nodes.empty?
   end
 
   def add_composite(current)
@@ -94,11 +141,11 @@ class XMLBehaviorTreeConverter
 
     # set composite type
     composite_header = Usg::Ai::CompositeHeader.new
-    composite_type = find_bt_pb("CompositeType_" + behaviorName)
+    composite_type = resolve_bt_pb("CompositeType_" + behaviorName, "composite #{behaviorName}")
     composite_header.compositeType = composite_type
 
     # set numChildren
-    composite = find_bt_pb(behaviorName + "Header").new({
+    composite = resolve_bt_pb(behaviorName + "Header", "composite #{behaviorName}").new({
       :numChildren => get_num_children(current)
     })
 
@@ -121,7 +168,7 @@ class XMLBehaviorTreeConverter
 
     # find out what type of decorator this is
     className = get_behavior_name(current)
-    dec_type = find_bt_pb(className)
+    dec_type = resolve_bt_pb(className, "decorator #{className}")
     dec_header = Usg::Ai::DecoratorHeader.new
     dec_header.decoratorHeader = dec_type
     @@pb_file.print(dec_header.serialize_to_string + Constants::NUL)
@@ -140,7 +187,7 @@ class XMLBehaviorTreeConverter
 
     # find out what type of action this is
     className = get_behavior_name(current)
-    bh_type = find_bt_pb(className)
+    bh_type = resolve_bt_pb(className, "action #{className}")
     bh_header = Usg::Ai::BehaviorHeader.new
     bh_header.behaviorType = bh_type
     @@pb_file.print(bh_header.serialize_to_string + Constants::NUL)
@@ -169,9 +216,9 @@ class XMLBehaviorTreeConverter
     hasData = false
     if (attributes.length > 0)
       name = get_behavior_name(current)
-      sub = name.split("_")
+      data_type = get_behavior_data_type_name(current)
       # puts (name)
-      bh = find_bt_pb(sub[1]).new
+      bh = resolve_bt_pb(data_type, "data for #{name}").new
       fields = bh.fields.collect { |k, v| v }.sort! {
         | x, y | x.tag <=> y.tag
       }
@@ -190,8 +237,7 @@ class XMLBehaviorTreeConverter
             fieldClass = field.class.to_s
             case fieldClass
             when "ProtocolBuffers::Field::EnumField"
-              btType = find_bt_pb_enum(sub[1])
-              raise "Can not find protobuf " + sub[1] if btType == nil
+              btType = resolve_bt_pb_enum(data_type, "enum data for #{name}")
               integerValue = btType.fields.find{|key,val| val.name.to_s == field.name.to_s }[1].value_to_name.find{|integerKey, stringName| stringName == value.to_s}[0]
               bh.attributes = { field.name.to_sym => integerValue }
             when "ProtocolBuffers::Field::BoolField"
@@ -228,14 +274,7 @@ class XMLBehaviorTreeConverter
     if behaviorName.start_with?("composite_")
       behaviorName = current.name.sub("composite_", "")
     else
-      nameHash = {
-        "behavior_" => "BehaviorType_",
-        "decorator_" => "DecoratorType_",
-        "tankbehavior_" => "TankBehaviorType_",
-        "tankdecorator_" => "TankDecoratorType_"
-      }
-
-      nameHash.each do |key, value|
+      type_prefixes.each do |key, value|
         if behaviorName.start_with?(key)
           behaviorName = behaviorName.sub(key, value)
         end
@@ -243,6 +282,18 @@ class XMLBehaviorTreeConverter
     end
 
     return behaviorName
+  end
+
+  def get_behavior_data_type_name(current)
+    type_prefixes.each_key do |prefix|
+      return current.name.sub(prefix, "") if current.name.start_with?(prefix)
+    end
+
+    nil
+  end
+
+  def type_prefixes
+    @behavior_type_prefixes.merge(@decorator_type_prefixes)
   end
 
   def get(current)
@@ -257,8 +308,11 @@ class XMLBehaviorTreeConverter
   end
 
   def get_behavior_type(current)
-    type = current.name.split('_')[0]
-    return type
+    return :composite if current.name.start_with?("composite_")
+    return :behavior if @behavior_type_prefixes.keys.any? { |prefix| current.name.start_with?(prefix) }
+    return :decorator if @decorator_type_prefixes.keys.any? { |prefix| current.name.start_with?(prefix) }
+
+    nil
   end
 
   def next_node(xml, current, last = nil)
@@ -339,12 +393,44 @@ class XMLBehaviorTreeConverter
 end
 
 ### THE ACTUAL SCRIPT
-$options = {}
+$options = {
+  load_paths: [],
+  project_behavior_protos: [],
+  use_default_project_behavior_proto: true,
+  behavior_type_prefixes: {},
+  decorator_type_prefixes: {}
+}
+
+def add_type_prefix(mapping, value)
+  xml_prefix, type_prefix = value.split(':', 2)
+  raise OptionParser::InvalidArgument, value if xml_prefix.nil? || xml_prefix.empty? || type_prefix.nil? || type_prefix.empty?
+  mapping[xml_prefix] = type_prefix
+end
 
 optparser = OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options] infile"
+  opts.on( '-I dir', 'Add a Ruby load path before requiring protobuf bindings' ) do |dir|
+    $options[:load_paths] << dir
+  end
+
   opts.on( '-o file', 'Specifies the filename to output' ) do |f|
     $options[:output] = f
+  end
+
+  opts.on( '--project-behavior-proto require', 'Require a project behavior protobuf Ruby binding' ) do |feature|
+    $options[:project_behavior_protos] << feature
+  end
+
+  opts.on( '--behavior-prefix xml:type', 'Map an XML action prefix to a protobuf enum prefix' ) do |value|
+    add_type_prefix($options[:behavior_type_prefixes], value)
+  end
+
+  opts.on( '--decorator-prefix xml:type', 'Map an XML decorator prefix to a protobuf enum prefix' ) do |value|
+    add_type_prefix($options[:decorator_type_prefixes], value)
+  end
+
+  opts.on( '--no-default-project-behavior-proto', 'Do not optionally require the legacy Tank behavior binding' ) do
+    $options[:use_default_project_behavior_proto] = false
   end
 
   opts.on( '-h', '--help', 'Display this screen' ) do
@@ -364,6 +450,13 @@ def create_output_parent_dir(output)
   FileUtils.mkdir_p(parent)
 end
 
+def configure_load_paths(load_paths)
+  load_paths.each do |dir|
+    raise "Load path does not exist: #{dir}" unless File.directory?(dir)
+    $LOAD_PATH.unshift(dir) unless $LOAD_PATH.include?(dir)
+  end
+end
+
 begin
   optparser.parse!
   raise "No input file specified" if ARGV.length == 0
@@ -372,9 +465,10 @@ begin
 
   SRC = ARGV[0]
   raise "Input file does not exist: #{SRC}" unless File.file?(SRC)
+  configure_load_paths($options[:load_paths])
   create_output_parent_dir($options[:output])
 
-  XMLBehaviorTreeConverter.new().run(SRC, $options[:output])
+  XMLBehaviorTreeConverter.new($options).run(SRC, $options[:output])
   Tracker::writeDependenciesFile($options, $options[:output])
 rescue OptionParser::ParseError, LoadError, StandardError => e
   warn "#{File.basename($0)}: ERROR: #{e.message}"
