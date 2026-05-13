@@ -140,7 +140,7 @@ void ParticleEditor::Init(usg::GFXDevice* pDevice, usg::ResourceMgr* pResMgr)
 
 	m_editorShapes.Init(pDevice, &m_emitterPreview.GetScene());
 
-	m_emitter.Alloc(pDevice, &m_emitterPreview.GetScene().GetParticleMgr(), "water_halo", true );
+	m_emitter.Alloc(pDevice, &m_emitterPreview.GetScene().GetParticleMgr(), "multi_texture_slots", true );
 	m_emitter.Init(pDevice, &m_emitterPreview.GetEffect());
 	m_emitterWindow.GetVariables() = m_emitter.GetDefinition();
 	m_emitterWindow.Init(pDevice, &m_guiRend);

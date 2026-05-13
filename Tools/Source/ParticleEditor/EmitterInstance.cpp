@@ -67,7 +67,7 @@ void EmitterInstance::Init(usg::GFXDevice* pDevice, usg::Scene& scene, EffectGro
 	m_parameterWindow.AddItem(&m_changeAssetButton);
 	m_parameterWindow.AddItem(&m_removeEmitterButton);
 
-	m_emitter.Alloc(pDevice, &scene.GetParticleMgr(), "water_halo", true);
+	m_emitter.Alloc(pDevice, &scene.GetParticleMgr(), "multi_texture_slots", true);
 	m_emitter.SetRenderMask(usg::RenderMask::RENDER_MASK_CUSTOM_0 << 1);
 
 	Add(false);
@@ -190,4 +190,3 @@ void EmitterInstance::UpdateEmitter(usg::GFXDevice* pDevice, usg::Scene& scene, 
 	m_emitter.InitMaterial(pDevice);
 	m_emitter.CreateEmitterShape(emitterData.eShape, shapeData);
 }
-
