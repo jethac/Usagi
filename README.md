@@ -71,7 +71,7 @@ Progress is likely to be slow, work is being done by ex-staff as Vitei have grac
 
 More detailed information is available in the [wiki](https://github.com/vitei/Usagi/wiki).  
 
-External project setup and build workflow notes are available in [Documents/ExternalProjectWorkflow.md](Documents/ExternalProjectWorkflow.md). Performance baseline notes are available in [Documents/PerformanceBaselines.md](Documents/PerformanceBaselines.md), model instancing notes are available in [Documents/ModelInstancing.md](Documents/ModelInstancing.md), audio tool replacement notes are available in [Documents/AudioToolReplacement.md](Documents/AudioToolReplacement.md), release readiness notes are available in [Documents/ReleaseReadiness.md](Documents/ReleaseReadiness.md), and UI layout contract notes are available in [Documents/UILayoutContract.md](Documents/UILayoutContract.md).
+External project setup and build workflow notes are available in [Documents/ExternalProjectWorkflow.md](Documents/ExternalProjectWorkflow.md). Performance baseline notes are available in [Documents/PerformanceBaselines.md](Documents/PerformanceBaselines.md), model instancing notes are available in [Documents/ModelInstancing.md](Documents/ModelInstancing.md), entity hierarchy validation notes are available in [Documents/EntityHierarchyValidation.md](Documents/EntityHierarchyValidation.md), audio tool replacement notes are available in [Documents/AudioToolReplacement.md](Documents/AudioToolReplacement.md), release readiness notes are available in [Documents/ReleaseReadiness.md](Documents/ReleaseReadiness.md), and UI layout contract notes are available in [Documents/UILayoutContract.md](Documents/UILayoutContract.md).
 
 
 Getting up and running
