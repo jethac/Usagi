@@ -35,6 +35,12 @@ public:
 	virtual void UpdateParticleCPUData(float fElapsed);
 
 	void SetMaxCount(uint32 uMaxCount);
+	uint32 GetActiveVertexCount() const { return m_uActivePart; }
+	uint32 GetTailVertex() const { return m_uTailPart; }
+	uint32 GetVertexSize() const { return m_uVertexSize; }
+	const uint8* GetCpuVertexData() const { return m_pCpuData; }
+	void SetSharedVertexBuffer(VertexBuffer* pSharedBuffer, uint32 uBaseVertex);
+	void ClearSharedVertexBuffer();
 protected:
 	virtual float InitParticleData(void* pData, void* pMetaData, float fLerp) = 0;
 	// TODO: Add a CPU pointer to this so we can perform more complex updates
@@ -58,6 +64,8 @@ private:
 	uint32					m_uInUse;
 	bool					m_bDirty;
 	SamplerHndl				m_samplerHndl;
+	VertexBuffer*			m_pSharedVertices;
+	uint32					m_uSharedBaseVertex;
 };
 
 }

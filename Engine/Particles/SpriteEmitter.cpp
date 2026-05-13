@@ -18,6 +18,8 @@ SpriteEmitter::SpriteEmitter()
 	m_uTailPart		= 0;
 	m_uMaxVerts		= 0;
 	m_bDirty		= false;
+	m_pSharedVertices = NULL;
+	m_uSharedBaseVertex = 0;
 
 
 	SetLayer(LAYER_TRANSLUCENT);
@@ -68,6 +70,7 @@ void SpriteEmitter::Init(usg::GFXDevice* pDevice, const ParticleEffect* pParent)
 
 void SpriteEmitter::Cleanup(GFXDevice* pDevice)
 {
+	ClearSharedVertexBuffer();
 	m_vertices.Cleanup(pDevice);
 	Inherited::Cleanup(pDevice);
 }
@@ -158,8 +161,10 @@ bool SpriteEmitter::Draw(GFXContext* pContext, RenderContext& renderContext)
 		SetMaterial(pContext);
 		// For now just hard coding the depth texture to a certain slot for particle effects
 		//pContext->BindTexture(5, pPostFXSys->GetPlatform().GetLinearDepthTex(), m_samplerHndl);
-		pContext->SetVertexBuffer(&m_vertices);
-		pContext->DrawImmediate(m_uActivePart-m_uTailPart, m_uTailPart);
+		VertexBuffer* pVertices = m_pSharedVertices ? m_pSharedVertices : &m_vertices;
+		const uint32 uBaseVertex = m_pSharedVertices ? m_uSharedBaseVertex : 0;
+		pContext->SetVertexBuffer(pVertices);
+		pContext->DrawImmediate(m_uActivePart-m_uTailPart, uBaseVertex + m_uTailPart);
 	}
 
 	return true;
@@ -204,6 +209,12 @@ bool SpriteEmitter::Update(float fElapsed)
 
 void SpriteEmitter::UpdateBuffers(GFXDevice* pDevice)
 {
+	if (m_pSharedVertices)
+	{
+		m_bDirty = false;
+		return;
+	}
+
 	if ((m_bDirty || RequiresCPUUpdate()) && m_uActivePart)
 	{
 		m_vertices.SetContents(pDevice, m_pCpuData, m_uActivePart);
@@ -231,6 +242,17 @@ void SpriteEmitter::SetMaxCount(uint32 uMaxCount)
 	m_uMaxVerts = usg::Math::Clamp(uMaxCount, (uint32)0, m_vertices.GetCount());
 }
 
+void SpriteEmitter::SetSharedVertexBuffer(VertexBuffer* pSharedBuffer, uint32 uBaseVertex)
+{
+	m_pSharedVertices = pSharedBuffer;
+	m_uSharedBaseVertex = uBaseVertex;
 }
 
+void SpriteEmitter::ClearSharedVertexBuffer()
+{
+	m_pSharedVertices = NULL;
+	m_uSharedBaseVertex = 0;
+}
+
+}
 

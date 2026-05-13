@@ -77,6 +77,7 @@ ScriptEmitter* ParticleMgr::EmitterInstances::GetInstance(GFXDevice* pDevice, Pa
 
 void ParticleMgr::EmitterInstances::FreeInstance(ScriptEmitter* pInstance)
 {
+	pInstance->ClearSharedVertexBuffer();
 	m_activeEmitters.remove(pInstance);
 	m_freeEmitters.push_front(pInstance);
 }
@@ -91,6 +92,14 @@ void ParticleMgr::EmitterInstances::PreloadInstances(GFXDevice* pDevice, Particl
 			pEmitter->Alloc(pDevice, &mgr, m_name.c_str());
 			m_freeEmitters.push_front(pEmitter);
 		}
+	}
+}
+
+void ParticleMgr::EmitterInstances::CollectActiveEmitters(usg::vector<ScriptEmitter*>& emitters)
+{
+	for (auto it : m_activeEmitters)
+	{
+		emitters.push_back(it);
 	}
 }
 
@@ -156,6 +165,8 @@ m_effects(uMaxEffects)
 {
 	m_pParticleSet = NULL;
 	m_envColor.Assign(1.0f, 1.0f, 1.0f, 1.0f);
+	m_uScriptedSharedVertexCapacity = 0;
+	m_uScriptedSharedVertexSize = 0;
 }
 
 ParticleMgr::~ParticleMgr()
@@ -181,6 +192,13 @@ void ParticleMgr::Init(GFXDevice* pDevice, Scene* pScene, ParticleSet* pSet)
 
 void ParticleMgr::Cleanup(GFXDevice* pDevice, Scene* pScene)
 {
+	if (m_uScriptedSharedVertexCapacity > 0)
+	{
+		m_scriptedSharedVertices.Cleanup(pDevice);
+		m_uScriptedSharedVertexCapacity = 0;
+		m_uScriptedSharedVertexSize = 0;
+	}
+
 	for (FastPool<EffectData>::DynamicIterator it = m_effects.BeginDynamic(); !it.IsEnd(); ++it)
 	{
 		(*it)->hndl.Destroy(&(*it)->effect);
@@ -230,11 +248,77 @@ bool ParticleMgr::Update(float fElapsed)
 
 void ParticleMgr::UpdateBuffers(usg::GFXDevice* pDevice)
 {
+	UpdateSharedScriptedVertexBuffer(pDevice);
+
 	for (FastPool<EffectData>::Iterator it = m_effects.Begin(); !it.IsEnd(); ++it)
 	{
 		ParticleEffect* pEffect = &(*it)->effect;
 		pEffect->UpdateBuffers(pDevice);
 	}
+}
+
+void ParticleMgr::UpdateSharedScriptedVertexBuffer(GFXDevice* pDevice)
+{
+	usg::vector<ScriptEmitter*> emitters;
+	for (FastPool<EmitterInstances>::Iterator it = m_emitters.Begin(); !it.IsEnd(); ++it)
+	{
+		(*it)->CollectActiveEmitters(emitters);
+	}
+
+	uint32 uTotalVertices = 0;
+	uint32 uVertexSize = 0;
+	for (ScriptEmitter* pEmitter : emitters)
+	{
+		const uint32 uActiveVertices = pEmitter->GetActiveVertexCount();
+		if (uActiveVertices == 0)
+		{
+			pEmitter->ClearSharedVertexBuffer();
+			continue;
+		}
+
+		if (uVertexSize == 0)
+		{
+			uVertexSize = pEmitter->GetVertexSize();
+		}
+		ASSERT(uVertexSize == pEmitter->GetVertexSize());
+		uTotalVertices += uActiveVertices;
+	}
+
+	if (uTotalVertices == 0 || uVertexSize == 0)
+	{
+		return;
+	}
+
+	if (uTotalVertices > m_uScriptedSharedVertexCapacity || uVertexSize != m_uScriptedSharedVertexSize)
+	{
+		if (m_uScriptedSharedVertexCapacity > 0)
+		{
+			m_scriptedSharedVertices.Cleanup(pDevice);
+		}
+
+		m_scriptedSharedVertices.Init(pDevice, NULL, uVertexSize, uTotalVertices, "SharedScriptedParticles", GPU_USAGE_DYNAMIC);
+		m_uScriptedSharedVertexCapacity = uTotalVertices;
+		m_uScriptedSharedVertexSize = uVertexSize;
+	}
+
+	m_scriptedSharedVertexData.resize(uTotalVertices * uVertexSize);
+
+	uint32 uBaseVertex = 0;
+	for (ScriptEmitter* pEmitter : emitters)
+	{
+		const uint32 uActiveVertices = pEmitter->GetActiveVertexCount();
+		if (uActiveVertices == 0)
+		{
+			continue;
+		}
+
+		ASSERT(pEmitter->GetCpuVertexData() != NULL);
+		MemCpy(&m_scriptedSharedVertexData[uBaseVertex * uVertexSize], pEmitter->GetCpuVertexData(), uActiveVertices * uVertexSize);
+		pEmitter->SetSharedVertexBuffer(&m_scriptedSharedVertices, uBaseVertex);
+		uBaseVertex += uActiveVertices;
+	}
+
+	m_scriptedSharedVertices.SetContents(pDevice, &m_scriptedSharedVertexData[0], uTotalVertices);
 }
 
 void ParticleMgr::CreateInstances(GFXDevice* pDevice, uint32 uInstances)

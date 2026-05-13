@@ -5,6 +5,7 @@
 #define _USG_PARTICLE_SYSTEM_H_
 
 #include "Engine/Memory/MemHeap.h"
+#include "Engine/Core/stl/vector.h"
 #include "Engine/Particles/Scripted/EffectGroup.pb.h"
 #include "Scripted/ScriptEmitter.h"
 #include "RibbonTrail.h"
@@ -56,6 +57,7 @@ protected:
 		ScriptEmitter* GetInstance(GFXDevice* pDevice, ParticleMgr& mgr);
 		void FreeInstance(ScriptEmitter* pInstance);
 		void PreloadInstances(GFXDevice* pDevice, ParticleMgr& mgr);
+		void CollectActiveEmitters(usg::vector<ScriptEmitter*>& emitters);
 	private:
 		ParticleEmitterResHndl		m_resHndl;
 		usg::string					m_name;
@@ -90,10 +92,15 @@ protected:
 
 	EmitterInstances* GetEmitterInstance(GFXDevice* pDevice, const char* szName);
 	EffectResources* GetEffectResource(GFXDevice* pDevice, const char* szName);
+	void UpdateSharedScriptedVertexBuffer(GFXDevice* pDevice);
 
 	FastPool<EmitterInstances>	m_emitters;
 	FastPool<EffectResources>	m_effectResources;
 	FastPool<EffectData>		m_effects;
+	VertexBuffer				m_scriptedSharedVertices;
+	usg::vector<uint8>			m_scriptedSharedVertexData;
+	uint32						m_uScriptedSharedVertexCapacity;
+	uint32						m_uScriptedSharedVertexSize;
 
 	list<RibbonTrail*>			m_activeRibbons;
 	list<RibbonTrail*>			m_freeRibbons;
