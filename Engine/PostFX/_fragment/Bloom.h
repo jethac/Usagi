@@ -40,6 +40,7 @@ private:
 	void GetOffsetsAndWeights(uint32 texSize, float fDeviation, float fMultiplier, float* pWeights, float* pOffsets);
 	void SetOffsetsHor(GFXDevice* pDevice, uint32 uWidth, float fDeviation, float fMultiplier);
 	void SetOffsetsVer(GFXDevice* pDevice, uint32 uHeight, float fDeviation, float fMultiplier);
+	void UpdateResizeConstants(GFXDevice* pDevice, uint32 uWidth, uint32 uHeight);
 	void UpdateParameterConstants(GFXDevice* pDevice);
 
 	enum

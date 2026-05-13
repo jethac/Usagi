@@ -65,6 +65,8 @@ public:
 	PipelineStateHndl GetGaussBlurPipeline(GFXDevice* pDevice, ResourceMgr* pResource, const RenderPassHndl& renderPass) const;
 	void SetupDownscale4x4(GFXDevice* pDevice, ConstantSet& cb, DescriptorSet& des, uint32 uWidth, uint32 uHeight) const;
 	void SetupGaussBlur(GFXDevice* pDevice, ConstantSet& cb, DescriptorSet& des, uint32 uWidth, uint32 uHeight, float fMultiplier) const;
+	void SetupOffsets4x4(GFXDevice* pDevice, ConstantSet& cb, uint32 uWidth, uint32 uHeight) const;
+	void SetupGaussBlurBuffer(GFXDevice* pDevice, ConstantSet& cb, uint32 uWidth, uint32 uHeight, float fMultiplier) const;
 	float GaussianDistribution(float x, float y, float rho) const;
 
 	void UpdateRTSize(GFXDevice* pDevice, Display* pDisplay);
@@ -75,8 +77,6 @@ public:
 protected:
 	PRIVATIZE_COPY(PostFXSys_ps)
 
-	void SetupOffsets4x4(GFXDevice* pDevice, ConstantSet& cb, uint32 uWidth, uint32 uHeight) const;
-	void SetupGaussBlurBuffer(GFXDevice* pDevice, ConstantSet& cb, uint32 uWidth, uint32 uHeight, float fMultiplier) const;
 	void ResizeTargetsInt(GFXDevice* pDevice, uint32 uWidth, uint32 uHeight);
 
 	void EnableEffectsInt(GFXDevice* pDevice, uint32 uEffectFlags);

@@ -286,11 +286,24 @@ void Bloom::Resize(GFXDevice* pDevice, uint32 uScrWidth, uint32 uSrcHeight)
 		m_bloomRT[i].Resize(pDevice);
 	}
 
+	UpdateResizeConstants(pDevice, uScrWidth, uSrcHeight);
+
 	for (uint32 i = 0; i < PASS_COUNT; i++)
 	{
 		// These passes don't change
 		m_descriptors[i].UpdateDescriptors(pDevice);
 	}
+}
+
+
+void Bloom::UpdateResizeConstants(GFXDevice* pDevice, uint32 uWidth, uint32 uHeight)
+{
+	SetOffsetsHor(pDevice, m_bloomRT[2].GetWidth(), m_fBlurDeviation, m_fBlurMultiplier);
+	SetOffsetsVer(pDevice, m_bloomRT[1].GetHeight(), m_fBlurDeviation, m_fBlurMultiplier);
+
+	m_pSys->GetPlatform().SetupOffsets4x4(pDevice, m_constants[PASS_4X4], uWidth, uHeight);
+	m_pSys->GetPlatform().SetupGaussBlurBuffer(pDevice, m_constants[PASS_GUASS_BRIGHT_PASS], m_brightPassRT.GetWidth() / 2, m_brightPassRT.GetHeight() / 2, 1.0f);
+	m_pSys->GetPlatform().SetupGaussBlurBuffer(pDevice, m_constants[PASS_GUASS_BLOOM_SRC], m_bloomSourceRT.GetWidth() / 2, m_bloomSourceRT.GetHeight() / 2, 1.0f);
 }
 
 
