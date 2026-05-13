@@ -46,15 +46,19 @@ end
 
 def build_audio()
   files = []
-  mono = ''
-  mono = 'mono' if ! Gem.win_platform?
   FileUtils.mkdir_p("#{PROJECT}/audio_gen")
   FileList["Data/VPB/Audio/*.yml"].select{|f| !File.directory? f}.map do |input|
     output = "#{PROJECT}/#{input.sub(/^Data\/VPB\/Audio\//, "audio_gen\/")}"
     output = output.sub(".yml", ".proto")
     name = File.basename(input).sub(".yml", "") 
     name_upper = name.upcase
-    vitei_audio_tool = "#{mono} #{ENV['USAGI_DIR']}/Tools/AudioTool/FSIDBuilder.exe"
+    if ENV['USAGI_USE_LEGACY_AUDIO_TOOL'] == '1'
+      mono = ''
+      mono = 'mono' if ! Gem.win_platform?
+      vitei_audio_tool = "#{mono} #{ENV['USAGI_DIR']}/Tools/AudioTool/FSIDBuilder.exe"
+    else
+      vitei_audio_tool = "dotnet run --project \"#{ENV['USAGI_DIR']}/Tools/Source/UsagiTools/src/Usagi.AudioToolCli/Usagi.AudioToolCli.csproj\" --no-restore --"
+    end
     cmdline = vitei_audio_tool + ' --proto -i="' + input + '" -o=' + output + ' -e=' + name + 'Audio -g=_CLR_' + name_upper + '_FSID_'
     puts cmdline
     sh cmdline

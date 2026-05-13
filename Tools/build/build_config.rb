@@ -377,6 +377,14 @@ def shader_pack
   end
 
   def vitei_audio_tool
+    if ENV['USAGI_USE_LEGACY_AUDIO_TOOL'] == '1'
+      return legacy_audio_tool
+    end
+
+    "dotnet run --project \"#{tools_dir}/Source/UsagiTools/src/Usagi.AudioToolCli/Usagi.AudioToolCli.csproj\" --no-restore --"
+  end
+
+  def legacy_audio_tool
     mono = ''
     mono = 'mono' if ! Gem.win_platform?
 
