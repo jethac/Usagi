@@ -4,12 +4,17 @@ import yaml
 import zlib
 
 INST_SUFFIX = '_inst'
+MODEL_OUTPUT_EXTENSION = '.vmdf'
 
 def createInstanceEntity( yamlPath, ext ):
     usagi_dir = os.getenv( 'USAGI_DIR' )
-    f = open( usagi_dir + '/Data/' + yamlPath + ext, 'r' )
+    entityPath = usagi_dir + '/Data/' + yamlPath + ext
+    if not os.path.isfile( entityPath ):
+        raise IOError( "Level references missing entity resource: %s" % entityPath )
+
+    f = open( entityPath, 'r' )
     yamlData = yaml.load(f)
-    f.close
+    f.close()
 
     if yamlData.has_key('ModelComponent'):
         yamlData.pop('ModelComponent')
@@ -56,7 +61,7 @@ def makeEntity( obj, format, isInst ):
                 enti['Inherits'] = [ymlName]
         else:
             # Add model component
-            outputUri = path + ".vmdc"
+            outputUri = path + MODEL_OUTPUT_EXTENSION
             outputUri = string.replace(outputUri, 'Models/', '')
             enti['ModelComponent'] = { 'name': outputUri }
 

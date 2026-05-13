@@ -16,13 +16,22 @@ class EntityYaml:
 
     def loadYaml(self, yamlPath):
         usagi_dir = os.getenv( 'USAGI_DIR' )
-        f = open( usagi_dir + '/Data/' + yamlPath, 'r' )
+        entityPath = usagi_dir + '/Data/' + yamlPath
+        if not os.path.isfile( entityPath ):
+            raise IOError( "Missing entity YAML: %s" % entityPath )
+
+        f = open( entityPath, 'r' )
 
         yamlData = yaml.load(f)
         f.close()
         return yamlData
 
     def traverseComponents(self, yamlData):
+        if isinstance( yamlData, list ):
+            for entry in yamlData:
+                self.traverseComponents( entry )
+            return
+
         self.compoName = ''
         for key, value in yamlData.items():
             self.compoName = key

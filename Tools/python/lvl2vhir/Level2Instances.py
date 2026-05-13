@@ -6,6 +6,8 @@ root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append( root + '/lvlUtil' )
 import EntityYaml
 
+MODEL_OUTPUT_EXTENSION = '.vmdf'
+
 def makeYamlTreeBase():
     blankData = {}
     blankData['Billboard'] = False
@@ -66,7 +68,7 @@ class InstancesConverter:
 
             gobj = LevelEditor.Game.GameObject( obj )
             cmdlPath = EntityYaml.searchModelComponent( gobj.getURI() )
-            cmdlPath = cmdlPath.replace( 'Models/', '' ) + '.vmdc'
+            cmdlPath = cmdlPath.replace( 'Models/', '' ) + MODEL_OUTPUT_EXTENSION
             if not self.hash.has_key( cmdlPath ):
                 self.hash[cmdlPath] = {}
 
