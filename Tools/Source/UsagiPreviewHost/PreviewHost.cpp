@@ -392,7 +392,16 @@ void PreviewHost::HandleLoadEntity(const IpcLoadEntityCommand& command)
 void PreviewHost::HandleLoadParticle(const IpcLoadParticleCommand& command)
 {
     const char* path = command.effectPath[0] != '\0' ? command.effectPath : command.emitterPath;
-    SendLoaded("particle", path, false, "Particle preview loading is not implemented yet");
+
+    char error[512] = {};
+    if (m_engine.LoadParticle(command.emitterPath, command.effectPath, error, sizeof(error)))
+    {
+        SendLoaded("particle", path, true);
+    }
+    else
+    {
+        SendLoaded("particle", path, false, error);
+    }
 }
 
 void PreviewHost::HandleTick(const IpcTickCommand& command)
@@ -405,12 +414,12 @@ void PreviewHost::HandleTick(const IpcTickCommand& command)
         return;
     }
 
-    m_engine.Tick();
+    m_engine.Tick(command.deltaTime);
 }
 
 void PreviewHost::HandleSetCameraPosition(const IpcSetCameraPositionCommand& command)
 {
-    UNREFERENCED_PARAMETER(command);
+    m_engine.SetCameraPosition(command.x, command.y, command.z, command.targetX, command.targetY, command.targetZ);
     SendDiagnostic("info", "Camera command accepted");
 }
 
