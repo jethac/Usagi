@@ -1,12 +1,13 @@
 param(
-    [int]$TimeoutSeconds = 20
+    [int]$TimeoutSeconds = 20,
+    [int]$HoldSeconds = 0
 )
 
 $ErrorActionPreference = "Stop"
 
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne [Threading.ApartmentState]::STA) {
     $powershell = (Get-Command powershell.exe).Source
-    & $powershell -STA -ExecutionPolicy Bypass -File $PSCommandPath -TimeoutSeconds $TimeoutSeconds
+    & $powershell -STA -ExecutionPolicy Bypass -File $PSCommandPath -TimeoutSeconds $TimeoutSeconds -HoldSeconds $HoldSeconds
     exit $LASTEXITCODE
 }
 
@@ -186,6 +187,15 @@ try {
     $changedPixels = Measure-PreviewVariance
     if ($changedPixels -lt 4) {
         throw "Preview window did not show enough pixel variance after particle load."
+    }
+
+    if ($HoldSeconds -gt 0) {
+        $holdUntil = [DateTime]::UtcNow.AddSeconds($HoldSeconds)
+        while ([DateTime]::UtcNow -lt $holdUntil) {
+            Send-Json "{`"type`":`"tick`",`"deltaTime`":0.0166667}"
+            Start-Sleep -Milliseconds 50
+            [System.Windows.Forms.Application]::DoEvents()
+        }
     }
 
     Send-Json "{`"type`":`"shutdown`"}"
