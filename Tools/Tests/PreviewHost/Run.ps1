@@ -136,17 +136,18 @@ function Measure-PreviewVariance {
     [System.Windows.Forms.Application]::DoEvents()
     Start-Sleep -Milliseconds 100
 
-    $bounds = $form.Bounds
-    $bitmap = [System.Drawing.Bitmap]::new($bounds.Width, $bounds.Height)
+    $clientRect = $form.ClientRectangle
+    $screenOrigin = $form.PointToScreen($clientRect.Location)
+    $bitmap = [System.Drawing.Bitmap]::new($clientRect.Width, $clientRect.Height)
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
-        $graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bounds.Size)
+        $graphics.CopyFromScreen($screenOrigin.X, $screenOrigin.Y, 0, 0, $clientRect.Size)
 
-        $sampleStep = 16
-        $first = $bitmap.GetPixel([Math]::Min(8, $bounds.Width - 1), [Math]::Min(8, $bounds.Height - 1)).ToArgb()
+        $sampleStep = 4
+        $first = $bitmap.GetPixel([Math]::Min(8, $clientRect.Width - 1), [Math]::Min(8, $clientRect.Height - 1)).ToArgb()
         $changed = 0
-        for ($y = 0; $y -lt $bounds.Height; $y += $sampleStep) {
-            for ($x = 0; $x -lt $bounds.Width; $x += $sampleStep) {
+        for ($y = 0; $y -lt $clientRect.Height; $y += $sampleStep) {
+            for ($x = 0; $x -lt $clientRect.Width; $x += $sampleStep) {
                 if ($bitmap.GetPixel($x, $y).ToArgb() -ne $first) {
                     $changed++
                 }
@@ -178,9 +179,9 @@ try {
     Send-Json "{`"type`":`"loadParticle`",`"emitterPath`":`"$emitterPath`",`"effectPath`":`"$effectPath`"}"
     [void](Wait-ForLine { param($line) $line -match '"type":"loaded"' -and $line -match '"success":true' } "successful particle load response")
 
-    for ($i = 0; $i -lt 12; $i++) {
+    for ($i = 0; $i -lt 60; $i++) {
         Send-Json "{`"type`":`"tick`",`"deltaTime`":0.0166667}"
-        Start-Sleep -Milliseconds 50
+        Start-Sleep -Milliseconds 16
         [System.Windows.Forms.Application]::DoEvents()
     }
 
@@ -192,7 +193,7 @@ try {
     if ($HoldSeconds -gt 0) {
         $holdUntil = [DateTime]::UtcNow.AddSeconds($HoldSeconds)
         while ([DateTime]::UtcNow -lt $holdUntil) {
-            Send-Json "{`"type`":`"tick`",`"deltaTime`":0.0166667}"
+            Send-Json "{`"type`":`"tick`",`"deltaTime`":0.0001}"
             Start-Sleep -Milliseconds 50
             [System.Windows.Forms.Application]::DoEvents()
         }
