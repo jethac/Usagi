@@ -128,7 +128,10 @@ void Scene::Init(GFXDevice* pDevice, ResourceMgr* pResMgr, const AABB& worldBoun
 	m_pImpl->debug3D.Init(pDevice, this, pResMgr);
 
 	m_debugStats.Init(&m_pImpl->debug3D, this);
-	DebugStats::Inst()->RegisterGroup(&m_debugStats);
+	if(DebugStats::Inst())
+	{
+		DebugStats::Inst()->RegisterGroup(&m_debugStats);
+	}
 }
 
 const RenderPassHndl& Scene::GetShadowRenderPass() const
