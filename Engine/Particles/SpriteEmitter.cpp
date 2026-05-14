@@ -14,6 +14,8 @@ namespace usg{
 SpriteEmitter::SpriteEmitter()
 {
 	m_pCpuData		= NULL;
+	m_pMetaData		= NULL;
+	m_pLifeTimes	= NULL;
 	m_uActivePart 	= 0;
 	m_uTailPart		= 0;
 	m_uMaxVerts		= 0;
@@ -255,4 +257,3 @@ void SpriteEmitter::ClearSharedVertexBuffer()
 }
 
 }
-
