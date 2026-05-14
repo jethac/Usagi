@@ -2,7 +2,10 @@
 
 ## Purpose
 
-`UsagiPreviewHost.exe` is the native process that future Avalonia tools will use for embedded engine previews. The first checked-in version is intentionally a small Win32 scaffold, not an engine renderer. It establishes the process boundary, window-hosting contract, and JSON-lines IPC shape while leaving scene and particle rendering behind explicit TODO responses.
+`UsagiPreviewHost.exe` is the native process that future Avalonia tools will use
+for embedded engine previews. It owns a child Win32 window, speaks JSON-lines IPC
+to the managed tools, and now bootstraps the real Usagi engine against the
+attached preview HWND.
 
 ## Existing Pattern Survey
 
@@ -10,11 +13,16 @@ ParticleEditor hosts a native Win32 window in `Tools/Source/ParticleEditor/main/
 
 The shared engine loop in `Engine/Game/GameMain.cpp` creates the game object through `CreateGame`, calls `PreGFXInit`, initializes the graphics display from `WINUTIL::GetWindow`, and drives `Update` and `Draw` while `GameInterface::IsRunning` remains true.
 
-The Avalonia tool shell already has a protocol/client shape under `Tools/Source/UsagiTools/src/Usagi.ToolCore/Preview`: it starts `Tools/bin/UsagiPreviewHost.exe`, redirects stdin/stdout, sends newline-delimited JSON commands, and waits for a `ready` response.
+The Avalonia tool shell already has a protocol/client shape under
+`Tools/Source/UsagiTools/src/Usagi.ToolCore/Preview`: it starts
+`Tools/bin/UsagiPreviewHost.exe`, redirects stdin/stdout, sends
+newline-delimited JSON commands, and waits for a `ready` response.
 
 ## Current Scaffold
 
-The current native host lives in `Tools/Source/UsagiPreviewHost` and builds from `project/UsagiPreviewHost.vcxproj` as a standalone x64 Win32 executable.
+The current native host lives in `Tools/Source/UsagiPreviewHost` and builds from
+`project/UsagiPreviewHost.vcxproj` as an x64 Win32 executable linked against the
+engine libraries.
 
 Implemented:
 
@@ -24,13 +32,17 @@ Implemented:
 - JSON responses compatible with `PreviewProtocol.cs`.
 - `init` protocol validation and `ready` response.
 - `attachWindow` reparenting of the native host window into the supplied parent HWND.
-- Stubbed `loadEntity`, `loadParticle`, `tick`, `pick`, and camera command handling.
+- Engine bootstrap through `PreviewEngineBridge` after `attachWindow`.
+- A minimal `GameInterface` implementation that clears/presents the attached
+  display on `tick`.
+- Resize forwarding to the engine display.
+- Stubbed `loadEntity`, `loadParticle`, `pick`, and camera command handling.
 - Graceful shutdown on `shutdown` or window close.
+- `Tools/Tests/PreviewHost/Run.ps1` smoke coverage for `init`, `attachWindow`,
+  engine initialization, one `tick`, and `shutdown`.
 
 Not implemented:
 
-- Engine `GameMain` integration.
-- Graphics device creation against the Avalonia-hosted child window.
 - Entity or particle resource loading.
 - Camera state storage beyond accepting the command.
 - Picking.
@@ -55,15 +67,21 @@ After the Avalonia surface has a native handle, the client sends:
 {"type":"attachWindow","hwnd":123456,"width":800,"height":600}
 ```
 
-The scaffold validates the HWND, calls `SetParent`, switches its window to `WS_CHILD | WS_VISIBLE`, resizes it, and emits a diagnostic response.
+The host validates the HWND, calls `SetParent`, switches its window to
+`WS_CHILD | WS_VISIBLE`, resizes it, initializes the engine against that child
+window, and emits diagnostics for both attach and engine initialization.
 
 ## Next Engine Step
 
-The next slice should decide how to bridge the ParticleEditor/GameInterface pattern with an externally owned child window. The likely path is:
+The next slice should load one real previewable resource through the engine host.
+The recommended order is:
 
-1. Extend or wrap the Win32 entry point so `WINUTIL::SetWindow` points at the attached child window before `GFX::Initialise` initializes the display.
-2. Move the current IPC loop into a lightweight `GameInterface` implementation that processes commands in `Update`.
-3. Add a minimal render path that clears the hosted window before loading entities or particles.
-4. Only then wire `loadParticle` to the same particle systems used by ParticleEditor.
+1. Move particle preview state into the preview `GameInterface`.
+2. Wire `loadParticle` to load a `.pem`/`.pfx` pair and instantiate the same
+   runtime particle classes used by `ParticleEditor`.
+3. Add a visual smoke path that ticks long enough to prove the hosted window is
+   not blank.
+4. After particles work, add entity/resource loading and picking.
 
-Keeping the first scaffold standalone avoids taking on renderer lifetime, OpenGL/Vulkan context ownership, and engine reset behavior before the Avalonia embedding contract is proven.
+Engine initialization currently requires a valid `nameDataHash.bin` under the
+runtime `_romfiles\win` directory, matching normal game/editor launch behavior.
