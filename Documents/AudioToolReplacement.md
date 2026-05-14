@@ -227,8 +227,10 @@ Current implementation status:
   fields such as `filterCRC`.
 - `Tools/Source/UsagiTools/src/Usagi.ToolShell/AudioEditorTab.cs` adds the
   first artist-facing audio bank editor to the Avalonia tool shell. It can open
-  and save audio-bank YAML, edit sound-file runtime fields, validate through
-  `AudioBankValidator`, and export FSID proto/header files from the same managed
+  and save audio-bank YAML, add/duplicate/remove sounds, edit sound-file runtime
+  fields, browse referenced WAV files, show parsed WAV metadata, refresh CRCs,
+  validate through `AudioBankValidator`, edit filters/reverbs/rooms, preview WAV
+  playback on Windows, and export FSID proto/header files from the same managed
   generator used by builds.
 
 No original game audio bank data is available in this workspace. Usagi was only
@@ -240,9 +242,11 @@ Remaining implementation work after switching project builds:
 
 - Keep `USAGI_USE_LEGACY_AUDIO_TOOL=1` only as a legacy-compatible input escape
   hatch. It cannot process normalized/current full-schema audio YAML.
-- Expand the artist-facing audio editor beyond the first sound-file editor:
-  add sound add/duplicate/remove flows, WAV browsing/metadata display, CRC
-  refresh helpers, filter/reverb/room editing, and playback preview.
+- Replace basic Windows WAV preview with engine-backed preview once the Usagi
+  preview host exists, so attenuation, looping, filters, and runtime playback
+  behavior can be tested in-editor.
+- Add ergonomic reference pickers for assigning sound filter/effect/room CRCs
+  from the bank's named filter, reverb, and room collections.
 
 Implemented WAV metadata support:
 
