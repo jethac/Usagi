@@ -17,6 +17,7 @@ public:
     ~PreviewEngineBridge();
 
     bool Initialize(HINSTANCE instance, HWND hwnd, const char* romfilesPath, char* error, int errorSize);
+    bool LoadEntity(const char* path, char* error, int errorSize);
     bool LoadParticle(const char* emitterPath, const char* effectPath, char* error, int errorSize);
     void Tick(float deltaTime);
     void SetCameraPosition(float x, float y, float z, float targetX, float targetY, float targetZ);

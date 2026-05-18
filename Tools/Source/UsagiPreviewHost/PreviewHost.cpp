@@ -386,7 +386,15 @@ void PreviewHost::HandleAttachWindow(const IpcAttachWindowCommand& command)
 
 void PreviewHost::HandleLoadEntity(const IpcLoadEntityCommand& command)
 {
-    SendLoaded("entity", command.path, false, "Entity preview loading is not implemented yet");
+    char error[512] = {};
+    if (m_engine.LoadEntity(command.path, error, sizeof(error)))
+    {
+        SendLoaded("entity", command.path, true);
+    }
+    else
+    {
+        SendLoaded("entity", command.path, false, error);
+    }
 }
 
 void PreviewHost::HandleLoadParticle(const IpcLoadParticleCommand& command)

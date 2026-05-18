@@ -71,9 +71,48 @@ function Copy-PreviewResource([string]$relativePath) {
     }
 }
 
+function Ensure-PreviewModelResource {
+    $modelPath = Join-Path $fallbackRomfilesRoot "Models\PBRSample\PBRSample.vmdf"
+    if (Test-Path $modelPath) {
+        return
+    }
+
+    $ayataka = Join-Path $usagiRepoRoot "Tools\bin\Ayataka.exe"
+    if (!(Test-Path $ayataka)) {
+        throw "Preview smoke requires Ayataka.exe to build the model fixture: $ayataka"
+    }
+
+    $modelSource = Join-Path $usagiRepoRoot "Data\Models\PBRSample\PBRSample.fbx"
+    if (!(Test-Path $modelSource)) {
+        throw "Preview smoke requires model source fixture: $modelSource"
+    }
+
+    $modelOutDir = Split-Path -Parent $modelPath
+    $skeletonPath = Join-Path $usagiRepoRoot "_build\skel\PBRSample\PBRSample.vmdf.xml"
+    New-Item -ItemType Directory -Force -Path $modelOutDir, (Split-Path -Parent $skeletonPath) | Out-Null
+
+    & $ayataka `
+        "-a16" `
+        "-o$modelPath" `
+        "-sk$modelOutDir\" `
+        "-lh" `
+        "-d$modelPath.d" `
+        "-h$skeletonPath" `
+        $modelSource
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    if (!(Test-Path $modelPath)) {
+        throw "Ayataka did not produce the preview model fixture: $modelPath"
+    }
+}
+
+Ensure-PreviewModelResource
 Copy-PreviewResource "Particle"
 Copy-PreviewResource "Effects"
 Copy-PreviewResource "Textures"
+Copy-PreviewResource "Models\PBRSample"
 
 $startInfo.WorkingDirectory = $romfilesRoot
 $startInfo.UseShellExecute = $false
@@ -197,6 +236,30 @@ try {
             Start-Sleep -Milliseconds 50
             [System.Windows.Forms.Application]::DoEvents()
         }
+    }
+
+    $entityPath = (Join-Path $usagiRepoRoot "Data\Entities\PreviewPBRSample.yml")
+    $tempEntityDir = Join-Path $usagiRepoRoot "_romfiles\preview"
+    New-Item -ItemType Directory -Force -Path $tempEntityDir | Out-Null
+    $entityPath = Join-Path $tempEntityDir "PreviewPBRSample.yml"
+    @'
+ModelComponent:
+  name: PBRSample/PBRSample.vmdf
+'@ | Set-Content -Encoding ASCII -Path $entityPath
+
+    $escapedEntityPath = $entityPath.Replace("\", "\\")
+    Send-Json "{`"type`":`"loadEntity`",`"path`":`"$escapedEntityPath`"}"
+    [void](Wait-ForLine { param($line) $line -match '"type":"loaded"' -and $line -match '"resourceType":"entity"' -and $line -match '"success":true' } "successful entity load response")
+
+    for ($i = 0; $i -lt 30; $i++) {
+        Send-Json "{`"type`":`"tick`",`"deltaTime`":0.0166667}"
+        Start-Sleep -Milliseconds 16
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+
+    $changedPixels = Measure-PreviewVariance
+    if ($changedPixels -lt 4) {
+        throw "Preview window did not show enough pixel variance after entity/model load."
     }
 
     Send-Json "{`"type`":`"shutdown`"}"
