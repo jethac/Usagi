@@ -3,6 +3,8 @@
 //	Description: Main entry point into the project for windows
 *****************************************************************************/
 #include "Engine/Common/Common.h"
+#include <cstdio>
+#include <cstdlib>
 #include "Engine/Game/GameInterface.h"
 #include "Engine/Graphics/GFX.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
@@ -25,6 +27,27 @@ namespace usg {
 
 bool		InitEngine(const char** dllModules, uint32 uModuleCount);
 void		EngineCleanup();
+
+// Boot breadcrumb logging (opt-in via USAGI_BOOT_LOG=1) to localize startup hangs.
+static bool BootLogEnabled()
+{
+	char* val = nullptr; size_t len = 0;
+	if (_dupenv_s(&val, &len, "USAGI_BOOT_LOG") == 0 && val)
+	{
+		free(val);
+		return true;
+	}
+	return false;
+}
+
+static void BootCrumb(const char* step)
+{
+	static bool s_enabled = BootLogEnabled();
+	if (!s_enabled) return;
+	FILE* f = nullptr;
+	fopen_s(&f, "B:\\usagi_dev\\_gp_boot.log", "a");
+	if (f) { fprintf(f, "%s\n", step); fflush(f); fclose(f); }
+}
 
 static GFXDevice*	g_pGFXDevice = nullptr;
 static bool			g_gameExit = false;
@@ -51,14 +74,17 @@ static GameInterface* game;
 
 bool GameInit()
 {
+	BootCrumb("GameInit: begin");
 	Math::SeedRand();
 	game->Init(g_pGFXDevice, usg::ResourceMgr::Inst());
+	BootCrumb("GameInit: after game->Init");
 
 	if (!game->IsRunning())
 	{
 		FATAL_RELEASE(false, "Game failed to initialise");
 		return false;
 	}
+	BootCrumb("GameInit: done (running)");
 
 	return true;
 }
@@ -158,18 +184,23 @@ bool InitInput()
 
 bool InitEngine(const char** dllModules, uint32 uModuleCount)
 {
+	BootCrumb("InitEngine: begin");
 	mem::InitialiseDefault();
+	BootCrumb("InitEngine: after mem::InitialiseDefault");
 	File::InitFileSystem();
+	BootCrumb("InitEngine: after File::InitFileSystem");
 
 	usg::ModuleManager::Inst()->Create();
 	usg::ModuleManager::Inst()->PreInit();
-	for (uint32 i = 0; i < uModuleCount; i++) 
+	for (uint32 i = 0; i < uModuleCount; i++)
 	{
 		// We pre-load as some of these may need to be known about when initing gfx and input
 		usg::ModuleManager::Inst()->LoadModule(dllModules[i]);
 	}
+	BootCrumb("InitEngine: before GFX::Initialise");
 
 	g_pGFXDevice = GFX::Initialise();
+	BootCrumb("InitEngine: after GFX::Initialise");
 
 	if(!g_pGFXDevice)
 	{
@@ -177,13 +208,16 @@ bool InitEngine(const char** dllModules, uint32 uModuleCount)
 	}
 
 	game = CreateGame();
+	BootCrumb("InitEngine: after CreateGame");
 	game->PreGFXInit();
+	BootCrumb("InitEngine: after PreGFXInit, before InitDisplay");
 
 #if (defined PLATFORM_PC)
 	g_pGFXDevice->InitDisplay(WINUTIL::GetWindow());
 #else
 	g_pGFXDevice->InitAllHardwareDisplays();
 #endif
+	BootCrumb("InitEngine: after InitDisplay");
 
 	// Moved these out of here to prevent dependencies, should probably remove this file
 	//Audio::Create()->Init();

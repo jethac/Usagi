@@ -516,7 +516,14 @@ namespace usg
 		Entity child = e->GetChildEntity();
 		while (child != NULL)
 		{
-			RecursivelyCallOnLoaded(child, handles);
+			// Re-resolve the scene/physics/model handles from each child's own
+			// hierarchy. A component loaded on this entity (e.g. a PhysicsScene
+			// or ModelMgr added in the same template merge) only initialises its
+			// runtime data during the CallOnLoaded above, so a snapshot taken
+			// before that would hand children a null scene.
+			ComponentLoadHandles childHandles;
+			FillComponentLoadHandles(childHandles, child);
+			RecursivelyCallOnLoaded(child, childHandles);
 			child = child->GetNextSibling();
 		}
 	}

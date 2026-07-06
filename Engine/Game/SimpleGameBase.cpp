@@ -1,4 +1,5 @@
 #include "Engine/Common/Common.h"
+#include <cstdlib>
 #include "Engine/Core/Utility.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Audio/Audio.h"
@@ -92,6 +93,26 @@ namespace usg
 
 		// We delay this due to the time some of the direct input init code takes
 		Input::Init();
+
+		// Establish the "static load complete" boundary. Everything created up to
+		// this point - the Display's own render passes/framebuffers, the Fader's
+		// descriptor set, the debug renderer, the transition mode and the engine
+		// resource packages - is persistent for the lifetime of the game and must
+		// survive the ClearDynamicResources() that InitThread::Run() performs at
+		// the start of every mode (re)load. Without this the static/dynamic split
+		// stays empty (m_uStaticPairs == 0), so the first mode load frees those
+		// still-referenced render passes and descriptor layouts, leaving the
+		// Display's framebuffers pointing at a freed VkRenderPass - the NVIDIA
+		// driver then faults inside vkCmdBeginRenderPass on the very first present,
+		// and the Fader trips an invalid-descriptor assert.
+		//
+		// NOTE: we intentionally do NOT call the full SimpleGameBase::FinishedStaticLoad()
+		// here because that also issues mem::AddMemoryTag(), which InitThread::Run()'s
+		// mem::FreeToLastTag() would then unbalance across repeated mode reloads. Only
+		// the render-state / resource pool "static" split is needed to keep the
+		// persistent resources alive.
+		usg::ResourceMgr::Inst()->FinishedStaticLoad();
+		pDevice->FinishedStaticLoad();
 	}
 
 	usg::ModeTransition* SimpleGameBase::CreateTransitionMode(usg::GFXDevice* pDevice, usg::ResourceMgr* pResMgr)
@@ -357,6 +378,32 @@ namespace usg
 		pImmContext->End();
 		pDevice->End(m_eState == STATE_LOADING);
 		m_cpuTimer.Start();
+
+		// Optional GPU-side swapchain capture (USAGI_SCREENSHOT=1). Reading the
+		// swapchain image directly avoids GDI/DWM overlay-capture returning black
+		// for the flip-model Vulkan surface. Fires once, a couple of seconds after
+		// the scene goes active so the countdown/first render has settled.
+		{
+			static int s_ssEnabled = -1;
+			if (s_ssEnabled < 0)
+			{
+				char* v = nullptr; size_t l = 0;
+				s_ssEnabled = (_dupenv_s(&v, &l, "USAGI_SCREENSHOT") == 0 && v) ? 1 : 0;
+				if (v) free(v);
+			}
+			if (s_ssEnabled == 1)
+			{
+				static int s_ssActive = 0;
+				if (m_eState == STATE_ACTIVE)
+				{
+					s_ssActive++;
+					if (s_ssActive == 120)
+					{
+						pDisplay->ScreenShot(pDevice, "usagi_frame.bmp");
+					}
+				}
+			}
+		}
 
 	}
 	//----------------------------------------------------

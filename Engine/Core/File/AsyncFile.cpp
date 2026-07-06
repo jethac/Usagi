@@ -240,6 +240,9 @@ namespace usg
 				if (m_fileThreads.CanAlloc())
 				{
 					AsyncFile* fileThread = m_fileThreads.Alloc();
+					// A recycled pool slot may still hold a finished-but-not-yet
+					// finalized OS thread; StartThread asserts unless it's cleared.
+					fileThread->JoinThread();
 					fileThread->Open(szFileName, eMode, eType);
 					AsyncFileHndl hndl = fileThread->GetHndl();
 					fileThread->StartThread();
