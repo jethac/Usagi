@@ -13,8 +13,7 @@ if "%2" == "x64" (
 		copy %USAGI_DIR%\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXDevice64.dll %1
 		copy %USAGI_DIR%\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXFoundation_64.dll %1
 		copy %USAGI_DIR%\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXGpu_64.dll %1
-	)
-	else (
+	) else (
 		copy %USAGI_DIR%\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysX_64.dll %1
 		copy %USAGI_DIR%\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXCommon_64.dll %1
 		copy %USAGI_DIR%\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXCooking_64.dll %1
