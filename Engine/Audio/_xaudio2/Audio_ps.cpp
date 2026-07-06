@@ -76,6 +76,16 @@ void Audio_ps::DisableEffect(AudioType eType, AudioEffect* pEffect)
 
 void Audio_ps::Init()
 {
+	// Allow opting out of audio hardware init - endpoint enumeration can block
+	// indefinitely in sessions with no usable audio device (automation, remote
+	// desktop). Everything downstream already checks m_bInitialised.
+	char szNoAudio[8] = {};
+	size_t noAudioLen = 0;
+	if (getenv_s(&noAudioLen, szNoAudio, sizeof(szNoAudio), "USAGI_NO_AUDIO") == 0 && noAudioLen > 0 && szNoAudio[0] == '1')
+	{
+		return;
+	}
+
 	CoInitializeEx( NULL, COINIT_MULTITHREADED );
 
 	if( FAILED( XAudio2Create( &m_pXAudio2, 0 ) ) )
@@ -99,6 +109,11 @@ void Audio_ps::Init()
 
 void Audio_ps::SetOutputChannelConfig(ChannelConfig eChannelConfig)
 {
+	if (!m_bInitialised)
+	{
+		return;
+	}
+
 	for (uint32 i = 0; i < _AudioType_count; i++)
 	{
 		// Note this means all active voices need to be stopped and restarted

@@ -14,6 +14,7 @@
 #ifndef FINAL_BUILD
 // Cache the debug log on all versions of the game except for the final rom
 void DumpDebugLog(const char* szBuildId = NULL);
+namespace usg { void DumpFatalStack(const char* szMsg); }
 #else
 void FatalInFinal(const char* format, ...);
 #endif

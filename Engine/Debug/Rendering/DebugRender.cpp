@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include <cstdlib>
 #include "Engine/Memory/Mem.h"
 #include "Engine/Graphics/Device/GFXContext.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
@@ -326,8 +327,24 @@ void DebugRender::AddRect( float fPosX, float fPosY, float fWidth, float fHeight
 	m_uBarCount++;
 }
 
+// Allows the debug overlay to be skipped when its font/effect data is absent
+// (the open-source drop ships no debug font), avoiding invalid descriptor updates.
+static bool DebugRenderDisabled()
+{
+	static int s_state = -1;
+	if (s_state < 0)
+	{
+		char szEnv[8] = {}; size_t envLen = 0;
+		s_state = (getenv_s(&envLen, szEnv, sizeof(szEnv), "USAGI_NO_DEBUGRENDER") == 0 && envLen > 0 && szEnv[0] == '1') ? 1 : 0;
+	}
+	return s_state == 1;
+}
+
 void DebugRender::Updatebuffers(GFXDevice* pDevice)
 {
+	if (DebugRenderDisabled())
+		return;
+
 	if(m_uBarCount)
 	{
 		m_barVerts.SetContents(pDevice, m_barBufferTmp, m_uBarCount*4);
@@ -351,8 +368,11 @@ void DebugRender::Updatebuffers(GFXDevice* pDevice)
 
 void DebugRender::Draw(GFXContext* pContext)
 {
+	if (DebugRenderDisabled())
+		return;
+
 	if(!m_uBarCount && !m_uCharCount)
-		return; 
+		return;
 
 	pContext->SetDescriptorSet(&m_globalDescriptors, 0);
 

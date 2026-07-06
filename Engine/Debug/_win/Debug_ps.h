@@ -12,6 +12,8 @@
 #endif
 
 #include "tchar.h"
+#include <cstdio>
+#include <cstdlib>
 #include "DebugMsgType.h"
 
 static HRESULT	g_hResult;
@@ -54,13 +56,29 @@ extern void DumpDebugLog(const char* szBuildId);
 // For file loading only, will quit the game on failure, even in release mode
 inline void FATAL_RELEASE_INT( const TCHAR* msg )
 {
+	// In headless / automation runs a modal MessageBox blocks forever. When
+	// USAGI_FATAL_STDERR is set, record the message to a log and exit instead.
+	char szStdErr[8] = {};
+	size_t stdErrLen = 0;
+	if (getenv_s(&stdErrLen, szStdErr, sizeof(szStdErr), "USAGI_FATAL_STDERR") == 0 && stdErrLen > 0 && szStdErr[0] == '1')
+	{
+		FILE* f = nullptr;
+		if (fopen_s(&f, "B:\\usagi_dev\\_gp_fatal.log", "a") == 0 && f)
+		{
+			fprintf(f, "FATAL: %s\n", msg);
+			fflush(f);
+			fclose(f);
+		}
+		exit(-1);
+	}
+
 	if(IsDebuggerPresent())
 	{
 		ASSERT(false);
 	}
 	else
 	{
-		MessageBox(0, msg, TEXT("FATAL"), 0);	
+		MessageBox(0, msg, TEXT("FATAL"), 0);
 		exit(-1);
 	}
 }
