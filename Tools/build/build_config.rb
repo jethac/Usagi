@@ -38,6 +38,13 @@ class BuildConfig
     path.tr('/', '\\')
   end
 
+  # Paths used as the first token of a ninja command are spawned directly
+  # via CreateProcess, which rejects multi-component forward-slash relative
+  # paths - they must be Windows paths when building on Windows
+  def self.to_spawnable_path(path)
+    Gem.win_platform? ? to_windows_path(path) : path
+  end
+
   # http://stackoverflow.com/a/5471032/1004609
   def self.which(cmd)
     exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
@@ -321,7 +328,7 @@ class BuildConfig
   end
 
   def boilerplate_tool
-    "#{tools_bin_dir}/systems-scanner.exe"
+    BuildConfig::to_spawnable_path("#{tools_bin_dir}/systems-scanner.exe")
   end
 
   def register_systems_template
@@ -357,15 +364,15 @@ class BuildConfig
   end
 
   def font_converter
-    "#{tools_bin_dir}/FontCreator.exe"
+    BuildConfig::to_spawnable_path("#{tools_bin_dir}/FontCreator.exe")
   end
 
   def cmdl_converter
-    "#{tools_bin_dir}/Ayataka.exe"
+    BuildConfig::to_spawnable_path("#{tools_bin_dir}/Ayataka.exe")
   end
 
 def shader_pack
-    "#{tools_bin_dir}/ShaderPackage.exe"
+    BuildConfig::to_spawnable_path("#{tools_bin_dir}/ShaderPackage.exe")
   end
 
   def cmdl_converter_dep_opts
@@ -373,7 +380,7 @@ def shader_pack
   end
 
   def resource_packer
-    "#{tools_bin_dir}/PakFileGen.exe"
+    BuildConfig::to_spawnable_path("#{tools_bin_dir}/PakFileGen.exe")
   end
 
   def vitei_audio_tool
@@ -444,7 +451,7 @@ def shader_pack
   end
 
   def protoc
-    "#{tools_bin_dir}/protoc"
+    BuildConfig::to_spawnable_path("#{tools_bin_dir}/protoc")
   end
 
   def luac
@@ -455,7 +462,7 @@ def shader_pack
     platform = ENV.fetch('VISUAL_STUDIO_PLATFORM', '')
     compiler = "#{tools_bin_dir}/luac53.exe" if platform == 'Win32'
 
-    compiler
+    BuildConfig::to_spawnable_path(compiler)
   end
 
   # these methods return paths for tools to be run from the protobuf

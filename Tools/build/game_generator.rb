@@ -21,8 +21,11 @@ def build_pc_data(config, n, platform)
   data_deps.merge game_textures
   data_deps.merge engine_textures
 
-  #models = build_pc_models(config, n)
-  #data_deps.merge models
+  # The PakFileGen model path is not yet stable; convert models with Ayataka
+  # into loose .vmdf files (this also emits the _build/skel skeleton XMLs the
+  # entity hierarchy converter depends on)
+  models = build_pc_models(config, n)
+  data_deps.merge models
 
   fonts = build_fonts(config, n)
   data_deps.merge fonts
@@ -194,7 +197,9 @@ def build_paks_for_audio(config, n, platform)
 end
 
 def build_paks_for_models(config, n, platform)
-  targets = FileList["Data/Models/**/*.yml"].exclude{|f| File.directory?(f)}.map do |input|
+  # A yml with a sibling fbx of the same basename is a material override file
+  # consumed by the model converter, not a pak definition
+  targets = FileList["Data/Models/**/*.yml"].exclude{|f| File.directory?(f) || File.exist?(f.sub(/\.yml$/, '.fbx'))}.map do |input|
     output = ("#{config.model_out_dir}/" + input.sub(/^Data\/Models\//, '')).sub(".yml", ".pak")
     defines = ""
     n.build('pak_file_def', {output => [input]},
