@@ -153,7 +153,10 @@ bool AlphaStateDecl::operator==(const AlphaStateDecl& rhs) const
 
 RasterizerStateDecl::RasterizerStateDecl()
 {
-	eCullFace = CULL_FACE_BACK;
+	// Default to no back-face culling. Procedurally generated game geometry can
+	// have inconsistent winding, and for this project double-sided rendering is
+	// preferable to invisible surfaces. (Was CULL_FACE_BACK.)
+	eCullFace = CULL_FACE_NONE;
 	fDepthBias	= 0.0f;
 	fLineWidth = 1.0f;
 	bLineSmooth = false;

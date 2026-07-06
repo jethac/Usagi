@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include <cstdio>
 #include "Engine/Scene/Scene.h"
 #include "Engine/Scene/LightingContext.h"
 #include "Engine/Graphics/Device/GFXContext.h"
@@ -208,6 +209,16 @@ void LightingContext::Update(GFXDevice* pDevice, SceneContext* pCtxt)
 		pLightConst->fCosInnerSpotCutoff = cosf(pLight->GetInnerCutoff());
 
 		uLightCount++;
+	}
+
+	{
+		static int s_c = 0;
+		if (s_c++ < 6)
+		{
+			FILE* f = nullptr; fopen_s(&f, "B:\\usagi_dev\\_gp_light.log", "a");
+			if (f) { fprintf(f, "LightUpdate: dirLights(list)=%u iDirLightCount=%d globalAmbient=(%.2f,%.2f,%.2f)\n",
+				(uint32)dirLights.size(), pLightingData->iDirLightCount, pLightingData->vGlobalAmbient.x, pLightingData->vGlobalAmbient.y, pLightingData->vGlobalAmbient.z); fflush(f); fclose(f); }
+		}
 	}
 
 	m_lightingConstants.Unlock();

@@ -77,7 +77,12 @@ namespace usg {
 		size_t uImageIndex = 0;
 
 		m_dynamicBuffers.clear();
-		
+
+		// If any image binding is missing its texture the descriptor write would
+		// carry a garbage image view and crash the driver in vkUpdateDescriptorSets.
+		// Skip the update in that case and keep the set in its previous state.
+		bool bAllImagesValid = true;
+
 		for (uint32 i = 0; i < pLayout->GetDeclarationCount(); i++)
 		{
 			m_pWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -110,6 +115,11 @@ namespace usg {
 				for (uint32 j = 0; j < m_pWrites[i].descriptorCount; j++)
 				{
 					VkDescriptorImageInfo& image = m_pImages[uImageIndex];
+					if (pData[j].texData.tex.get() == nullptr)
+					{
+						bAllImagesValid = false;
+						continue;
+					}
 					image.sampler = pData[j].texData.sampler.GetContents()->GetSampler();
 					if (pData[j].texData.imageView.IsDefault())
 					{
@@ -133,6 +143,11 @@ namespace usg {
 				for (uint32 j = 0; j < m_pWrites[i].descriptorCount; j++)
 				{
 					VkDescriptorImageInfo& image = m_pImages[uImageIndex];
+					if (pData[j].texData.tex.get() == nullptr)
+					{
+						bAllImagesValid = false;
+						continue;
+					}
 					if (pData[j].texData.imageView.IsDefault())
 					{
 						image.imageView = pData[j].texData.tex->GetPlatform().GetImageView();
@@ -155,7 +170,10 @@ namespace usg {
 			pData += pLayout->GetDeclaration(i)->uCount;
 		}
 
-		vkUpdateDescriptorSets(pDevice->GetPlatform().GetVKDevice(), pLayout->GetDeclarationCount(), m_pWrites, 0, nullptr);
+		if (bAllImagesValid)
+		{
+			vkUpdateDescriptorSets(pDevice->GetPlatform().GetVKDevice(), pLayout->GetDeclarationCount(), m_pWrites, 0, nullptr);
+		}
 	}
 
 

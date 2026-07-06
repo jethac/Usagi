@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include <cstdio>
 #include "Engine/Graphics/GFX.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/Device/GFXContext.h"
@@ -552,6 +553,25 @@ namespace usg {
 		// FIXME: Handle multiple views
 		renderContext.pGlobalDescriptors = &m_pImpl->globalDescriptors[m_pImpl->eActiveViewType];
 		renderContext.pPostFX = m_pImpl->pPostFXSys;
+
+		{
+			static int s_c = 0;
+			if (s_c++ < 6)
+			{
+				uint32 uTotal = 0;
+				for (uint32 uL = 0; uL < RenderLayer::LAYER_COUNT; uL++) uTotal += (uint32)m_pImpl->pVisibleNodes[uL].size();
+				const Camera* pCam = GetCamera();
+				Vector4f cp = pCam ? pCam->GetPos() : Vector4f(0,0,0,0);
+				Vector4f cf = pCam ? pCam->GetFacing() : Vector4f(0,0,0,0);
+				FILE* f = nullptr; fopen_s(&f, "B:\\usagi_dev\\_gp_draw.log", "a");
+				if (f) {
+					fprintf(f, "DrawScene: nodes=%u groups=%u camPos=(%.1f,%.1f,%.1f) facing=(%.2f,%.2f,%.2f) near=%.1f far=%.1f\n",
+						uTotal, GetVisibleGroupCount(), cp.x, cp.y, cp.z, cf.x, cf.y, cf.z,
+						pCam ? pCam->GetNear() : 0.f, pCam ? pCam->GetFar() : 0.f);
+					fflush(f); fclose(f);
+				}
+			}
+		}
 
 		for (uint32 uLayer = 0; uLayer < RenderLayer::LAYER_COUNT; uLayer++)
 		{

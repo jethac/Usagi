@@ -315,6 +315,11 @@ void Display_ps::CreateSwapChain(GFXDevice* pDevice)
 		// This will be true if the user has use HDR set to true in windows, false otherwise
 		bAllowHDR = desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
 
+		// The HDR output path on this branch has no tonemap/brightness control yet,
+		// so SDR-range scene colour maps to near-black on an ST2084 swap chain.
+		// Force the SDR (sRGB) swap chain until HDR tonemapping is implemented.
+		bAllowHDR = false;
+
 		factory->Release();
 	}
 #endif
@@ -599,7 +604,7 @@ void Display_ps::SetAsTarget(VkCommandBuffer& cmd)
 
 	vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 
-	
+
 	VkViewport viewport;
 	viewport.height = (float)m_uHeight;
 	viewport.width = (float)m_uWidth;

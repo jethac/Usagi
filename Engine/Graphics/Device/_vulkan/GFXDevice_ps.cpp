@@ -467,6 +467,34 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	};
 	int validationLayerCount = ARRAY_SIZE(validationLayerNames);
 
+	// Only request layers the loader can actually provide - the SDK may not be
+	// registered on this machine (and VK_LAYER_PATH is ignored for elevated
+	// processes). Running without validation is preferable to failing to boot.
+	{
+		uint32 uAvailableLayers = 0;
+		vkEnumerateInstanceLayerProperties(&uAvailableLayers, nullptr);
+		bool bValidationFound = false;
+		if (uAvailableLayers > 0)
+		{
+			vector<VkLayerProperties> availableLayers;
+			availableLayers.resize(uAvailableLayers);
+			vkEnumerateInstanceLayerProperties(&uAvailableLayers, availableLayers.data());
+			for (uint32 i = 0; i < uAvailableLayers; i++)
+			{
+				if (strcmp(availableLayers[i].layerName, validationLayerNames[0]) == 0)
+				{
+					bValidationFound = true;
+					break;
+				}
+			}
+		}
+		if (!bValidationFound)
+		{
+			RELEASE_WARNING("%s is not available, running without validation layers\n", validationLayerNames[0]);
+			validationLayerCount = 0;
+		}
+	}
+
 	VkValidationFeatureDisableEXT disabledValidation[] = { VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT, VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT };
 	VkValidationFeaturesEXT validation = {};
 	validation.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;

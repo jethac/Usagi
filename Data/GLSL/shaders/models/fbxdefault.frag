@@ -141,7 +141,12 @@ void main(void)
 		vDiffuse.rgb *= vRead.rgb;
 		vDiffuse.a = vRead.a;
 	}
-	vDiffuse *= vo_vColor;
+	// A mesh with no vertex-colour layer arrives here as black, which would zero
+	// the albedo and render the surface unlit-black. Treat an all-black vertex
+	// colour as white so the material colour still comes through.
+	vec4 vVtxCol = vo_vColor;
+	if (dot(vVtxCol.rgb, vec3(1.0)) < 0.001) { vVtxCol.rgb = vec3(1.0, 1.0, 1.0); }
+	vDiffuse *= vVtxCol;
 	vDiffuse *= uMaterial.diffuse;
 
 	vec3 rim = vec3(GetRimValue(1.0, 4.0, vNormal.z)) * vSpecular.rgb;
