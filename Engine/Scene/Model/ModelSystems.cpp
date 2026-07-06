@@ -30,6 +30,7 @@ namespace usg
 		template<typename INPUTS, typename OUTPUTS>
 		static void LateUpdateInt(const INPUTS& inputs, OUTPUTS& outputs)
 		{
+			outputs.bone.GetRuntimeData().pBone->SetExternallyDriven(true);
 			outputs.bone.GetRuntimeData().pBone->SetTransform(inputs.mtx->matrix, inputs.mtx.Dirty());
 		}
 

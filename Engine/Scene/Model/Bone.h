@@ -40,6 +40,13 @@ public:
 
 	void UpdateScaleBounds(float fScale);
 
+	// Set when a per-bone entity (BoneComponent) drives this bone's transform, so
+	// the owning Model knows not to overwrite the bone constant from its own world
+	// matrix. Rigid ModelComponent entities without per-bone child entities leave
+	// this false, letting the Model fill the mModelMat constant directly.
+	void SetExternallyDriven(bool bDriven) { m_bExternallyDriven = bDriven; }
+	bool IsExternallyDriven() const { return m_bExternallyDriven; }
+
 	void UpdateConstants(GFXDevice* pDevice)
 	{
 		// TODO: Only perform if we are visible
@@ -80,6 +87,7 @@ private:
 	TransformNode*					m_pTransformNode;
 	ConstantSet						m_boneConstants;
 	RenderGroup*					m_pRenderGroup;
+	bool							m_bExternallyDriven = false;
 };
 
 } // namespace usg

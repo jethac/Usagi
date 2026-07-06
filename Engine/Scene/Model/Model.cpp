@@ -735,6 +735,35 @@ void Model::GPUUpdate(GFXDevice* pDevice, bool bVisible)
 	// Should internally check for any relevant changes, drop out if nothing needs changing
 	AddToSceneInt(pDevice);
 
+	// A NO_SKINNING mesh takes its vertex-shader model matrix (mModelMat) from its
+	// root bone's constant set. That constant is normally filled by a per-bone
+	// entity (BoneComponent). A plain rigid ModelComponent (e.g. static props or
+	// physics-driven bodies) has no such bone entities, so without this the root
+	// bone constant is never written and every vertex collapses to the origin.
+	// Push the model's world transform into any root bone that nothing else drives.
+	if (bVisible && m_pSkeleton && m_pTransformNode)
+	{
+		const Matrix4x4& mWorld = m_pTransformNode->GetMatrix();
+		const uint32 uMeshCount = m_pResource->GetMeshCount();
+		for (uint32 i = 0; i < uMeshCount; i++)
+		{
+			const ModelResource::Mesh* pMesh = m_pResource->GetMesh(i);
+			if (pMesh->primitive.eSkinningMode != usg::exchange::SkinningType_NO_SKINNING)
+				continue;
+
+			// A NO_SKINNING mesh's root bone maps 1:1 to the model, so the model's
+			// authoritative world matrix is the correct mModelMat. The auto-generated
+			// per-bone entity feeds a collapsed matrix here (its bind pose never gets
+			// the model transform), so always drive the constant from the model.
+			Bone* pBone = m_pSkeleton->GetBone(pMesh->primitive.uRootIndex);
+			if (pBone)
+			{
+				pBone->SetTransform(mWorld);
+				pBone->UpdateConstants(pDevice);
+			}
+		}
+	}
+
 	// Update the bone buffers
 	if (bVisible)
 	{

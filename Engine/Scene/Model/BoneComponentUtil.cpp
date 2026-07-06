@@ -216,6 +216,7 @@ void SetBoneTransforms(Entity e, ComponentLoadHandles& handles)
 		DEBUG_PRINT("Missing bone %s\n", inputs.id->name);
 		ASSERT(false);
 	}
+	outputs.bone.GetRuntimeData().pBone->SetExternallyDriven(true);
 	outputs.bone.GetRuntimeData().pBone->SetTransform(inputs.mtx->matrix);
 	outputs.bone.GetRuntimeData().pBone->UpdateConstants(inputs.device.GetRuntimeData().pDevice);
 }
