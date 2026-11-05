@@ -681,6 +681,9 @@ SoundHandle Audio::Play3DSoundInt(SoundActorHandle& actorHandle, SoundFile* pSou
 			handle.GetObject()->ScaleVolumeBySystemVolume(
 				m_fVolume[pSoundFile->GetAudioType()]
 			);
+			// Same contract as Prepare2DSound: the caller's volume scales the
+			// instance (the bank volume is already applied as the file volume)
+			handle.SetVolume(fVolume);
 			if (bPlay)
 			{
 				handle.Start();
