@@ -59,5 +59,5 @@ void main()
     ao = dot( vec4( ao, aoH, aoV, aoD ), blendWeights ) / blendWeightsSum;
 #endif
 
-    colorOut = vec4( ao.xxx, 1.0 );
+    colorOut = vec4( ao.xxx, ao );
 }
