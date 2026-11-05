@@ -694,15 +694,33 @@ void Display_ps::TransferRect(GFXContext* pContext, RenderTarget* pTarget, const
 	subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 	subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
 
-	pContext->GetPlatform().SetImageLayout(m_pSwapchainImages[m_uActiveImage], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange);
+	// A transition from VK_IMAGE_LAYOUT_UNDEFINED allows the driver to discard
+	// the image's contents, so only use it where they don't matter. NVIDIA's
+	// Windows driver happens to keep them; the Linux NVIDIA and Mesa drivers
+	// don't, which lost the whole scene.
+	// The swap chain image is about to be overwritten, but only within dstBounds
+	VkImageLayout eSwapLayout = (dstBounds.width == (sint32)m_uWidth && dstBounds.height == (sint32)m_uHeight) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	pContext->GetPlatform().SetImageLayout(m_pSwapchainImages[m_uActiveImage], eSwapLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange);
 
+	// The source holds the frame, so transition it from the layout its render
+	// pass left it in
 	const Texture_ps& tex = pTarget->GetColorTexture(0)->GetPlatform();
 	VkImage srcImage = tex.GetImage();
-	pContext->GetPlatform().SetImageLayout(srcImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+	VkImageLayout eSrcLayout = pTarget->GetRenderPass().IsValid() ? pTarget->GetRenderPass().GetContents()->GetColorAttachmentFinalLayout(0) : VK_IMAGE_LAYOUT_UNDEFINED;
+	if (eSrcLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+	{
+		pContext->GetPlatform().SetImageLayout(srcImage, eSrcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+	}
 	VkFilter filter = srcBounds.width == dstBounds.width ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
 	vkCmdBlitImage(pContext->GetPlatform().GetVkCmdBuffer(), srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_pSwapchainImages[m_uActiveImage], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ic, filter);
 
-	pContext->GetPlatform().SetImageLayout(m_pSwapchainImages[m_uActiveImage], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, subresourceRange);
+	// Keep the blitted frame: the overlay pass that follows loads it
+	pContext->GetPlatform().SetImageLayout(m_pSwapchainImages[m_uActiveImage], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, subresourceRange);
+	// and return the source to the layout its render pass expects to find
+	if (eSrcLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && eSrcLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+	{
+		pContext->GetPlatform().SetImageLayout(srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, eSrcLayout, subresourceRange);
+	}
 	//pContext->GetPlatform().ImageBarrier(m_pSwapchainImages[m_uActiveImage], VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	//pContext->GetPlatform().ImageBarrier(srcImage, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_HOST_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 	m_bRTShouldLoad = true;

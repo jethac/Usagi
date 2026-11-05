@@ -228,6 +228,7 @@ void RenderPass::Init(GFXDevice* pDevice, const RenderPassInitData &initData, ui
 		{
 			const VkAttachmentDescription& desc = attachmentDescriptions[sub.pColorAttachments[i].uIndex];
 			m_colorFormats[i] = desc.format;
+			m_colorFinalLayouts[i] = desc.finalLayout;
 			m_sampleCount = desc.samples;
 		}
 		if (sub.pDepthAttachment)

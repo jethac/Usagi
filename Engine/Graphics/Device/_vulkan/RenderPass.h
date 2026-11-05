@@ -25,6 +25,8 @@ public:
 	// which need to build pipelines compatible with this pass
 	uint32 GetColorAttachmentCount() const { return m_uColorAttachments; }
 	VkFormat GetColorAttachmentFormat(uint32 uIndex) const { return uIndex < m_uColorAttachments ? m_colorFormats[uIndex] : VK_FORMAT_UNDEFINED; }
+	// The layout the pass leaves a colour attachment in
+	VkImageLayout GetColorAttachmentFinalLayout(uint32 uIndex) const { return uIndex < m_uColorAttachments ? m_colorFinalLayouts[uIndex] : VK_IMAGE_LAYOUT_UNDEFINED; }
 	VkFormat GetDepthAttachmentFormat() const { return m_depthFormat; }
 	VkSampleCountFlagBits GetSampleCount() const { return m_sampleCount; }
 
@@ -34,6 +36,7 @@ private:
 	VkRenderPass m_renderPass = VK_NULL_HANDLE;
 	uint32		 m_uCRCForPass = 0;
 	VkFormat	 m_colorFormats[MAX_COLOR_TARGETS] = {};
+	VkImageLayout m_colorFinalLayouts[MAX_COLOR_TARGETS] = {};
 	uint32		 m_uColorAttachments = 0;
 	VkFormat	 m_depthFormat = VK_FORMAT_UNDEFINED;
 	VkSampleCountFlagBits m_sampleCount = VK_SAMPLE_COUNT_1_BIT;
