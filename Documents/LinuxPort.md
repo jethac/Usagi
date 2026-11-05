@@ -22,6 +22,22 @@ piece.
   `systems-scanner`, `protoc` 2.5 with the nanopb plugin batch files) are
   Windows binaries. Porting them is out of scope for the first pass.
 
+## Layout after the shared platform layers
+
+The port was first written in `_linux` directories. Since macOS, iOS and
+Android use the same code, it has been split into shared layers, and the
+paths below that say `_linux` now live here:
+
+| Directory | Contents | Selected by |
+| --- | --- | --- |
+| `_sdl` | window and events (`Engine/Core/_sdl/SDLUtil`, namespace `SDLUTIL`), HID, the Vulkan surface (`Engine/Graphics/Device/_sdl/VulkanWindow_ps.cpp`), audio | `USE_SDL`, `HID_HEADER`, `AUDIO_HEADER` |
+| `_posix` | files, threads, timers, memory, crash handling, modules, sockets, locale, profiling, `os_ps`, `VulkanIncludes.h`, the shared `Common_ps.h` | `OS_HEADER`, `PLATFORM_POSIX` |
+| `_linux` | `Common_ps.h` (includes the `_posix` one), and anything Linux-only | `PLATFORM_LINUX` |
+
+A game's entry point for every SDL platform is `main/_sdl/SDLMain.cpp`.
+The Linux build whitelists `_linux`, `_posix`, `_sdl`, `_vulkan` and
+`_fragment`. See `ApplePort.md` for macOS and iOS.
+
 ## Window, surface and events: SDL3
 
 SDL3 is used for the window, the Vulkan surface, keyboard, mouse, text
