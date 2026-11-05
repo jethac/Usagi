@@ -197,7 +197,25 @@ def vs_project_tuples
    ['Scene', 'Engine/Scene/Scene.vcxproj', '6FEBD175-576B-411D-8173-2833305AE882', 'Engine/Project.vcxproj.erb'],
    ['System', 'Engine/System/System.vcxproj', '2CA5C758-FA4D-431A-86EF-79065E243D3E', 'Engine/Project.vcxproj.erb'],
    ['ThirdParty', 'Engine/ThirdParty/ThirdParty.vcxproj', '491FE2EF-D449-4FDD-A3CE-9A1102AA2AF4', 'Engine/ThirdParty/ThirdParty.vcxproj.erb']
-  ]
+  ] + vs_module_project_tuples
+end
+
+# Add-on engine modules (typically git submodules mounted at Engine/<Name>)
+# declare themselves with an Engine/<Name>/usagi_module.yml manifest:
+#
+#   name: Cameraman          # must match the directory name
+#   guid: 6B0D3F2E-...       # stable Visual Studio project GUID
+#   template: Engine/Project.vcxproj.erb   # optional, this is the default
+#
+# They are appended to the built-in project list, so no generator edits are
+# needed to add one. Games reference them through usagi_module_references
+# (see Tools/ruby/usagi_modules.rb).
+def vs_module_project_tuples
+  require_relative '../ruby/usagi_modules'
+  UsagiModules.manifests('.').map do |m|
+    [m['name'], "Engine/#{m['name']}/#{m['name']}.vcxproj", m['guid'],
+     m['template'] || 'Engine/Project.vcxproj.erb']
+  end
 end
 
 def vs_project_dll_tuples
