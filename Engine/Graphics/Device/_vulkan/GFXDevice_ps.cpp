@@ -427,11 +427,49 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	{
 		extensions.push_back(surfaceExtensions[i]);
 	}
-	extensions.push_back("VK_EXT_swapchain_colorspace");
+
+	uint32 uInstanceExtCount = 0;
+	vkEnumerateInstanceExtensionProperties(nullptr, &uInstanceExtCount, nullptr);
+	vector<VkExtensionProperties> instanceExt(uInstanceExtCount);
+	vkEnumerateInstanceExtensionProperties(nullptr, &uInstanceExtCount, instanceExt.data());
+
+	auto HasInstanceExtension = [&instanceExt](const char* szName)
+	{
+		for (const auto& extension : instanceExt)
+		{
+			if (strcmp(extension.extensionName, szName) == 0)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	// Optional instance extensions are only requested when present; asking
+	// for a missing one fails instance creation
+	if (HasInstanceExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+	}
 #ifndef FINAL_BUILD
-	extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-	extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	if (HasInstanceExtension(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	}
+	if (HasInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	}
 #endif
+
+	// Implementations that aren't fully conformant (MoltenVK on macOS and
+	// iOS) are only listed when the application says it can handle them
+	VkInstanceCreateFlags instanceFlags = 0;
+	if (HasInstanceExtension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+		instanceFlags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+	}
 
 	
 	// Check to see if an HMD has been loaded and grab the extensions
@@ -514,7 +552,7 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	const char *validationLayerNames[1] = {};
 #endif
 
-	inst_info.flags = 0;
+	inst_info.flags = instanceFlags;
 	inst_info.pApplicationInfo = &app_info;
 	inst_info.enabledExtensionCount = (uint32)extensions.size();
 	inst_info.ppEnabledExtensionNames = extensions.data();
@@ -785,6 +823,13 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	if (HasDeviceExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME))
 	{
 		extensions.push_back(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+	}
+	// A portability implementation (MoltenVK) that advertises this must have
+	// it enabled; it reports what the device can't do in
+	// VkPhysicalDevicePortabilitySubsetFeaturesKHR
+	if (HasDeviceExtension("VK_KHR_portability_subset"))
+	{
+		extensions.push_back("VK_KHR_portability_subset");
 	}
 
 #ifdef USE_DEBUG_MARKERS
