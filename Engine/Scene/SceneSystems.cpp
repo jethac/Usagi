@@ -301,7 +301,14 @@ namespace usg
 				ASSERT(cameraRtd.pCamera != nullptr);
 				Matrix4x4 mtx;
 				mtx.LookAt(vPos, vPos + vForward, vUp);
-				cameraRtd.pCamera->SetUp(mtx, outputs.cam->fAspectRatio, outputs.cam->fFOV, outputs.cam->fNearPlaneDist, outputs.cam->fFarPlaneDist);
+				if (outputs.cam->eProjection == CAMERA_PROJECTION_ORTHOGRAPHIC)
+				{
+					cameraRtd.pCamera->SetUpOrthographic(mtx, outputs.cam->fAspectRatio, outputs.cam->fOrthographicSize, outputs.cam->fNearPlaneDist, outputs.cam->fFarPlaneDist);
+				}
+				else
+				{
+					cameraRtd.pCamera->SetUp(mtx, outputs.cam->fAspectRatio, outputs.cam->fFOV, outputs.cam->fNearPlaneDist, outputs.cam->fFarPlaneDist);
+				}
 				cameraRtd.pCamera->SetRenderMask(outputs.cam->uRenderMask);
 			}
 
@@ -313,6 +320,16 @@ namespace usg
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const usg::SetFieldOfView& evt)
 			{
 				outputs.cam.Modify().fFOV = evt.fFOV;
+			}
+
+			static void OnEvent(const Inputs& inputs, Outputs& outputs, const usg::SetCameraProjection& evt)
+			{
+				outputs.cam.Modify().eProjection = evt.bOrthographic ? CAMERA_PROJECTION_ORTHOGRAPHIC : CAMERA_PROJECTION_PERSPECTIVE;
+			}
+
+			static void OnEvent(const Inputs& inputs, Outputs& outputs, const usg::SetOrthographicSize& evt)
+			{
+				outputs.cam.Modify().fOrthographicSize = evt.fOrthographicSize;
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const usg::AddSubCameraRenderMask& evt)
