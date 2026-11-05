@@ -1,5 +1,6 @@
 #include "../includes/platformdefines.inc"
 #include "../includes/global_3d.inc"
+#include "../includes/pbr.inc"
 #include "../includes/deferred_read.inc"
 #include "../includes/lighting_structs.inc"
 #include "../includes/shadow/poisson_values.inc"
@@ -97,7 +98,7 @@ void main(void)
                  
     // TODO: Add the ambient colour of the light
     float NdotHV = max(dot(vNormal,refl),0.0);
-    vec3 vSpecular = fAttenuation * vSpecCol * light.vSpecular.rgb * pow(max(NdotHV, 0.0001), fSpecularPow);
+    vec3 vSpecular = fAttenuation * vSpecCol * light.vSpecular.rgb * pow(max(NdotHV, 0.0001), fSpecularPow);		
 
     float fShadow = 1.0f;
 #ifdef SHADOW_READ
@@ -108,7 +109,8 @@ void main(void)
     fShadow = ShadowCalculationSoft(vWorldPos);
 #endif
 #endif
-	vec3 vDiffColor = ((light.vDiffuse.xyz * nDotLD * (fShadow)) + light.vAmbient.rgb) * fAttenuation;
-
-	vColorOut0	= vec4((vDiffColor*vColor)+(vSpecular*fShadow), 1.0);
+	PBRSurface surf = GetDeferredSurface(vTexCoord);
+	vec3 vLit = PBR_DirectLight(surf, normalize(-vPos), vLightDir) * light.vDiffuse.rgb * fShadow;
+	vec3 vAmbient = light.vAmbient.rgb * PBR_DiffuseColor(surf);
+	vColorOut0	= vec4((vLit + vAmbient) * fAttenuation, 1.0);
 }

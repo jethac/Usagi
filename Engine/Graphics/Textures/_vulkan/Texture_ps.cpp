@@ -109,6 +109,8 @@ VkFormat GetFormatGLI(uint32 uFormat)
 		return VK_FORMAT_R16_UNORM;
 	case gli::format::FORMAT_R32_SFLOAT_PACK32:
 		return VK_FORMAT_R32_SFLOAT;
+	case gli::format::FORMAT_RGBA16_SFLOAT_PACK16:
+		return VK_FORMAT_R16G16B16A16_SFLOAT;	// HDR environment maps
 	default:
 		ASSERT(false);	// See what we end up getting passed through
 	}

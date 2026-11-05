@@ -19,6 +19,7 @@ CustomEffects:
       - { index: 2, hint: "EmissiveFactor", default: "Textures/black_default", defines: "!SHADOW_PASS"  }
       - { index: 3, hint: "SpecularColor", default: "Textures/black_default", defines: "!SHADOW_PASS"  }
       - { index: 4, hint: "Reflection",  type: "samplerCube", default: "Textures/white_cube", defines: "!SHADOW_PASS"  }      
+      - { index: 5, hint: "MetalRoughMap", default: "Textures/white_default", defines: "!SHADOW_PASS"  } # glTF layout: occlusion R, roughness G, metallic B
     ConstantDefs:      
       - name: uVSMaterial
         binding: Material   
@@ -48,6 +49,17 @@ CustomEffects:
           - { type: float,  name: alphaRef,       count: 1, default: 1.0 } # 80
           - { type: int,    name: alphaCmp,       count: 1, default: 0 } # 84 // Less, Equal, Greater
           - { type: vec4,   name: emissionMapMul, count: 1, default: [1.0, 1.0, 1.0, 1.0] } # 88         
+          # Metal/roughness PBR (deferred). When bPBR is false the specular/specularpow
+          # values above are mapped onto the PBR G-buffer instead.
+          - { type: bool,   name: bPBR,               default: false }
+          - { type: float,  name: metallic,           count: 1, default: 0.0 }
+          - { type: float,  name: roughness,          count: 1, default: 0.5 }
+          - { type: float,  name: reflectance,        count: 1, default: 0.5 }  # dielectric F0 = 0.16 * r^2 (0.5 = 4%)
+          - { type: float,  name: clearcoat,          count: 1, default: 0.0 }
+          - { type: float,  name: clearcoatRoughness, count: 1, default: 0.05 }
+          - { type: bool,   name: bMetalRoughMap,     default: false }  # multiplies roughness/metallic, R = occlusion
+          - { type: float,  name: occlusionStrength,  count: 1, default: 1.0 }
+          - { type: bool,   name: bFlipNormalY,       default: false }
       - binding: Custom0
         shaderType: VS 
         defines: "!INSTANCED !HAS_SKELETON"        

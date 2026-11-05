@@ -7,6 +7,8 @@
 #define _USG_POSTFX_DEFERRED_SHADING_DEFERRED_SHADING_H_
 
 #include "Engine/Graphics/Effects/Effect.h"
+#include "Engine/Graphics/Effects/ConstantSet.h"
+#include "Engine/PostFX/PostFXSettings.pb.h"
 #include "Engine/Graphics/Materials/Material.h"
 #include "Engine/Graphics/Primitives/VertexBuffer.h"
 #include "Engine/Graphics/Primitives/IndexBuffer.h"
@@ -38,7 +40,14 @@ public:
 	virtual void PassDataSet(GFXDevice* pDevice) override;
 	virtual bool LoadsTexture(Input eInput) const override;
 
+	// Image based lighting, ambient and contact shadow parameters
+	void SetLightingSettings(GFXDevice* pDevice, ResourceMgr* pResource, const LightingSettings& settings);
+	// Inline screen space AO applied to ambient and image based lighting
+	void SetAOSettings(GFXDevice* pDevice, const SSAOSettings& settings);
+
 private:
+	void UpdateParams(GFXDevice* pDevice);
+
 
 
 	struct VolumeShader
@@ -85,6 +94,13 @@ private:
 	Pipeline				m_baseDirPass;
 	Pipeline				m_additionalShadowPass[MAX_EXTRA_DIR_LIGHTS];
 	DescriptorSet			m_readDescriptors;
+	ConstantSet				m_paramsConstants;
+	LightingSettings		m_lighting;
+	SSAOSettings			m_ao;
+	TextureHndl				m_envRadiance;
+	TextureHndl				m_envIrradiance;
+	SamplerHndl				m_envSampler;
+	uint32					m_uDebugView;
 	
 	VolumeShader			m_spotShaders;
 	VolumeShader			m_sphereShaders;

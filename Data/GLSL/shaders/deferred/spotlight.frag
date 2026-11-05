@@ -1,5 +1,6 @@
 #include "../includes/platformdefines.inc"
 #include "../includes/global_3d.inc"
+#include "../includes/pbr.inc"
 #include "../includes/deferred_read.inc"
 #include "../includes/lighting_structs.inc"
 #include "../includes/shadow/poisson_values.inc"
@@ -74,7 +75,7 @@ void main(void)
 	fAttenuation *= fShadow;
 	vSpecColor *= fShadow;
 #endif
-	vec3 vDiffColor = light.vDiffuse.rgb * nDotLD * fAttenuation;
-
-	vColorOut0	= vec4((vDiffColor*vColor)+(vSpecColor), 1.0);
+	PBRSurface surf = GetDeferredSurface(vTexCoord);
+	vec3 vLit = PBR_DirectLight(surf, normalize(-vPos), vLightDir) * light.vDiffuse.rgb * fAttenuation;
+	vColorOut0	= vec4(vLit, 1.0);
 }

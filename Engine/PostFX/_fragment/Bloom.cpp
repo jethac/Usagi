@@ -194,6 +194,20 @@ void Bloom::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSys)
 
 
 
+void Bloom::SetParams(GFXDevice* pDevice, float fThreshold, float fScale)
+{
+	// brightpass.frag scales by fMiddleGray / 0.001 and subtracts a fixed 4.0
+	BloomBrightPassConstants* pConsts = m_constants[PASS_BRIGHT_PASS].Lock<BloomBrightPassConstants>();
+	pConsts->vMiddleGray.x = 0.001f * 4.0f / Math::Max(fThreshold, 0.01f);
+	m_constants[PASS_BRIGHT_PASS].Unlock();
+	m_constants[PASS_BRIGHT_PASS].UpdateData(pDevice);
+
+	BloomFinalConstants* pFinalConsts = m_constants[PASS_FINAL].Lock<BloomFinalConstants>();
+	pFinalConsts->fBloomScale = fScale;
+	m_constants[PASS_FINAL].Unlock();
+	m_constants[PASS_FINAL].UpdateData(pDevice);
+}
+
 void Bloom::Cleanup(GFXDevice* pDevice)
 {
 	for (uint32 i = 0; i < PASS_COUNT; i++)

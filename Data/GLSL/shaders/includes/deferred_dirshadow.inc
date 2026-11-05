@@ -1,52 +1,35 @@
 #ifndef _DEFERRED_LIGHTING_INC
 #define _DEFERRED_LIGHTING_INC
 
+// Additive pass for a shadowed directional light after the first (LIGHT_INDEX)
+
+// Requires ../includes/deferred_env.inc to be included first
 
 ATTRIB_LOC(0) in vec2 vo_vTexCoord;
 ATTRIB_LOC(1) in vec3 vo_vFSVector;
-
-
+ATTRIB_LOC(2) in vec3 vo_vRayNear;
+ATTRIB_LOC(3) in vec3 vo_vRayFar;
 
 layout(location = 0) out vec4 colorOut;
 
-void CalculateDirectionalLighting(int iLight, vec3 vNormal, vec3 vViewDir, float fSpecPow, inout vec4 vDiffuse, inout vec4 vSpecular)
-{
-	vec3 vLightDir		= lights[iLight].vDirection.xyz;
-	float nDotL			= max( dot( vNormal, vLightDir ), 0.0); 
-   
-	vec3  vReflection	= reflect( vNormal, - vLightDir ); 
-	float fRDotV		= max( 0.0, dot( vReflection, vViewDir ) );
-
-	float fSpecular = ( pow( max( fRDotV, 0.0001 ), fSpecPow ) );
-
-	vDiffuse  += lights[iLight].vDiffuse*nDotL;
-	vSpecular += lights[iLight].vSpecular*fSpecular;
-}
-
 void main(void)
 {
-	vec3 vPos, vNormal, vColor, vSpecCol;
-	float fSpecPow;
-	GetDeferredDataSpecFS(vo_vTexCoord, vo_vFSVector, vPos, vNormal, vColor, vSpecCol, fSpecPow);
+	float fDepth = GetDeferredLinearDepth(vo_vTexCoord);
+	vec3 vPos = GetViewPosFromRay(fDepth, vo_vRayNear, vo_vRayFar);
+	PBRSurface s = GetDeferredSurface(vo_vTexCoord);
+	vec3 V = normalize(vo_vRayNear - vo_vRayFar);
 
-	vec3 vFSVector = normalize(vo_vFSVector);
-	vec4 vSpecular = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-	vec4 vDiffuse = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	vec3 L = lights[LIGHT_INDEX].vDirection.xyz;
+	vec3 vLit = PBR_DirectLight(s, V, L) * lights[LIGHT_INDEX].vDiffuse.rgb;
 
-	CalculateDirectionalLighting(LIGHT_INDEX, vNormal, vFSVector, fSpecPow, vDiffuse, vSpecular);
-	
-	if(vPos.z < cascades[LIGHT_INDEX-iCascadeLightStart].vSplitDistance.w)
+	int iCascadeSet = LIGHT_INDEX - iCascadeLightStart;
+	if (vPos.z < cascades[iCascadeSet].vSplitDistance.w)
 	{
-		vec3 vWorldPos = (vec4(vPos,1.0) * mInvViewMat).xyz;
-		float fShadow = SampleShadowmap(vPos.z, vWorldPos.xyz, LIGHT_INDEX-iCascadeLightStart);
-		vec4 vShadowMul = mix(vShadowColor, vec4(1.0), fShadow);
-		
-		vDiffuse *= vShadowMul;
-		vSpecular *= vShadowMul;
+		vec3 vWorldPos = (vec4(vPos, 1.0) * mInvViewMat).xyz;
+		vLit *= SampleShadowmap(vPos.z, vWorldPos.xyz, iCascadeSet);
 	}
 
-	colorOut = vec4((vColor * (vDiffuse.xyz)) + (vSpecular.xyz * vSpecCol), 1.0);
+	colorOut = vec4(vLit, 1.0);
 }
 
 #endif
-

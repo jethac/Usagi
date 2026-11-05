@@ -33,8 +33,34 @@ static const DescriptorDeclaration g_descriptorGBuffer[] =
 	DESCRIPTOR_ELEMENT(2,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_ELEMENT(3,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_ELEMENT(4,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
+	DESCRIPTOR_ELEMENT(5,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),	// Environment radiance cube
+	DESCRIPTOR_ELEMENT(6,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),	// Environment irradiance cube
+	DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_END()
 };
+
+// Matches DeferredParams in deferred_env.inc
+struct DeferredParams
+{
+	Matrix4x4	mEnvRotation;
+	Vector4f	vEnvParams;
+	Vector4f	vContactShadow;
+	Vector4f	vShadowParams;
+	Vector4f	vAOParams;
+};
+
+static const ShaderConstantDecl g_deferredParamsDecl[] =
+{
+	SHADER_CONSTANT_ELEMENT(DeferredParams, mEnvRotation,	CT_MATRIX_44, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vEnvParams,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vContactShadow,	CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vShadowParams,	CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vAOParams,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_END()
+};
+
+// The studio environment's radiance mips: mip m holds perceptual roughness m / 5
+static const float g_fEnvRoughnessMips = 5.0f;
 
 
 
@@ -247,13 +273,76 @@ void DeferredShading::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSy
 	DescriptorSetLayoutHndl texReadDesc = pDevice->GetDescriptorSetLayout(g_descriptorGBuffer);
 	m_readDescriptors.Init(pDevice, texReadDesc);
 
+	SamplerDecl envDecl(SAMP_FILTER_LINEAR, SAMP_WRAP_CLAMP);
+	envDecl.eMipFilter = MIP_FILTER_LINEAR;
+	m_envSampler = pDevice->GetSampler(envDecl);
+	m_paramsConstants.Init(pDevice, g_deferredParamsDecl);
+	m_readDescriptors.SetConstantSetAtBinding(SHADER_CONSTANT_MATERIAL, &m_paramsConstants);
+
+	// USAGI_DEFERRED_DEBUG=1..6 shows one lighting term (see deferred_lighting.inc)
+	m_uDebugView = 0;
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4996)
+#endif
+	const char* szDebug = getenv("USAGI_DEFERRED_DEBUG");
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+	if (szDebug)
+	{
+		m_uDebugView = (uint32)atoi(szDebug);
+	}
+
+	LightingSettings_init(&m_lighting);
+	SSAOSettings_init(&m_ao);
+	m_ao.fRadius = 0.0f;	// Off until SetAOSettings
+	SetLightingSettings(pDevice, pRes, m_lighting);
+
 	MakeSphere(pDevice);
 	MakeCone(pDevice);
 	MakeFrustum(pDevice);
 }
 
+void DeferredShading::SetLightingSettings(GFXDevice* pDevice, ResourceMgr* pRes, const LightingSettings& settings)
+{
+	m_lighting = settings;
+	const char* szRadiance = settings.envRadianceName[0] != '\0' ? settings.envRadianceName : "env_studio_radiance";
+	const char* szIrradiance = settings.envIrradianceName[0] != '\0' ? settings.envIrradianceName : "env_studio_irradiance";
+	m_envRadiance = pRes->GetTexture(pDevice, szRadiance);
+	m_envIrradiance = pRes->GetTexture(pDevice, szIrradiance);
+	m_readDescriptors.SetImageSamplerPairAtBinding(5, m_envRadiance, m_envSampler);
+	m_readDescriptors.SetImageSamplerPairAtBinding(6, m_envIrradiance, m_envSampler);
+	UpdateParams(pDevice);
+	if (m_pDestTarget)
+	{
+		// Already bound to the chain (G-buffer textures are set)
+		m_readDescriptors.UpdateDescriptors(pDevice);
+	}
+}
+
+void DeferredShading::SetAOSettings(GFXDevice* pDevice, const SSAOSettings& settings)
+{
+	m_ao = settings;
+	UpdateParams(pDevice);
+}
+
+void DeferredShading::UpdateParams(GFXDevice* pDevice)
+{
+	DeferredParams* pParams = m_paramsConstants.Lock<DeferredParams>();
+	pParams->mEnvRotation.MakeRotateY(m_lighting.fEnvRotation);
+	pParams->vEnvParams.Assign(m_lighting.fIBLIntensity, g_fEnvRoughnessMips, m_lighting.fAmbientScale, m_lighting.fHorizonFade);
+	pParams->vContactShadow.Assign(m_lighting.fContactShadowLength, m_lighting.fContactShadowThickness,
+		(float)Math::Max(m_lighting.uContactShadowSteps, 1U), m_lighting.fContactShadowLength > 0.0f ? m_lighting.fContactShadowStrength : 0.0f);
+	pParams->vShadowParams.Assign(1.0f, 0.0f, 0.0f, (float)m_uDebugView);
+	pParams->vAOParams.Assign(m_ao.fRadius, m_ao.fStrength, m_ao.fPower, 0.0f);
+	m_paramsConstants.Unlock();
+	m_paramsConstants.UpdateData(pDevice);
+}
+
 void DeferredShading::Cleanup(GFXDevice* pDevice)
 {
+	m_paramsConstants.Cleanup(pDevice);
 	m_readDescriptors.Cleanup(pDevice);
 	m_sphereVB.Cleanup(pDevice);
 	m_sphereIB.Cleanup(pDevice);

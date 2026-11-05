@@ -14,6 +14,7 @@
 #include "Engine/Graphics/Textures/RenderTarget.h"
 #include "Engine/Graphics/Device/GFXHandles.h"
 #include "Engine/PostFX/PostEffect.h"
+#include "Engine/PostFX/PostFXSettings.pb.h"
 #include "Engine/Core/stl/vector.h"
 #include "Engine/Core/stl/list.h"
 #include "Engine/Scene/RenderNode.h"
@@ -71,6 +72,7 @@ public:
 	RenderTarget* GetFinalRT();
 
 	void ForceUpdateRenderPasses(GFXDevice* pDevice);
+	void SetSettings(GFXDevice* pDevice, ResourceMgr* pResource, const PostFXSettings& settings);
 
 	uint32 GetPostEffectCount() const { return (uint32)m_activeEffects.size(); }
 	PostEffect* GetEffect(uint32 uEffectId) { return m_activeEffects[uEffectId]; }
@@ -121,6 +123,8 @@ protected:
 	class FilmGrain*		m_pFilmGrain;
 	class ASSAO*			m_pSSAO;
 	class DeferredShading*	m_pDeferredShading;
+	class ToneMap*			m_pToneMap;
+	class TiltShift*		m_pTiltShift;
 	class SetSceneTarget*	m_pSetNoDepthTarget;
 	class SetSceneLinDepthTarget*	m_pSetLinDepthTarget;
 	PostEffect*				m_pDefaultEffects[MAX_DEFAULT_EFFECTS];

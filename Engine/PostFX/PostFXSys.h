@@ -41,7 +41,9 @@ public:
 		EFFECT_SSAO = (1<<7),
 		// This post effect is being used to create an intermediate target
 		EFFECT_OFFSCREEN_TARGET = (1<<8),
-		EFFECT_FINAL_TARGET_HDR = (1 << 9)
+		EFFECT_FINAL_TARGET_HDR = (1 << 9),
+		EFFECT_TONEMAP = (1 << 10),		// Filmic tone curve, exposure, grading LUT (HDR -> display)
+		EFFECT_TILT_SHIFT = (1 << 11)		// Miniature depth of field (screen band)
 	};
 
 	PostFXSys();
@@ -55,6 +57,8 @@ public:
 	void PreViewUpdate(GFXDevice* pDevice) { m_platform.PreViewUpdate(pDevice); }
 
 	void EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags);
+	// Look settings for lighting and the default effects
+	void SetSettings(GFXDevice* pDevice, ResourceMgr* pResource, const PostFXSettings& settings) { m_platform.SetSettings(pDevice, pResource, settings); }
 
 	void AddCustomEffect(PostEffect* pEffect) { m_platform.AddCustomEffect(pEffect); }
 	void RemoveCustomEffect(PostEffect* pEffect) { m_platform.RemoveCustomEffect(pEffect); }

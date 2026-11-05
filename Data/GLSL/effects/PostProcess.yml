@@ -45,6 +45,8 @@ Effects:
   - { name: FXAA,                   vert: PostFX/fxaa,              frag: PostFX/fxaa } 
   - { name: BloomMain,              vert: PostFX/fullscreen,        frag: PostFX/bloom } 
   - { name: BloomFinal,             vert: PostFX/fullscreen,        frag: PostFX/bloomfinal } 
+  - { name: ToneMap,                vert: PostFX/fullscreen,        frag: PostFX/tonemap }
+  - { name: TiltShift,              vert: PostFX/fullscreen,        frag: PostFX/tiltshift }
   - { name: BloomBrightPass,        vert: PostFX/fullscreen,        frag: PostFX/brightpass } 
   - { name: Downscale2x2,           vert: PostFX/fullscreen,        frag: PostFX/downscale2x2 }
   - { name: Gauss5x5,               vert: PostFX/fullscreen,        frag: PostFX/guass }
