@@ -67,6 +67,7 @@ message DirShadowSpec
 	required bool  bFitReceivers = 2 [default = false];
 	required float fReceiverMinY = 3 [default = 0.0];
 	required float fReceiverMaxY = 4 [default = 1.0];
+	required float fPCFRadius = 5 [default = 3.0];			// Soft shadow filter radius, shadow map texels
 };
 
 message LightSpec

@@ -38,7 +38,9 @@ m_pParent(nullptr)
 	m_uActiveFrame = UINT_MAX;
 	m_bLightTexDirty = false;
 	m_uShadowCastingFlags = RENDER_MASK_ALL;
-	m_uShadowMapRes = 32;
+	// Match the default QualitySettings: SetQualitySettings() returns early
+	// when given the defaults, so starting at 32 left the cascades at 32x32.
+	m_uShadowMapRes = m_qualitySettings.bDirectionalShadows ? g_uShadowResMap[m_qualitySettings.uShadowQuality] : 32;
 }
 
 LightMgr::~LightMgr(void)
@@ -523,6 +525,7 @@ Light* LightMgr::CreateLight(GFXDevice* pDevice, ResourceMgr* pResMgr, const Lig
 		{
 			pDir->GetCascade()->SetMaxShadowDistance(light.dirShadow.fMaxDistance);
 			pDir->GetCascade()->SetReceiverHeightRange(light.dirShadow.bFitReceivers, light.dirShadow.fReceiverMinY, light.dirShadow.fReceiverMaxY);
+			pDir->GetCascade()->SetPCFRadius(light.dirShadow.fPCFRadius);
 		}
 		newLight = pDir;
 	}

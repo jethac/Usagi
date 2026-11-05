@@ -39,6 +39,7 @@ public:
 	// Keeps top-down and orthographic views at full shadow resolution.
 	void SetReceiverHeightRange(bool bEnable, float fMinY, float fMaxY);
 	void SetMaxShadowDistance(float fDist) { m_fMaxShadowDist = fDist; }
+	void SetPCFRadius(float fTexels) { m_fPCFRadius = fTexels; }
 
 	const ConstantSet* GetShadowReadConstants() const { return &m_readConstants; }
 	ShadowContext* GetContext(uint32 uContext) { return m_pSceneContext[uContext]; }
@@ -98,6 +99,7 @@ private:
 	float					m_fSplitDist[MAX_CASCADES];	// View depth where each cascade ends, this frame
 	float					m_fSplitStart;		// View depth where the first cascade starts
 	bool					m_bFitReceivers;
+	float					m_fPCFRadius;
 	float					m_fReceiverMinY;
 	float					m_fReceiverMaxY;
 

@@ -54,6 +54,7 @@ ShadowCascade::ShadowCascade()
     m_fMaxShadowDist = 1000.f;
     m_fResolutionMultiplier = 1.0f;
 	m_bFitReceivers = false;
+	m_fPCFRadius = 3.0f;
 	m_fSplitStart = 0.0f;
 	m_fReceiverMinY = 0.0f;
 	m_fReceiverMaxY = 0.0f;
@@ -153,7 +154,8 @@ void ShadowCascade::Update(const Camera& sceneCam)
 	float fBiasMul = 5.0f / m_fResolutionMultiplier;
 
     readData->vBias.Assign(-0.000002f*fBiasMul, -0.000004f*fBiasMul, -0.000007f*fBiasMul, -0.000009f*fBiasMul);
-	readData->vSampleRange.Assign(3.0f, 2.5f, 2.0f, 0.5f);
+	// Coarser cascades get a smaller texel radius to keep the world-space penumbra similar
+	readData->vSampleRange.Assign(m_fPCFRadius, m_fPCFRadius * 0.85f, m_fPCFRadius * 0.7f, m_fPCFRadius * 0.5f);
 
 	float fadeDistances[MAX_CASCADES];
 	float invFadeRange[MAX_CASCADES];
