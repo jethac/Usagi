@@ -23,7 +23,7 @@ namespace usg
 			return;
 
 		FILE* f = nullptr;
-		if (fopen_s(&f, "B:\\usagi_dev\\_gp_fatal.log", "a") != 0 || !f)
+		if (fopen_s(&f, "_gp_fatal.log", "a") != 0 || !f)
 			return;
 
 		fprintf(f, "\n=== FATAL: %s ===\n", szMsg ? szMsg : "");

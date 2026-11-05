@@ -45,7 +45,7 @@ static void BootCrumb(const char* step)
 	static bool s_enabled = BootLogEnabled();
 	if (!s_enabled) return;
 	FILE* f = nullptr;
-	fopen_s(&f, "B:\\usagi_dev\\_gp_boot.log", "a");
+	fopen_s(&f, "_gp_boot.log", "a");
 	if (f) { fprintf(f, "%s\n", step); fflush(f); fclose(f); }
 }
 

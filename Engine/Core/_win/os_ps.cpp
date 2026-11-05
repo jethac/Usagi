@@ -25,7 +25,7 @@ namespace usg {
 	static LONG WINAPI UsgCrashFilter(EXCEPTION_POINTERS* ep)
 	{
 		FILE* f = nullptr;
-		fopen_s(&f, "B:\\usagi_dev\\_gp_crash.log", "a");
+		fopen_s(&f, "_gp_crash.log", "a");
 		if (f)
 		{
 			EXCEPTION_RECORD* er = ep->ExceptionRecord;

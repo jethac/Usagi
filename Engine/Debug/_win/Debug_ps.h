@@ -63,7 +63,7 @@ inline void FATAL_RELEASE_INT( const TCHAR* msg )
 	if (getenv_s(&stdErrLen, szStdErr, sizeof(szStdErr), "USAGI_FATAL_STDERR") == 0 && stdErrLen > 0 && szStdErr[0] == '1')
 	{
 		FILE* f = nullptr;
-		if (fopen_s(&f, "B:\\usagi_dev\\_gp_fatal.log", "a") == 0 && f)
+		if (fopen_s(&f, "_gp_fatal.log", "a") == 0 && f)
 		{
 			fprintf(f, "FATAL: %s\n", msg);
 			fflush(f);
