@@ -33,6 +33,9 @@ def build_pc_data(config, n, platform)
   custom_effects = build_custom_effects(config, n)
   data_deps.merge custom_effects
 
+  ui = build_ui_documents(config, n)
+  data_deps.merge ui
+
 
   data_deps
 end
@@ -140,6 +143,20 @@ end
 #####################################################################
 # PC-Specific Functions                                             #
 #####################################################################
+
+# UXML documents and USS stylesheets (Engine/UXML) are read as text at load
+# time: copy everything under Data/UI verbatim.
+def build_ui_documents(config, n)
+  pairs = FileList["Data/UI/**/*.{uxml,uss,tss}"].select{|f| !File.directory? f}.map do |input|
+    [input, "#{config.romfiles_dir}/UI/#{input.sub(/^Data\/UI\//, "")}"]
+  end
+
+  targets = Hash[pairs]
+
+  GeneratorUtil.copy_files(n, targets)
+
+  targets.values
+end
 
 def build_audio(config, n)
   pairs = FileList["Data/Audio/**/*.wav"].select{|f| !File.directory? f}.map do |input|
