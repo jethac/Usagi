@@ -8,20 +8,29 @@
 
 namespace usg{
 
+	class Audio;
 	class SoundObject;
+	struct StreamingSoundDef;
 
 class SoundObject_ps
 {
-public:	
+public:
 	SoundObject_ps() {}
 	~SoundObject_ps() {}
 
-	void Init() {}
+	void Init(Audio* pAudio) {}
+	void SetCustomData(const StreamingSoundDef& def) {}
 	void Reset() {}
 	void Start() {}
 	void Stop() {}
+	void Pause() {}
 	void Update(const SoundObject* pParent) {}
 	bool IsPlaying() const { return false;  }
+	bool IsPaused() const { return false; }
+	bool IsReady() const { return true; }
+	void SetActiveTrack(uint32 uTrack, float fLerpTime) {}
+	void SubmitData(void* pData, memsize size) {}
+	uint64 GetSamplesPlayed() const { return 0; }
 
 private:
 

@@ -35,7 +35,7 @@ bool SockMultiLink::Shutdown()
 	closesocket(m_serverSocket);
 	shutdown(m_serverSocket, 2);
 
-#elif defined(PLATFORM_OSX)
+#elif defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
 	close(m_clientSocket);
 	shutdown(m_clientSocket, 2);
 	

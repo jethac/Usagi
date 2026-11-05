@@ -1,7 +1,7 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Stores the header for a streamed file so we can kick off
-//	playback as quickly as possible
+//	Description: A sound file which plays nothing, for platforms without an
+//	audio backend
 *****************************************************************************/
 #ifndef __USG_AUDIO_DUMMYSOUNDFILE_H__
 #define __USG_AUDIO_DUMMYSOUNDFILE_H__
@@ -13,12 +13,14 @@ namespace usg{
 
 	class DummySoundFile  : public SoundFile
 	{
-	public:	
+	public:
 		DummySoundFile() {}
 		virtual ~DummySoundFile() {}
 
-		virtual void Init(const SoundFileDef* pSoundFile, Audio* pAudio, const char* pszLocalizedSubdir = NULL) { }
-		virtual void BindToSoundObject(class SoundObject* pSoundObject, bool bPositional) {}
+		virtual void Init(const SoundFileDef* pSoundFile, const PakFileRaw* pPak, Audio* pAudio, const char* pszLocalizedSubdir = NULL) override { }
+		virtual void InitRaw(const SoundFileDef* pSoundFile, const void* pData, size_t rawDataSize, Audio* pAudio) override { }
+		virtual void Cleanup(Audio* pAudio) override { }
+		virtual void BindToSoundObject(class SoundObject* pSoundObject, bool bPositional) override {}
 
 	private:
 

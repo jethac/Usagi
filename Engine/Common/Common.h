@@ -24,6 +24,8 @@
 #include "_cafe/common_ps.h"
 #elif (defined PLATFORM_OSX)
 #include "_osx/Common_ps.h"
+#elif (defined PLATFORM_LINUX)
+#include "_linux/Common_ps.h"
 #elif (defined PLATFORM_IOS)
 #include "_ios/Common_ps.h"
 #else

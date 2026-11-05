@@ -5,6 +5,7 @@
 #define SOCK_CLIENT_LINK_H
 
 #include <Engine/Network/NetClientLink.h>
+#include <Engine/Network/NetPlatform.h>
 #include <Engine/Network/NetPacket.h>
 
 namespace usg

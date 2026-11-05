@@ -20,6 +20,8 @@
 #include "Engine/Resource/ResourceMgr.h"
 #if (defined PLATFORM_PC || defined PLATFORM_SWITCH_EMU)
 #include "Engine/Core/_win/WinUtil.h"
+#elif (defined PLATFORM_LINUX)
+#include "Engine/Core/_linux/LinuxUtil.h"
 #endif
 #include "Engine/Core/OS.h"
 
@@ -31,22 +33,21 @@ void		EngineCleanup();
 // Boot breadcrumb logging (opt-in via USAGI_BOOT_LOG=1) to localize startup hangs.
 static bool BootLogEnabled()
 {
-	char* val = nullptr; size_t len = 0;
-	if (_dupenv_s(&val, &len, "USAGI_BOOT_LOG") == 0 && val)
-	{
-		free(val);
-		return true;
-	}
-	return false;
+	char szEnv[8] = {};
+	return OS::GetEnvVar("USAGI_BOOT_LOG", szEnv, sizeof(szEnv));
 }
 
 static void BootCrumb(const char* step)
 {
 	static bool s_enabled = BootLogEnabled();
 	if (!s_enabled) return;
+#ifdef PLATFORM_PC
 	FILE* f = nullptr;
 	fopen_s(&f, "_gp_boot.log", "a");
 	if (f) { fprintf(f, "%s\n", step); fflush(f); fclose(f); }
+#else
+	fprintf(stderr, "%s\n", step);
+#endif
 }
 
 static GFXDevice*	g_pGFXDevice = nullptr;
@@ -214,6 +215,8 @@ bool InitEngine(const char** dllModules, uint32 uModuleCount)
 
 #if (defined PLATFORM_PC)
 	g_pGFXDevice->InitDisplay(WINUTIL::GetWindow());
+#elif (defined PLATFORM_LINUX)
+	g_pGFXDevice->InitDisplay(LINUXUTIL::GetWindow());
 #else
 	g_pGFXDevice->InitAllHardwareDisplays();
 #endif

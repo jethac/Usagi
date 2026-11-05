@@ -1,0 +1,178 @@
+/****************************************************************************
+//	Usagi Engine, Copyright © Vitei, Inc. 2013
+****************************************************************************/
+#include "Engine/Common/Common.h"
+#include "Input_ps.h"
+#include "Keyboard_ps.h"
+#include <SDL3/SDL.h>
+
+namespace usg
+{
+	struct CodeMap
+	{
+		SDL_Scancode	eScancode;
+		uint32			uKeyCode;
+	};
+
+	// Matches the mapping DirectInputKeyboard uses on Windows
+	static const CodeMap g_sKeyMapping[] =
+	{
+		{ SDL_SCANCODE_ESCAPE, KEYBOARD_KEY_ESCAPE },
+		{ SDL_SCANCODE_1, '1' },
+		{ SDL_SCANCODE_2, '2' },
+		{ SDL_SCANCODE_3, '3' },
+		{ SDL_SCANCODE_4, '4' },
+		{ SDL_SCANCODE_5, '5' },
+		{ SDL_SCANCODE_6, '6' },
+		{ SDL_SCANCODE_7, '7' },
+		{ SDL_SCANCODE_8, '8' },
+		{ SDL_SCANCODE_9, '9' },
+		{ SDL_SCANCODE_0, '0' },
+		{ SDL_SCANCODE_MINUS, KEYBOARD_KEY_MINUS },
+		{ SDL_SCANCODE_EQUALS, KEYBOARD_KEY_PLUS },
+		{ SDL_SCANCODE_BACKSPACE, KEYBOARD_KEY_BACK },
+		{ SDL_SCANCODE_TAB, KEYBOARD_KEY_TAB },
+		{ SDL_SCANCODE_Q, 'Q' },
+		{ SDL_SCANCODE_W, 'W' },
+		{ SDL_SCANCODE_E, 'E' },
+		{ SDL_SCANCODE_R, 'R' },
+		{ SDL_SCANCODE_T, 'T' },
+		{ SDL_SCANCODE_Y, 'Y' },
+		{ SDL_SCANCODE_U, 'U' },
+		{ SDL_SCANCODE_I, 'I' },
+		{ SDL_SCANCODE_O, 'O' },
+		{ SDL_SCANCODE_P, 'P' },
+		{ SDL_SCANCODE_LEFTBRACKET, '[' },
+		{ SDL_SCANCODE_RIGHTBRACKET, ']' },
+		{ SDL_SCANCODE_RETURN, KEYBOARD_KEY_RETURN },
+		{ SDL_SCANCODE_LCTRL, KEYBOARD_KEY_CONTROL },
+		{ SDL_SCANCODE_A, 'A' },
+		{ SDL_SCANCODE_S, 'S' },
+		{ SDL_SCANCODE_D, 'D' },
+		{ SDL_SCANCODE_F, 'F' },
+		{ SDL_SCANCODE_G, 'G' },
+		{ SDL_SCANCODE_H, 'H' },
+		{ SDL_SCANCODE_J, 'J' },
+		{ SDL_SCANCODE_K, 'K' },
+		{ SDL_SCANCODE_L, 'L' },
+		{ SDL_SCANCODE_SEMICOLON, ';' },
+		{ SDL_SCANCODE_APOSTROPHE, '\'' },
+		{ SDL_SCANCODE_GRAVE, '`' },
+		{ SDL_SCANCODE_LSHIFT, KEYBOARD_KEY_SHIFT },
+		{ SDL_SCANCODE_BACKSLASH, '\\' },
+		{ SDL_SCANCODE_Z, 'Z' },
+		{ SDL_SCANCODE_X, 'X' },
+		{ SDL_SCANCODE_C, 'C' },
+		{ SDL_SCANCODE_V, 'V' },
+		{ SDL_SCANCODE_B, 'B' },
+		{ SDL_SCANCODE_N, 'N' },
+		{ SDL_SCANCODE_M, 'M' },
+		{ SDL_SCANCODE_COMMA, ',' },
+		{ SDL_SCANCODE_PERIOD, '.' },
+		{ SDL_SCANCODE_SLASH, '/' },
+		{ SDL_SCANCODE_RSHIFT, KEYBOARD_KEY_SHIFT },
+		{ SDL_SCANCODE_KP_MULTIPLY, '*' },
+		{ SDL_SCANCODE_LALT, KEYBOARD_KEY_ALT },
+		{ SDL_SCANCODE_SPACE, ' ' },
+		{ SDL_SCANCODE_CAPSLOCK, KEYBOARD_KEY_CAPS },
+		{ SDL_SCANCODE_F1, KEYBOARD_KEY_F1 },
+		{ SDL_SCANCODE_F2, KEYBOARD_KEY_F2 },
+		{ SDL_SCANCODE_F3, KEYBOARD_KEY_F3 },
+		{ SDL_SCANCODE_F4, KEYBOARD_KEY_F4 },
+		{ SDL_SCANCODE_F5, KEYBOARD_KEY_F5 },
+		{ SDL_SCANCODE_F6, KEYBOARD_KEY_F6 },
+		{ SDL_SCANCODE_F7, KEYBOARD_KEY_F7 },
+		{ SDL_SCANCODE_F8, KEYBOARD_KEY_F8 },
+		{ SDL_SCANCODE_F9, KEYBOARD_KEY_F9 },
+		{ SDL_SCANCODE_F10, KEYBOARD_KEY_F10 },
+		{ SDL_SCANCODE_NUMLOCKCLEAR, KEYBOARD_KEY_NUMLOCK },
+		{ SDL_SCANCODE_SCROLLLOCK, KEYBOARD_KEY_SCROLL },
+		{ SDL_SCANCODE_KP_7, KEYBOARD_KEY_NUMPAD7 },
+		{ SDL_SCANCODE_KP_8, KEYBOARD_KEY_NUMPAD8 },
+		{ SDL_SCANCODE_KP_9, KEYBOARD_KEY_NUMPAD9 },
+		{ SDL_SCANCODE_KP_MINUS, KEYBOARD_KEY_SUBTRACT },
+		{ SDL_SCANCODE_KP_4, KEYBOARD_KEY_NUMPAD4 },
+		{ SDL_SCANCODE_KP_5, KEYBOARD_KEY_NUMPAD5 },
+		{ SDL_SCANCODE_KP_6, KEYBOARD_KEY_NUMPAD6 },
+		{ SDL_SCANCODE_KP_PLUS, KEYBOARD_KEY_ADD },
+		{ SDL_SCANCODE_KP_1, KEYBOARD_KEY_NUMPAD1 },
+		{ SDL_SCANCODE_KP_2, KEYBOARD_KEY_NUMPAD2 },
+		{ SDL_SCANCODE_KP_3, KEYBOARD_KEY_NUMPAD3 },
+		{ SDL_SCANCODE_KP_0, KEYBOARD_KEY_NUMPAD0 },
+		{ SDL_SCANCODE_KP_PERIOD, '.' },
+		{ SDL_SCANCODE_NONUSBACKSLASH, '<' },
+		{ SDL_SCANCODE_F11, KEYBOARD_KEY_F11 },
+		{ SDL_SCANCODE_F12, KEYBOARD_KEY_F12 },
+		{ SDL_SCANCODE_F13, KEYBOARD_KEY_F13 },
+		{ SDL_SCANCODE_F14, KEYBOARD_KEY_F14 },
+		{ SDL_SCANCODE_F15, KEYBOARD_KEY_F15 },
+		{ SDL_SCANCODE_INTERNATIONAL2, KEYBOARD_KEY_KANA },
+		{ SDL_SCANCODE_INTERNATIONAL4, KEYBOARD_KEY_CONVERT },
+		{ SDL_SCANCODE_INTERNATIONAL5, KEYBOARD_KEY_NONCONVERT },
+		{ SDL_SCANCODE_INTERNATIONAL3, 165 },	// Yen
+		{ SDL_SCANCODE_KP_EQUALS, '=' },
+		{ SDL_SCANCODE_STOP, KEYBOARD_KEY_STOP },
+		{ SDL_SCANCODE_KP_ENTER, KEYBOARD_KEY_RETURN },
+		{ SDL_SCANCODE_RCTRL, KEYBOARD_KEY_CONTROL },
+		{ SDL_SCANCODE_KP_COMMA, ',' },
+		{ SDL_SCANCODE_RALT, KEYBOARD_KEY_ALT },
+		{ SDL_SCANCODE_UP, KEYBOARD_KEY_UP },
+		{ SDL_SCANCODE_PAUSE, KEYBOARD_KEY_PAUSE },
+		{ SDL_SCANCODE_HOME, KEYBOARD_KEY_HOME },
+		{ SDL_SCANCODE_LEFT, KEYBOARD_KEY_LEFT },
+		{ SDL_SCANCODE_RIGHT, KEYBOARD_KEY_RIGHT },
+		{ SDL_SCANCODE_END, KEYBOARD_KEY_END },
+		{ SDL_SCANCODE_DOWN, KEYBOARD_KEY_DOWN },
+		{ SDL_SCANCODE_PAGEDOWN, KEYBOARD_KEY_PGDN },
+		{ SDL_SCANCODE_PAGEUP, KEYBOARD_KEY_PGUP },
+		{ SDL_SCANCODE_INSERT, KEYBOARD_KEY_INSERT },
+		{ SDL_SCANCODE_DELETE, KEYBOARD_KEY_DELETE },
+		{ SDL_SCANCODE_KP_DIVIDE, '/' },
+		{ SDL_SCANCODE_PRINTSCREEN, KEYBOARD_KEY_PRINT }
+	};
+
+	void Keyboard_ps::Init(Input_ps* pOwner)
+	{
+		m_pOwner = pOwner;
+		for(uint32 i=0; i<KEYBOARD_KEY_COUNT; i++)
+		{
+			m_prevKeysDown[i] = false;
+			m_keysDown[i] = false;
+		}
+		for (uint32 i = 0; i < KEYBOARD_TOGGLE_COUNT; i++)
+		{
+			m_bToggles[i] = false;
+		}
+	}
+
+	void Keyboard_ps::Update()
+	{
+		int iNumKeys = 0;
+		const bool* pKeys = SDL_GetKeyboardState(&iNumKeys);
+
+		for(uint32 i=0; i<KEYBOARD_KEY_COUNT; i++)
+		{
+			m_prevKeysDown[i] = m_keysDown[i];
+			m_keysDown[i] = false;
+		}
+
+		for (memsize i = 0; i < ARRAY_SIZE(g_sKeyMapping); i++)
+		{
+			if (g_sKeyMapping[i].eScancode < iNumKeys && pKeys[g_sKeyMapping[i].eScancode])
+			{
+				m_keysDown[g_sKeyMapping[i].uKeyCode] = true;
+			}
+		}
+
+		SDL_Keymod mod = SDL_GetModState();
+		m_bToggles[KEYBOARD_TOGGLE_CTRL] = (mod & SDL_KMOD_CTRL) != 0;
+		m_bToggles[KEYBOARD_TOGGLE_SHIFT] = (mod & SDL_KMOD_SHIFT) != 0;
+		m_bToggles[KEYBOARD_TOGGLE_ALT] = (mod & SDL_KMOD_ALT) != 0;
+
+		m_uInputChars = m_pOwner->GetInputChars();
+		for(uint32 i=0; i<m_uInputChars; i++)
+		{
+			m_inputChars[i] = m_pOwner->GetInputChar(i);
+		}
+	}
+}

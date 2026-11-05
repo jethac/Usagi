@@ -127,7 +127,10 @@ class PlatformLinux < Platform
              '-Wno-unused-function', '-Wno-unused-private-field',
              '-Wno-missing-braces', '-Wno-reorder', '-Wno-reorder-ctor',
              '-Wno-sign-compare', '-Wno-switch', '-Wno-char-subscripts',
-             '-Wno-unknown-warning-option']
+             '-Wno-unknown-warning-option',
+             # gli (third party) uses 'template' without an argument list,
+             # which recent clang makes an error
+             '-Wno-missing-template-arg-list-after-template-kw']
 
     if debug_build?
       flags += ['-g', '-O0']
@@ -146,8 +149,9 @@ class PlatformLinux < Platform
     common_flags + ['-std=c++17']
   end
 
+  # Interpolated straight into the compile rules, so a string
   def c_cpp_dep_flags
-    ['-MMD', '-MF', '$out.d']
+    '-MMD -MF $out.d'
   end
 
   def arflags

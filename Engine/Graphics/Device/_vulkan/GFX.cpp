@@ -6,6 +6,9 @@
 #include "Engine/Graphics/Viewports/Viewport.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/GFX.h"
+#ifdef PLATFORM_LINUX
+#include "Engine/Core/_linux/LinuxUtil.h"
+#endif
 
 
 namespace usg {
@@ -44,6 +47,8 @@ void GFX::PostUpdate()
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+#elif defined(PLATFORM_LINUX)
+	LINUXUTIL::PumpEvents();
 #endif
 }
 
