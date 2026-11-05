@@ -34,6 +34,11 @@ public:
 	virtual void Finished(GFXContext* pContext);
 
 	void SetShadowCastFlags(uint32 uFlags);
+	// Fit the cascades to where the camera sees world Y in [fMinY, fMaxY]
+	// (the ground and what stands on it) rather than to a fixed view distance.
+	// Keeps top-down and orthographic views at full shadow resolution.
+	void SetReceiverHeightRange(bool bEnable, float fMinY, float fMaxY);
+	void SetMaxShadowDistance(float fDist) { m_fMaxShadowDist = fDist; }
 
 	const ConstantSet* GetShadowReadConstants() const { return &m_readConstants; }
 	ShadowContext* GetContext(uint32 uContext) { return m_pSceneContext[uContext]; }
@@ -77,6 +82,7 @@ private:
 	void CreateFrustumPointsFromInterval(float fIntervalBegin, float fIntervalEnd,const Matrix4x4& mViewProj, Vector4f* pvPointsWorld);
 	void DrawSceneFromLight(GFXContext* pGFXCtxt, ShadowContext* pShadowCtxt);
 	void InitFrame(const Camera& sceneCam);
+	void GetReceiverDepthRange(const Camera& sceneCam, float& fStartOut, float& fEndOut) const;
 
 	uint32					m_uGroupWidth;
 	uint32					m_uGroupHeight;
@@ -89,6 +95,11 @@ private:
 	float					m_fCascadePartitionsMax;
 	float					m_fMaxShadowDist;
 	float					m_fResolutionMultiplier;
+	float					m_fSplitDist[MAX_CASCADES];	// View depth where each cascade ends, this frame
+	float					m_fSplitStart;		// View depth where the first cascade starts
+	bool					m_bFitReceivers;
+	float					m_fReceiverMinY;
+	float					m_fReceiverMaxY;
 
 	// One frustum for each cascade
 	PointFrustum			m_frustum[MAX_CASCADES];

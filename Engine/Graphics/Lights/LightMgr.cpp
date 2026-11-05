@@ -515,10 +515,16 @@ Light* LightMgr::CreateLight(GFXDevice* pDevice, ResourceMgr* pResMgr, const Lig
 	{
 	case LightKind_DIRECTIONAL:
 	{
-		newLight = AddDirectionalLight(pDevice, light.base.bShadow);
+		DirLight* pDir = AddDirectionalLight(pDevice, light.base.bShadow);
 		Vector4f vDir(light.direction, 0.0);
 		vDir.Normalise();
-		newLight->SetDirection(vDir);
+		pDir->SetDirection(vDir);
+		if (pDir->GetCascade())
+		{
+			pDir->GetCascade()->SetMaxShadowDistance(light.dirShadow.fMaxDistance);
+			pDir->GetCascade()->SetReceiverHeightRange(light.dirShadow.bFitReceivers, light.dirShadow.fReceiverMinY, light.dirShadow.fReceiverMaxY);
+		}
+		newLight = pDir;
 	}
 	break;
 	case LightKind_POINT:
