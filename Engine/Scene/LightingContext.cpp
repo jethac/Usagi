@@ -211,16 +211,6 @@ void LightingContext::Update(GFXDevice* pDevice, SceneContext* pCtxt)
 		uLightCount++;
 	}
 
-	{
-		static int s_c = 0;
-		if (s_c++ < 6)
-		{
-			FILE* f = nullptr; fopen_s(&f, "B:\\usagi_dev\\_gp_light.log", "a");
-			if (f) { fprintf(f, "LightUpdate: dirLights(list)=%u iDirLightCount=%d globalAmbient=(%.2f,%.2f,%.2f)\n",
-				(uint32)dirLights.size(), pLightingData->iDirLightCount, pLightingData->vGlobalAmbient.x, pLightingData->vGlobalAmbient.y, pLightingData->vGlobalAmbient.z); fflush(f); fclose(f); }
-		}
-	}
-
 	m_lightingConstants.Unlock();
 	m_lightingConstants.UpdateData(pDevice);
 }
