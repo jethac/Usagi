@@ -1144,14 +1144,14 @@ uint32 GFXDevice_ps::GetMemoryTypeIndex(uint32 typeBits, VkMemoryPropertyFlags p
 
 	bool bFound = false;
 	bool bPrefferedFound = false;
-	uint32 uCurrentHeapSize = 0;
+	VkDeviceSize uCurrentHeapSize = 0;
 
 	for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; ++i)
 	{
 		if (typeBits & 0x1)
 		{
 			uint32 uHeapIdx = m_memoryProperites[0].memoryTypes[i].heapIndex;
-			uint32 uHeapSize = (uint32)m_memoryProperites[0].memoryHeaps[uHeapIdx].size;
+			VkDeviceSize uHeapSize = m_memoryProperites[0].memoryHeaps[uHeapIdx].size;
 			bool bPreferred = ((m_memoryProperites[0].memoryTypes[i].propertyFlags & prefferedProps) == prefferedProps);
 
 			if ((m_memoryProperites[0].memoryTypes[i].propertyFlags & properties) == properties)
