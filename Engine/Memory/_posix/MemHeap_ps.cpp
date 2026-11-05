@@ -6,7 +6,13 @@
 #include "Engine/Maths/MathUtil.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <malloc/malloc.h>
+// Darwin's name for malloc_usable_size
+#define malloc_usable_size malloc_size
+#else
 #include <malloc.h>
+#endif
 
 namespace usg{
 

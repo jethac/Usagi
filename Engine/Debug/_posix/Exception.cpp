@@ -7,6 +7,9 @@
 #include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 #include <cstdio>
 #include <cstring>
 
@@ -21,6 +24,17 @@ namespace usg
 
 	bool IsDebuggerAttached()
 	{
+#ifdef __APPLE__
+		// The kernel flags a traced process with P_TRACED
+		int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+		struct kinfo_proc info = {};
+		size_t uSize = sizeof(info);
+		if (sysctl(mib, ARRAY_SIZE(mib), &info, &uSize, nullptr, 0) != 0)
+		{
+			return false;
+		}
+		return (info.kp_proc.p_flag & P_TRACED) != 0;
+#else
 		FILE* f = fopen("/proc/self/status", "r");
 		if (!f)
 		{
@@ -39,6 +53,7 @@ namespace usg
 		}
 		fclose(f);
 		return bAttached;
+#endif
 	}
 
 	// Writes a backtrace of the current thread to stderr so asserts and
