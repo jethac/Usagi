@@ -139,7 +139,7 @@ def write_dependencies(sources_file, options)
   suffices.map do |suffix|
     file = sources_file.sub('.sources', suffix)
 
-    next if ! File.exists? file
+    next if ! File.exist? file
 
     Tracker::DepSet.instance.addDep(file)
   end
@@ -163,7 +163,7 @@ def write_temporary_files(argv, project_file, filters_file, options)
   boilerplate_sources = []
   boilerplate_file = sources_file.gsub(/\.sources/, '.boilerplate')
 
-  if File.exists?(boilerplate_file)
+  if File.exist?(boilerplate_file)
     boilerplate_sources = create_file_list(boilerplate_file).sort
   end
 
@@ -171,11 +171,11 @@ def write_temporary_files(argv, project_file, filters_file, options)
   platform_headers = []
   platform_file = sources_file.gsub(/\.sources/, '.platform')
 
-  if File.exists?(platform_file)
+  if File.exist?(platform_file)
     platform_sources = create_file_list(platform_file).sort
   end
 
-  if File.exists?(platform_headers_file)
+  if File.exist?(platform_headers_file)
     platform_headers = create_file_list(platform_headers_file).sort
   end
 
@@ -194,7 +194,7 @@ def write_temporary_files(argv, project_file, filters_file, options)
     # Skip Lua CPP which contain nothing but the precompiled header include statement
     proto_dir = "_build\\proto\\"
     fn = proto_dir + project_dir + f
-    exists = File.exists?(fn)
+    exists = File.exist?(fn)
     size = if exists then File.size(fn) else 0 end
     comp = ('#include "Engine/Common/Common.h"').length
     exists and size <= comp
@@ -205,7 +205,7 @@ def write_temporary_files(argv, project_file, filters_file, options)
   lua_header_files.reject! do |f|
     proto_dir = "_includes\\"
     fn = proto_dir + project_dir + f
-    exists = File.exists?(fn)
+    exists = File.exist?(fn)
     size = if exists then File.size(fn) else 0 end
     exists and size == 0
   end
@@ -232,7 +232,7 @@ def write_temporary_files(argv, project_file, filters_file, options)
 end
 
 def should_replace_files?(current, temporary)
-  if ! File.exists? current
+  if ! File.exist? current
     return true
   end
 

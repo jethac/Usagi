@@ -162,7 +162,7 @@ end
 def find_include(entity_name)
     relative_path = $options[:includes].find do |i|
       path = File.join(i, entity_name + ".yml")
-      File.exists? path
+      File.exist? path
     end
 
     raise "Couldn't find entity \"#{entity_name}\"" if !relative_path

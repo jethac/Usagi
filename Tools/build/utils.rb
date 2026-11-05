@@ -30,7 +30,7 @@ def get_sourcelist(dir, target_platform,
   src = FileList[]
   sourceList = "#{dir}/.sources.#{target_platform}"
 
-  if File.exists?(sourceList)
+  if File.exist?(sourceList)
     # If a .sources file for the target platform exists, only include
     # files listed in it.
     File.open(sourceList, 'r') do |file|
@@ -41,7 +41,7 @@ def get_sourcelist(dir, target_platform,
         elsif should_find_headers
           header = "#{dir}/#{line.strip.gsub(/(\.cpp|\.proto|\.c)$/, '.h')}"
           # prevent addition of headers that don't exist when a glob isn't used
-          src.include(header) if line.match(/\*/) || File.exists?(header)
+          src.include(header) if line.match(/\*/) || File.exist?(header)
         else
           src.include("#{dir}/#{line.strip}")
         end
@@ -204,7 +204,7 @@ def write_file_list(filelist, dir, subdir, filename='.sources.txt')
   srclist = Pathname.new(dir).join(subdir, filename)
   FileUtils.mkdir_p(File.dirname srclist)
 
-  if File.exists? srclist
+  if File.exist? srclist
     existing_list = File.readlines(srclist).map{|line| line.chomp}
 
     # Rewriting the output file will trigger the project generation

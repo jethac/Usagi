@@ -60,7 +60,7 @@ end
 ##################
 HEAD_FILE = ".git/HEAD"
 
-if File.exists? HEAD_FILE
+if File.exist? HEAD_FILE
   HEAD_CONTENT = File.open(HEAD_FILE, "r") { |f| f.read.strip }
   COMMIT_SHA1 = is_ref(HEAD_CONTENT) ? get_sha1_from_ref(HEAD_CONTENT) : HEAD_CONTENT
 else

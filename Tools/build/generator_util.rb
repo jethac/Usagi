@@ -370,7 +370,7 @@ module GeneratorUtil
   def GeneratorUtil.create_build_id(config, n, output = config.build_id_header, prefix = nil)
     git_head_file = '.git/HEAD'
     dependencies = [config.build_id_generator]
-    dependencies << git_head_file if File.exists? git_head_file
+    dependencies << git_head_file if File.exist? git_head_file
     parameters = {:implicit_deps => dependencies}
     parameters[:variables] = {:prefix_option => "-p #{prefix}"} if !prefix.nil?
 

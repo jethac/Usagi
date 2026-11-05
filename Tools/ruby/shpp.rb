@@ -57,7 +57,7 @@ def get_includepath_from_line(l)
   localPath = l.sub(/.*#include /, "").gsub(/"/, "").strip
   $options[:includedirs].each do |dir|
     f = "#{dir}/#{localPath}"
-    return f if File.exists? f
+    return f if File.exist? f
   end
 
   raise "Include file not found: #{localPath}"

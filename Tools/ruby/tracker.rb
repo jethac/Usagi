@@ -76,7 +76,7 @@ module Tracker
           end
 
           dep_path = dep_path.sub_ext("#{RUBY_PROTOBUF_SUFFIX}.rb")
-        elsif File.exists?(ruby_tools_path + dep_path.sub_ext('.rb'))
+        elsif File.exist?(ruby_tools_path + dep_path.sub_ext('.rb'))
           dep_path = ruby_tools_path + dep_path.sub_ext('.rb')
         end
 
