@@ -349,7 +349,8 @@ namespace usg
 					const usg::Matrix4x4& mat = inputs.mtx->matrix;
 					float fMaxScale = Math::Max(mat.vRight().MagnitudeSq(), mat.vUp().MagnitudeSq());
 					fMaxScale = Math::Max(mat.vFace().MagnitudeSq(), fMaxScale);
-					outputs.bone.GetRuntimeData().pBone->UpdateScaleBounds(fMaxScale);
+					// fMaxScale is a squared axis length; the radius scales by the length.
+					outputs.bone.GetRuntimeData().pBone->UpdateScaleBounds(Math::SqrtSafe(fMaxScale));
 				}
 			}
 
