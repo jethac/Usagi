@@ -671,7 +671,7 @@ def project_exe(config, platform, n, project_obj)
   # The engine libraries depend on each other, so link them as a group
   engine_libs = config.libs.reject { |l| platform.excluded_libs.include?(l) }
                            .map { |l| config.get_lib_filename(l) }
-  syslibs = (['-Wl,--start-group'] + engine_libs + ['-Wl,--end-group'] +
+  syslibs = (platform.link_group(engine_libs) +
              platform.physx_libs + platform.system_libs).join(' ')
 
   n.build('ld', {exe => project_obj},

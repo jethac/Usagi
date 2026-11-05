@@ -49,8 +49,13 @@ class PlatformLinux < Platform
     @config.build == 'debug'
   end
 
+  # The PLATFORM_* symbols that select this platform's Common_ps.h
+  def platform_defines
+    ['PLATFORM_LINUX']
+  end
+
   def defines
-    list = ['PLATFORM_LINUX',
+    list = platform_defines + [
             'EASTL_CUSTOM_FLOAT_CONSTANTS_REQUIRED',
             'EASTL_USER_DEFINED_ALLOCATOR',
             'PB_FIELD_32BIT',
@@ -121,8 +126,13 @@ class PlatformLinux < Platform
     flags.reject(&:empty?)
   end
 
+  # Target architecture flags, used when compiling and linking
+  def arch_flags
+    ['-m64']
+  end
+
   def common_flags
-    flags = ['-m64', '-pthread', '-fPIC', '-fno-strict-aliasing',
+    flags = arch_flags + ['-pthread', '-fPIC', '-fno-strict-aliasing',
              '-Wall', '-Wno-unknown-pragmas', '-Wno-unused-variable',
              '-Wno-unused-function', '-Wno-unused-private-field',
              '-Wno-missing-braces', '-Wno-reorder', '-Wno-reorder-ctor',
@@ -159,7 +169,13 @@ class PlatformLinux < Platform
   end
 
   def ldflags
-    ['-m64', '-pthread', '-rdynamic']
+    arch_flags + ['-pthread', '-rdynamic']
+  end
+
+  # The engine libraries depend on each other in both directions, so a
+  # single-pass linker needs them grouped
+  def link_group(libs)
+    ['-Wl,--start-group'] + libs + ['-Wl,--end-group']
   end
 
   def ld_response_file_arg

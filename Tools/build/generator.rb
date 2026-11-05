@@ -2,6 +2,7 @@
 require_relative 'generator_util.rb'
 require_relative 'platform.win.rb'
 require_relative 'platform.linux.rb'
+require_relative 'platform.macos.rb'
 
 NINJA_FILE = ARGV[5]
 $engine = BuildConfig.new(ENV['USAGI_DIR'], ARGV)
@@ -11,6 +12,8 @@ when 'win'
   $platform = PlatformWin.new
 when 'linux'
   $platform = PlatformLinux.new($engine)
+when 'macos'
+  $platform = PlatformMacOS.new($engine)
 end
 
 n = Ninja::File.new()

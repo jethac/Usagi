@@ -2,7 +2,7 @@ require 'tempfile'
 require 'fileutils'
 
 DEFAULT_PLATFORM = case RUBY_PLATFORM
-                   when /darwin/ then "osx"
+                   when /darwin/ then "macos"
                    when /linux/ then "linux"
                    else "win"
                    end

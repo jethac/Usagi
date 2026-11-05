@@ -1,0 +1,11 @@
+*.cpp
+nanopb/*.c
+imgui/*.cpp
+EASTL/source/*.cpp
+lua-5.3.2/src/*.c
+-:lua-5.3.2/src/liolib.c
+-:lua-5.3.2/src/loslib.c
+-:lua-5.3.2/src/lua.c
+-:lua-5.3.2/src/luac.c
+yaml-cpp/src/*.cpp
+meshoptimizer/src/*.cpp

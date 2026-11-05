@@ -19,8 +19,9 @@ class BuildConfig
 
   # Here 'nxe' refers to the Windows platform using the Nintendo APIs,
   # while 'nx' refers to the Switch hardware using the same APIs.
-  # 'linux' is native x86_64 Linux, compiled and linked by ninja.
-  VALID_PLATFORMS = ["win", "nxe", "nx", "linux"]
+  # 'linux' is native x86_64 Linux and 'macos' native arm64 macOS, both
+  # compiled and linked by ninja.
+  VALID_PLATFORMS = ["win", "nxe", "nx", "linux", "macos"]
 
   # maps file extensions to the command used to compile them
   COMPILERS = {".c" => "cc", ".cpp" => "cxx", ".m" => "cm", ".mm" => "cmm"}
@@ -100,7 +101,7 @@ class BuildConfig
 
   # True when ninja, rather than MSBuild, compiles and links the code
   def compiles_with_ninja?
-    @target_platform == 'linux'
+    ['linux', 'macos'].include?(@target_platform)
   end
 
   # Some code generators are Windows-only binaries: protoc 2.5 with the
