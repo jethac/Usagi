@@ -107,6 +107,11 @@ def merge_with_defaults(protocol, hash)
       pname = f.proxy_class.name.gsub(/^.*::/, '').to_sym
       defaultVals = $defaults[pname] ? $defaults[pname] : {}
       passedVals = hash[f.name] ? hash[f.name] : {}
+      if passedVals.is_a? Array
+        # Repeated message field: merge the defaults into each element.
+        # (symbolize_keys does not descend into arrays, so do it here.)
+        next [f.name, passedVals.map { |v| merge_with_defaults(f.proxy_class, defaultVals.deep_merge(symbolize_keys(v) || {})) }]
+      end
       [f.name, merge_with_defaults(f.proxy_class, defaultVals.deep_merge(passedVals))]
     else
       [f.name, hash.has_key?(f.name) ? hash[f.name] : f.default_value]
