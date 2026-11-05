@@ -41,7 +41,8 @@ end
 package_regexp = /^\s*package ([\w\.]+)\s*;/u
 message_regexp = /^\s*(?:message|enum) ([A-Za-z]\w+)/u
 
-protocol_definitions = FileList[DIRS.map{|d| "#{d}/**/*.proto"}]
+# "#{d}/*/**" as well: ** does not descend into junctioned add-on modules.
+protocol_definitions = FileList[DIRS.flat_map{|d| ["#{d}/*.proto", "#{d}/*/**/*.proto"]}]
 protocol_definitions.exclude("**/Engine/ThirdParty/nanopb/**/*")
 protocol_definitions.exclude("**/Engine/Core/usagipb.proto")
 
