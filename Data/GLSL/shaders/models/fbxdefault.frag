@@ -154,6 +154,18 @@ void main(void)
 	vDiffuse *= vVtxCol;
 	vDiffuse *= uMaterial.diffuse;
 
+	// Two-scale layer map: a broad macro variation and a fine detail, each at its own
+	// repeat of the base tile so a large tiling surface (a table top, a floor) doesn't
+	// show the base tile's repeat at a distance and isn't blurry close up.
+	float fLayer = 0.0;
+	if (uMaterial.bLayerMap)
+	{
+		float fMacro = texture(sampler6, vo_vTexCoord01.xy * uMaterial.layerParams.x).r;
+		float fDetail = texture(sampler6, vo_vTexCoord01.xy * uMaterial.layerParams.y).g;
+		vDiffuse.rgb *= mix(1.0, 2.0 * fMacro, uMaterial.layerParams.z) * mix(1.0, 2.0 * fDetail, uMaterial.layerParams.w);
+		fLayer = (fMacro - 0.5) * uMaterial.layerParams.z + (fDetail - 0.5) * uMaterial.layerParams.w;
+	}
+
 	vec3 rim = vec3(GetRimValue(1.0, 4.0, vNormal.z)) * vSpecular.rgb;
 
 	//vOut.xyz += rim;
@@ -177,6 +189,7 @@ void main(void)
 			fRoughness *= vORM.g;
 			fMetallic *= vORM.b;
 		}
+		fRoughness = clamp(fRoughness * (1.0 + uMaterial.layerRoughness * 2.0 * fLayer), 0.02, 1.0);
 		OutputDeferredPBR(-vo_vViewDir.z, vNormal, vDiffuse.rgb, vEmissive, fRoughness, fMetallic, uMaterial.reflectance,
 			uMaterial.clearcoat, uMaterial.clearcoatRoughness, fOcclusion);
 	}
