@@ -48,16 +48,16 @@ namespace usg {
 	bool ModuleManager::LoadModule(const char* szModuleName)
 	{
 		Module module;
-		module.dllHandle = LoadLibrary(szModuleName);
+		module.dllHandle = LoadModuleLibrary(szModuleName);
 		if (!module.dllHandle)
 		{
 			return false;
 		}
 
 		module.moduleName = szModuleName;
-		module.loadFunction = (usg::OnModuleLoad)GetProcAddress(module.dllHandle, "OnModuleLoad");
-		module.initFunction = (InitModule)GetProcAddress(module.dllHandle, "InitModule");
-		module.destroyFunction = (DestroyModule)GetProcAddress(module.dllHandle, "DestroyModule");
+		module.loadFunction = (usg::OnModuleLoad)GetModuleSymbol(module.dllHandle, "OnModuleLoad");
+		module.initFunction = (InitModule)GetModuleSymbol(module.dllHandle, "InitModule");
+		module.destroyFunction = (DestroyModule)GetModuleSymbol(module.dllHandle, "DestroyModule");
 
 		if (!module.initFunction || !module.destroyFunction || !module.loadFunction)
 		{
@@ -86,7 +86,7 @@ namespace usg {
 		return true;
 	}
 
-	HMODULE ModuleManager::GetModule(usg::string moduleName)
+	ModuleHndl ModuleManager::GetModule(usg::string moduleName)
 	{
 		for (Module& module : m_modules)
 		{
@@ -99,7 +99,7 @@ namespace usg {
 		return nullptr;
 	}
 
-	HMODULE ModuleManager::GetModule(const ModuleInterface* pInterface)
+	ModuleHndl ModuleManager::GetModule(const ModuleInterface* pInterface)
 	{
 		for (Module& module : m_modules)
 		{

@@ -66,7 +66,7 @@ namespace usg
 		usg::Timer				m_timer;
 		usg::ProfilingTimer		m_cpuTimer;
 		State					m_eState;
-		usg::stack<DWORD>		m_messages;
+		usg::stack<uint32>		m_messages;
 
 
 		struct InternalData;

@@ -11,6 +11,7 @@
 #include "Engine/Core/stl/string.h"
 #include "Engine/Core/Singleton.h"
 #include "Engine/Core/Modules/ModuleInterfaces.h"
+#include OS_HEADER(Engine/Core/Modules, Module_ps.h)
 
 namespace usg
 {
@@ -24,8 +25,8 @@ namespace usg
 		void PostInit(GFXDevice* pDevice);
 		void Shutdown(GFXDevice* pDevice);
 		bool LoadModule(const char* szModuleName);
-		HMODULE GetModule(usg::string moduleName);
-		HMODULE GetModule(const ModuleInterface* pInterface);
+		ModuleHndl GetModule(usg::string moduleName);
+		ModuleHndl GetModule(const ModuleInterface* pInterface);
 		uint32 GetNumberOfInterfacesForType(uint32 uTypeId);
 		ModuleInterface* GetInterfaceOfType(uint32 uTypeId, uint32 uIndex);
 
@@ -33,7 +34,7 @@ namespace usg
 	private:
 		struct Module
 		{
-			HMODULE dllHandle;
+			ModuleHndl dllHandle;
 			usg::OnModuleLoad loadFunction;
 			usg::InitModule initFunction;
 			usg::DestroyModule destroyFunction;

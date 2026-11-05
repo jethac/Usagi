@@ -1,4 +1,5 @@
 #include "Engine/Common/Common.h"
+#include "Engine/Core/OS.h"
 #include <cstdlib>
 #include "Engine/Core/Utility.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
@@ -387,9 +388,8 @@ namespace usg
 			static int s_ssEnabled = -1;
 			if (s_ssEnabled < 0)
 			{
-				char* v = nullptr; size_t l = 0;
-				s_ssEnabled = (_dupenv_s(&v, &l, "USAGI_SCREENSHOT") == 0 && v) ? 1 : 0;
-				if (v) free(v);
+				char szEnv[8] = {};
+				s_ssEnabled = OS::GetEnvVar("USAGI_SCREENSHOT", szEnv, sizeof(szEnv)) ? 1 : 0;
 			}
 			if (s_ssEnabled == 1)
 			{
@@ -412,7 +412,7 @@ namespace usg
 	{
 		while(!m_messages.empty())
 		{
-			DWORD messageID = m_messages.top();
+			uint32 messageID = m_messages.top();
 			m_messages.pop();
 
 			switch (messageID)

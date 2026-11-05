@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include "Engine/Core/OS.h"
 #include <cstdlib>
 #include "Engine/Memory/Mem.h"
 #include "Engine/Graphics/Device/GFXContext.h"
@@ -334,8 +335,8 @@ static bool DebugRenderDisabled()
 	static int s_state = -1;
 	if (s_state < 0)
 	{
-		char szEnv[8] = {}; size_t envLen = 0;
-		s_state = (getenv_s(&envLen, szEnv, sizeof(szEnv), "USAGI_NO_DEBUGRENDER") == 0 && envLen > 0 && szEnv[0] == '1') ? 1 : 0;
+		char szEnv[8] = {};
+		s_state = (OS::GetEnvVar("USAGI_NO_DEBUGRENDER", szEnv, sizeof(szEnv)) && szEnv[0] == '1') ? 1 : 0;
 	}
 	return s_state == 1;
 }

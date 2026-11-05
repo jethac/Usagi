@@ -6,6 +6,8 @@
 #ifndef USG_ENGINE_MEMORY_PC_MEM_PS_H
 #define USG_ENGINE_MEMORY_PC_MEM_PS_H
 
+#include <malloc.h>
+
 namespace usg {
 
 const int MAIN_HEAP_SIZE	= 512*1024*1024;		// 512MB
@@ -34,6 +36,10 @@ namespace mem
 		inline void* Alloc(MemType eType, MemAllocType eAlloc, uint32 uSize, uint32 uAlign, uint8 uGroup) { return NULL; }
 		inline void Free(void*) { }
 		inline void FreeGroup(MemType eType, uint8 uGroup) { }
+
+		// Backs the conventional (non-heap) allocation path in Mem.cpp
+		inline void* AlignedAlloc(memsize uSize, memsize uAlign) { return _aligned_malloc(uSize, uAlign); }
+		inline void AlignedFree(void* pData) { _aligned_free(pData); }
 
 		inline void AddMemoryTag() {}
 		inline void FreeToLastTag() {}

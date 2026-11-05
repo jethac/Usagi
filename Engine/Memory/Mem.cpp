@@ -69,7 +69,7 @@ static const char* gszAllocStrings[] =
 
 static_assert(ARRAY_SIZE(gszAllocStrings) == MemAllocType::ALLOC_TYPE_COUNT, "gszAllocStrings size does NOT match that of MemAllocType::ALLOC_TYPE_COUNT");
 
-#if defined (PLATFORM_PC) || defined(PLATFORM_SWITCH)
+#if defined (PLATFORM_PC) || defined(PLATFORM_LINUX) || defined(PLATFORM_SWITCH)
 namespace mem {
 	static bool s_bConventionalMemManagement = true;
 	void setConventionalMemManagement(bool b)
@@ -160,10 +160,10 @@ static uint8* s_pNexBufferPointer = s_nexHackBuffer;
 
 void* mem::Alloc(MemType eHeap, MemAllocType eType, memsize uSize, memsize uAlign, bool bNotifyGPU)
 {
-#ifdef PLATFORM_PC
+#if defined(PLATFORM_PC) || defined(PLATFORM_LINUX)
 	if (usg::mem::s_bConventionalMemManagement)
 	{
-		return _aligned_malloc(uSize, uAlign);
+		return mem::ps::AlignedAlloc(uSize, uAlign);
 	}
 	else
 #endif
@@ -188,10 +188,10 @@ void* mem::Alloc(MemType eHeap, MemAllocType eType, memsize uSize, memsize uAlig
 
 void mem::Free(MemType eHeap, void* pData, bool bNotifyGPU)
 {
-#ifdef PLATFORM_PC
+#if defined(PLATFORM_PC) || defined(PLATFORM_LINUX)
 	if (usg::mem::s_bConventionalMemManagement)
 	{
-		_aligned_free(pData);
+		mem::ps::AlignedFree(pData);
 	}
 	else
 #endif
@@ -207,7 +207,7 @@ void mem::Free(MemType eHeap, void* pData, bool bNotifyGPU)
 
 void* mem::ReAlloc(void* pData, uint32 uSize)
 {
-#ifdef PLATFORM_PC
+#if defined(PLATFORM_PC) || defined(PLATFORM_LINUX)
 	if (usg::mem::s_bConventionalMemManagement)
 	{
 		return realloc(pData, uSize);
@@ -221,10 +221,10 @@ void* mem::ReAlloc(void* pData, uint32 uSize)
 
 void mem::Free(void* pData)
 {
-#ifdef PLATFORM_PC
+#if defined(PLATFORM_PC) || defined(PLATFORM_LINUX)
 	if (usg::mem::s_bConventionalMemManagement)
 	{
-		_aligned_free(pData);
+		mem::ps::AlignedFree(pData);
 	}
 	else
 #endif
@@ -271,7 +271,7 @@ void operator delete(void* ptr) NEW_THROW
 
 void* operator new[](size_t size)
 {
-#if defined (PLATFORM_PC) || defined(PLATFORM_SWITCH)
+#if defined (PLATFORM_PC) || defined(PLATFORM_LINUX) || defined(PLATFORM_SWITCH)
 	//if (usg::mem::s_bConventionalMemManagement)
 	{
 		// Only for External programs(e.g. Ayataka, ...) use

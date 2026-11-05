@@ -53,6 +53,22 @@ extern void DumpDebugLog(const char* szBuildId);
 
 
 
+inline void DEBUG_BREAK_INT()
+{
+	__debugbreak();
+}
+
+inline bool DEBUGGER_PRESENT_INT()
+{
+	return IsDebuggerPresent() != FALSE;
+}
+
+// Fatal errors restore the cursor, which games may have hidden
+inline void RESTORE_CURSOR_INT()
+{
+	ShowCursor(TRUE);
+}
+
 // For file loading only, will quit the game on failure, even in release mode
 // Exits with _Exit: running static destructors after a fatal error can
 // re-enter the logging and memory code that has just failed
