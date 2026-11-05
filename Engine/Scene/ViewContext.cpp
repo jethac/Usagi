@@ -553,6 +553,7 @@ namespace usg {
 		// FIXME: Handle multiple views
 		renderContext.pGlobalDescriptors = &m_pImpl->globalDescriptors[m_pImpl->eActiveViewType];
 		renderContext.pPostFX = m_pImpl->pPostFXSys;
+		renderContext.pViewContext = this;
 
 		{
 			static int s_c = 0;
