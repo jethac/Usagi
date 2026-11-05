@@ -21,11 +21,22 @@ public:
 	const VkRenderPass& GetPass() const { return m_renderPass; }
 	uint32 GetCRC() const { return m_uCRCForPass; }
 
+	// Attachment formats of the first subpass, for external renderers (e.g. middleware)
+	// which need to build pipelines compatible with this pass
+	uint32 GetColorAttachmentCount() const { return m_uColorAttachments; }
+	VkFormat GetColorAttachmentFormat(uint32 uIndex) const { return uIndex < m_uColorAttachments ? m_colorFormats[uIndex] : VK_FORMAT_UNDEFINED; }
+	VkFormat GetDepthAttachmentFormat() const { return m_depthFormat; }
+	VkSampleCountFlagBits GetSampleCount() const { return m_sampleCount; }
+
 private:
 
 	
 	VkRenderPass m_renderPass = VK_NULL_HANDLE;
 	uint32		 m_uCRCForPass = 0;
+	VkFormat	 m_colorFormats[MAX_COLOR_TARGETS] = {};
+	uint32		 m_uColorAttachments = 0;
+	VkFormat	 m_depthFormat = VK_FORMAT_UNDEFINED;
+	VkSampleCountFlagBits m_sampleCount = VK_SAMPLE_COUNT_1_BIT;
 };
 
 }

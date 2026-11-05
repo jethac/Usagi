@@ -8,6 +8,7 @@
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/Device/RenderPassInitData.h"
 #include "Engine/Core/stl/vector.h"
+#include "Engine/Maths/MathUtil.h"
 
 namespace usg
 {
@@ -215,6 +216,26 @@ void RenderPass::Init(GFXDevice* pDevice, const RenderPassInitData &initData, ui
 		uPreserveOffset += in.uPreserveCount;
 	}
 
+
+	// Record the first subpass's attachment formats
+	m_uColorAttachments = 0;
+	m_depthFormat = VK_FORMAT_UNDEFINED;
+	if (decl.uSubPasses > 0)
+	{
+		const RenderPassDecl::SubPass& sub = decl.pSubPasses[0];
+		m_uColorAttachments = Math::Min(sub.uColorCount, (uint32)MAX_COLOR_TARGETS);
+		for (uint32 i = 0; i < m_uColorAttachments; i++)
+		{
+			const VkAttachmentDescription& desc = attachmentDescriptions[sub.pColorAttachments[i].uIndex];
+			m_colorFormats[i] = desc.format;
+			m_sampleCount = desc.samples;
+		}
+		if (sub.pDepthAttachment)
+		{
+			m_depthFormat = attachmentDescriptions[sub.pDepthAttachment->uIndex].format;
+			m_sampleCount = attachmentDescriptions[sub.pDepthAttachment->uIndex].samples;
+		}
+	}
 
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
