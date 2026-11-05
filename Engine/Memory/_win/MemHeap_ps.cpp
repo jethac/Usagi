@@ -38,9 +38,13 @@ void* MemHeap_ps::Alloc(memsize uSize, memsize uAlign, bool bGPUUse)
 	return pData;
 }
 
-void* MemHeap_ps::ReAlloc(void* pData, memsize uSize)
+void* MemHeap_ps::ReAlloc(void* pData, memsize uSize, memsize uAlign)
 {
-	return realloc(pData, uSize);
+	// Blocks come from _aligned_malloc, which plain realloc must not touch
+	m_uAllocated -= _aligned_msize(pData, uAlign, 0);
+	void* pNew = _aligned_realloc(pData, uSize, uAlign);
+	m_uAllocated += _aligned_msize(pNew ? pNew : pData, uAlign, 0);
+	return pNew;
 }
 
 void  MemHeap_ps::Free(void* pFree, memsize uAlign, bool bGPUUse)

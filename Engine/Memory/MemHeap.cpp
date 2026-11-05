@@ -93,7 +93,7 @@ void* MemHeap::ReAlloc(void* pMem, memsize uNewSize)
 	AllocHeader* pPrev = pHeader;
 
 	void* pOrigAlloc = (void*)((memsize)pHeader - (memsize)pHeader->uAlignOffset);
-	void* pNew = m_platform.ReAlloc((void*)pOrigAlloc, uNewSize);
+	void* pNew = m_platform.ReAlloc((void*)pOrigAlloc, uNewSize, pHeader->uAlignment);
 
 	pHeader = (AllocHeader *)((char *)pMem - sizeof(AllocHeader));
 	if (pHeader != pPrev)
