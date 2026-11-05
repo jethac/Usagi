@@ -32,7 +32,11 @@ namespace usg
 		PARTICLE_EMITTER,
 		PROTOCOL_BUFFER,
 		PAK_FILE,
-		HEIGHTFIELD
+		HEIGHTFIELD,
+
+		// Resource types defined by optional engine modules or games start here,
+		// e.g. ResourceType(uint32(ResourceType::MODULE_BASE) + n)
+		MODULE_BASE = 0x1000
 	};
 
 	class ResourceBase

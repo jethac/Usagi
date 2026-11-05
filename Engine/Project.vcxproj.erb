@@ -140,6 +140,9 @@
 <% end %>
   </ItemGroup>
 
+  <!-- Optional per-module MSBuild additions, e.g. vendored third-party sources or include paths -->
+  <Import Project="$(USAGI_DIR)\Engine\$(ProjectName)\_msbuild\Module.props" Condition="exists('$(USAGI_DIR)\Engine\$(ProjectName)\_msbuild\Module.props')" />
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

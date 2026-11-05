@@ -43,7 +43,10 @@ public:
 
 	// USE WITH CAUTION
 	// For game specific assets - note that the resource manager will delete the resource so do not delete it manually or pass in a member variable
-	void AddResource(ResourceBase* pBase);
+	BaseResHandle AddResource(ResourceBase* pBase);
+	// Look up an already added resource by name and type, intended for resource types defined
+	// outside of this module (see ResourceType::MODULE_BASE). Returns an invalid handle if not found
+	BaseResHandle FindResource(const char* szName, ResourceType eType);
 
 	// Contain customisable constant set data in addition to the effects
 	CustomEffectResHndl			GetCustomEffectRes(GFXDevice* pDevice, const char* szFileName);

@@ -46,6 +46,8 @@ public:
 		RenderContext() {}
 		const class DescriptorSet* pGlobalDescriptors = nullptr;
 		PostFXSys* pPostFX = nullptr;
+		// The view being drawn (camera, render passes); null outside of ViewContext::DrawScene
+		const class ViewContext* pViewContext = nullptr;
 		RenderPass eRenderPass = RENDER_PASS_FORWARD;
 	};
 
