@@ -7,7 +7,7 @@
 #include "Engine/Common/Common.h"
 #include "Engine/HID/Input.h"
 #include OS_HEADER(Engine/Core, WinUtil.h)
-#include OS_HEADER(Engine/HID, Input_ps.h)
+#include HID_HEADER(Engine/HID, Input_ps.h)
 
 using namespace usg;
 

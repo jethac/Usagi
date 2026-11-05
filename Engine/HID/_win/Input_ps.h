@@ -8,11 +8,11 @@
 #include "Engine/HID/InputDefines.h"
 #include "Engine/Core/stl/vector.h"
 #include "Engine/HID/Microphone.h"
-#include OS_HEADER(Engine/HID, XInputPad.h)
-#include OS_HEADER(Engine/HID, VirtualGamepad.h)
-#include OS_HEADER(Engine/HID, Keyboard_ps.h)
-#include OS_HEADER(Engine/HID, DirectInput.h)
-#include OS_HEADER(Engine/HID, DirectInputJoystick.h)
+#include HID_HEADER(Engine/HID, XInputPad.h)
+#include HID_HEADER(Engine/HID, VirtualGamepad.h)
+#include HID_HEADER(Engine/HID, Keyboard_ps.h)
+#include HID_HEADER(Engine/HID, DirectInput.h)
+#include HID_HEADER(Engine/HID, DirectInputJoystick.h)
 
 #define USE_DIRECT_INPUT_KB  
 
@@ -22,15 +22,15 @@
 #endif
 
 #ifdef USE_DIRECT_INPUT_MOUSE
-#include OS_HEADER(Engine/HID, DirectInputMouse.h)
+#include HID_HEADER(Engine/HID, DirectInputMouse.h)
 #else
-#include OS_HEADER(Engine/HID, Mouse_ps.h)
+#include HID_HEADER(Engine/HID, Mouse_ps.h)
 #endif
 
 #ifdef USE_DIRECT_INPUT_KB
-#include OS_HEADER(Engine/HID, DirectInputKeyboard.h)
+#include HID_HEADER(Engine/HID, DirectInputKeyboard.h)
 #else
-#include OS_HEADER(Engine/HID, Keyboard_ps.h)
+#include HID_HEADER(Engine/HID, Keyboard_ps.h)
 #endif
 
 namespace usg{

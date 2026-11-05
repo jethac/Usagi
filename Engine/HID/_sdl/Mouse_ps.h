@@ -2,8 +2,8 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 //	Description: Mouse read from SDL, relative to the game window
 *****************************************************************************/
-#ifndef __USG_HID_LINUX_MOUSE_PS_H__
-#define __USG_HID_LINUX_MOUSE_PS_H__
+#ifndef __USG_HID_SDL_MOUSE_PS_H__
+#define __USG_HID_SDL_MOUSE_PS_H__
 
 #include "Engine/HID/Gamepad.h"
 #include "Engine/HID/Mouse.h"

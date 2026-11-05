@@ -2,8 +2,8 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 //	Description: Platform specific implementation of the microphone
 *****************************************************************************/
-#ifndef __USG_HID_LINUX_MICROPHONE_PS__
-#define __USG_HID_LINUX_MICROPHONE_PS__
+#ifndef __USG_HID_SDL_MICROPHONE_PS__
+#define __USG_HID_SDL_MICROPHONE_PS__
 
 #include "Engine/HID/InputDefines.h"
 

@@ -1,18 +1,19 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Raw user input on Linux. Keyboard, mouse and gamepads come
-//	from SDL; LinuxUtil feeds events in through the Register* functions.
+//	Description: Raw user input on the SDL platforms. Keyboard, mouse and
+//	gamepads come from SDL; SDLUtil feeds events in through the Register*
+//	functions.
 *****************************************************************************/
-#ifndef __USG_HID_LINUX_INPUT_PS_H__
-#define __USG_HID_LINUX_INPUT_PS_H__
+#ifndef __USG_HID_SDL_INPUT_PS_H__
+#define __USG_HID_SDL_INPUT_PS_H__
 
 #include "Engine/HID/InputDefines.h"
 #include "Engine/Core/stl/vector.h"
 #include "Engine/HID/Microphone.h"
-#include OS_HEADER(Engine/HID, VirtualGamepad.h)
-#include OS_HEADER(Engine/HID, Keyboard_ps.h)
-#include OS_HEADER(Engine/HID, Mouse_ps.h)
-#include OS_HEADER(Engine/HID, SDLGamepad.h)
+#include HID_HEADER(Engine/HID, VirtualGamepad.h)
+#include HID_HEADER(Engine/HID, Keyboard_ps.h)
+#include HID_HEADER(Engine/HID, Mouse_ps.h)
+#include HID_HEADER(Engine/HID, SDLGamepad.h)
 
 namespace usg{
 

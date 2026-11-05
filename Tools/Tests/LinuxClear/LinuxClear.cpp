@@ -16,9 +16,9 @@
 #include "Engine/Core/OS.h"
 #include "Engine/Core/String/String_Util.h"
 #include OS_HEADER(Engine/Core/Timer, TimeTracker.h)
-#include "Engine/Core/_linux/LinuxUtil.h"
+#include "Engine/Core/_sdl/SDLUtil.h"
 #include "Engine/HID/Input.h"
-#include "Engine/HID/_linux/Input_ps.h"
+#include "Engine/HID/_sdl/Input_ps.h"
 #include "Engine/Resource/ResourceMgr.h"
 
 namespace usg
@@ -120,12 +120,12 @@ int main(int argc, char** argv)
 		settings.screenDim.height = atoi(argv[3]);
 	}
 
-	if (!LINUXUTIL::Init())
+	if (!SDLUTIL::Init())
 	{
 		return 1;
 	}
 
-	WindHndl hndl = LINUXUTIL::CreateDisplayWindow(settings.name, &settings, false);
+	WindHndl hndl = SDLUTIL::CreateDisplayWindow(settings.name, &settings, false);
 	if (!hndl)
 	{
 		return 1;
@@ -135,7 +135,7 @@ int main(int argc, char** argv)
 	usg::OS::Initialize();
 	usg::GameMain(nullptr, 0);
 	usg::OS::ShutDown();
-	LINUXUTIL::Shutdown();
+	SDLUTIL::Shutdown();
 
 	return 0;
 }

@@ -2,7 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
-#include OS_HEADER(Engine/HID, Input_ps.h)
+#include HID_HEADER(Engine/HID, Input_ps.h)
 #include <EASTL/sort.h>
 #include "Input.h"
 

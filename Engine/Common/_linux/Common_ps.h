@@ -11,6 +11,8 @@
 #endif
 
 #define USE_VULKAN
+// The window, Vulkan surface and input come from SDL (the _sdl directories)
+#define USE_SDL
 
 #include <stddef.h>
 #include <stdint.h>
@@ -36,6 +38,7 @@
 #define FRAGMENT_HEADER(PATH, FILE) STRINGIFY(PATH/_fragment/FILE)
 #define OS_HEADER(PATH, FILE) STRINGIFY(PATH/_linux/FILE)
 #define AUDIO_HEADER(PATH, FILE) STRINGIFY(PATH/_sdl/FILE)
+#define HID_HEADER(PATH, FILE) STRINGIFY(PATH/_sdl/FILE)
 
 #ifndef ALIGNED_VAR
 #define ALIGNED_VAR(varType, varAlign, varDef) alignas(varAlign) varType varDef

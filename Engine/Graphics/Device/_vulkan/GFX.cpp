@@ -6,8 +6,8 @@
 #include "Engine/Graphics/Viewports/Viewport.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/GFX.h"
-#ifdef PLATFORM_LINUX
-#include "Engine/Core/_linux/LinuxUtil.h"
+#ifdef USE_SDL
+#include "Engine/Core/_sdl/SDLUtil.h"
 #endif
 
 
@@ -47,8 +47,8 @@ void GFX::PostUpdate()
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
-#elif defined(PLATFORM_LINUX)
-	LINUXUTIL::PumpEvents();
+#elif defined(USE_SDL)
+	SDLUTIL::PumpEvents();
 #endif
 }
 

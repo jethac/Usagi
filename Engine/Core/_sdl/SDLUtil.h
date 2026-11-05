@@ -1,14 +1,15 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Linux window and event handling, the counterpart of
-//	WINUTIL. Windows are SDL windows; SDL picks Wayland or X11 at run time.
+//	Description: Window and event handling for the platforms that use SDL
+//	(Linux, macOS, iOS, Android); the counterpart of WINUTIL. SDL picks the
+//	window system at run time (Wayland or X11 on Linux, Cocoa, UIKit).
 *****************************************************************************/
-#ifndef _USG_CORE_LINUX_LINUXUTIL_H_
-#define _USG_CORE_LINUX_LINUXUTIL_H_
+#ifndef _USG_CORE_SDL_SDLUTIL_H_
+#define _USG_CORE_SDL_SDLUTIL_H_
 
 #include "Engine/Graphics/Device/Display.h"
 
-namespace LINUXUTIL
+namespace SDLUTIL
 {
 	// Initialises SDL's video, event and gamepad subsystems. Call before
 	// creating a window

@@ -3,7 +3,7 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Memory/MemUtil.h"
-#include OS_HEADER(Engine/HID, VirtualGamepad.h)
+#include HID_HEADER(Engine/HID, VirtualGamepad.h)
 #include "Input_ps.h"
 #include <string.h>
 

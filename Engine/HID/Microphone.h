@@ -6,7 +6,7 @@
 #define __USG_HID_MICROPHONE__
 
 #include "Engine/HID/InputDefines.h"
-#include OS_HEADER(Engine/HID, Microphone_ps.h)
+#include HID_HEADER(Engine/HID, Microphone_ps.h)
 
 namespace usg{
 

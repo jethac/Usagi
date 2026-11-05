@@ -3,8 +3,8 @@
 //	Description: Keyboard read from SDL's key state, using the same key
 //	codes as DirectInputKeyboard on Windows
 *****************************************************************************/
-#ifndef __USG_HID_LINUX_KEYBOARD_PS_H__
-#define __USG_HID_LINUX_KEYBOARD_PS_H__
+#ifndef __USG_HID_SDL_KEYBOARD_PS_H__
+#define __USG_HID_SDL_KEYBOARD_PS_H__
 
 #include "Engine/HID/Gamepad.h"
 #include "Engine/HID/Keyboard.h"

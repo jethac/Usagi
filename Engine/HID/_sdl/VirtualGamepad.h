@@ -2,8 +2,8 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 //	Description: A gamepad interface which actually uses the mouse and keyboard
 *****************************************************************************/
-#ifndef __USG_HID_LINUX_VIRTUALGAMEPAD_H__
-#define __USG_HID_LINUX_VIRTUALGAMEPAD_H__
+#ifndef __USG_HID_SDL_VIRTUALGAMEPAD_H__
+#define __USG_HID_SDL_VIRTUALGAMEPAD_H__
 
 #include "Engine/HID/Keyboard.h"
 #include "Engine/HID/IGamepad.h"

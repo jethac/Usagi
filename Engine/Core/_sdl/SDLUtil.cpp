@@ -1,12 +1,12 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Linux window and event handling through SDL
+//	Description: Window and event handling through SDL
 *****************************************************************************/
 #include "Engine/Common/Common.h"
-#include "Engine/Core/_linux/LinuxUtil.h"
+#include "Engine/Core/_sdl/SDLUtil.h"
 #include "Engine/Graphics/GFX.h"
 #include "Engine/HID/Input.h"
-#include "Engine/HID/_linux/Input_ps.h"
+#include "Engine/HID/_sdl/Input_ps.h"
 #include <SDL3/SDL.h>
 
 namespace usg
@@ -15,7 +15,7 @@ namespace usg
 	void GameMessage(const uint32 messageID, const void* const pParameters);
 }
 
-namespace LINUXUTIL
+namespace SDLUTIL
 {
 	static WindHndl g_wndHndl = nullptr;
 	static bool g_bInFocus = true;

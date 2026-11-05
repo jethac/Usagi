@@ -3,8 +3,8 @@
 //	Description: A gamepad read through SDL's gamepad API, which maps any
 //	controller in its database to an Xbox-style layout
 *****************************************************************************/
-#ifndef __USG_HID_LINUX_SDL_GAMEPAD_H__
-#define __USG_HID_LINUX_SDL_GAMEPAD_H__
+#ifndef __USG_HID_SDL_SDL_GAMEPAD_H__
+#define __USG_HID_SDL_SDL_GAMEPAD_H__
 
 #include "Engine/HID/IGamepad.h"
 

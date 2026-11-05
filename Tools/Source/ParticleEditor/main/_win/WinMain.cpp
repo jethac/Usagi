@@ -9,7 +9,7 @@
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include API_HEADER(Engine/Graphics/Device, GFXDevice_ps.h)
 #include OS_HEADER(Engine/Core, WinUtil.h)
-#include OS_HEADER(Engine/HID, Input_ps.h)
+#include HID_HEADER(Engine/HID, Input_ps.h)
 #include <stdlib.h>
 
 bool	 g_bFullScreen = false;

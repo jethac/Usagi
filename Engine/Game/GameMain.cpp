@@ -22,8 +22,8 @@
 #include "Engine/Resource/ResourceMgr.h"
 #if (defined PLATFORM_PC || defined PLATFORM_SWITCH_EMU)
 #include "Engine/Core/_win/WinUtil.h"
-#elif (defined PLATFORM_LINUX)
-#include "Engine/Core/_linux/LinuxUtil.h"
+#elif (defined USE_SDL)
+#include "Engine/Core/_sdl/SDLUtil.h"
 #endif
 #include "Engine/Core/OS.h"
 #include <EASTL/sort.h>
@@ -338,8 +338,8 @@ bool InitEngine(const char** dllModules, uint32 uModuleCount)
 
 #if (defined PLATFORM_PC)
 	g_pGFXDevice->InitDisplay(WINUTIL::GetWindow());
-#elif (defined PLATFORM_LINUX)
-	g_pGFXDevice->InitDisplay(LINUXUTIL::GetWindow());
+#elif (defined USE_SDL)
+	g_pGFXDevice->InitDisplay(SDLUTIL::GetWindow());
 #else
 	g_pGFXDevice->InitAllHardwareDisplays();
 #endif

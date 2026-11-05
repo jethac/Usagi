@@ -33,6 +33,7 @@
 #define FRAGMENT_HEADER(PATH, FILE) STRINGIFY(PATH/_fragment/FILE)
 #define OS_HEADER(PATH, FILE) STRINGIFY(PATH/_win/FILE)
 #define AUDIO_HEADER(PATH, FILE) STRINGIFY(PATH/_xaudio2/FILE)
+#define HID_HEADER(PATH, FILE) STRINGIFY(PATH/_win/FILE)
 #ifndef ALIGNED_VAR
 #define ALIGNED_VAR(varType, varAlign, varDef) __declspec(align(varAlign)) varType varDef
 #endif

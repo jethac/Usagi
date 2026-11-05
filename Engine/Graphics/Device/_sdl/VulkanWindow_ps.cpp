@@ -1,13 +1,14 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Linux window system services for the Vulkan backend. SDL
-//	chooses the Wayland or X11 surface extension at run time.
+//	Description: Window system services for the Vulkan backend on the SDL
+//	platforms. SDL chooses the surface extension at run time (Wayland, X11,
+//	Metal through MoltenVK, Android).
 *****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Graphics/Device/Display.h"
 #include "Engine/Core/String/String_Util.h"
 #include "Engine/Maths/MathUtil.h"
-#include "Engine/Core/_linux/LinuxUtil.h"
+#include "Engine/Core/_sdl/SDLUtil.h"
 #include API_HEADER(Engine/Graphics/Device, VulkanWindow.h)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -51,7 +52,7 @@ void VulkanWindow::GetClientSize(WindHndl hndl, uint32& uWidthOut, uint32& uHeig
 		uWidthOut = uHeightOut = 0;
 		return;
 	}
-	LINUXUTIL::GetWindowSize(hndl, uWidthOut, uHeightOut);
+	SDLUTIL::GetWindowSize(hndl, uWidthOut, uHeightOut);
 }
 
 void VulkanWindow::ProcessEvents()
