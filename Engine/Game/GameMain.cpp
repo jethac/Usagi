@@ -17,6 +17,7 @@
 #include "Engine/Maths/MathUtil.h"
 #include "Engine/Physics/PhysX.h"
 #include "Engine/Core/Timer/Timer.h"
+#include OS_HEADER(Engine/Core/Timer, TimeTracker.h)
 #include "Engine/Core/Modules/ModuleManager.h"
 #include "Engine/Resource/ResourceMgr.h"
 #if (defined PLATFORM_PC || defined PLATFORM_SWITCH_EMU)
@@ -91,9 +92,11 @@ bool GameInit()
 	return true;
 }
 
-// Frame rate report (opt-in via USAGI_FPS_LOG=1): average frame rate and
-// worst frame time every few seconds, in every build configuration.
-static void ReportFrameRate(float fDelta)
+// Frame rate report (opt-in via USAGI_FPS_LOG=1): every few seconds, the
+// average frame rate, the frame time spread and how much of a frame the CPU
+// spends in the game's Update and Draw, in every build configuration. GPU
+// pass timings come from USAGI_GPU_PROFILE (see GPUProfiler).
+static bool FrameRateReportEnabled()
 {
 	static int s_enabled = -1;
 	if (s_enabled < 0)
@@ -101,18 +104,26 @@ static void ReportFrameRate(float fDelta)
 		char szEnv[8] = {};
 		s_enabled = OS::GetEnvVar("USAGI_FPS_LOG", szEnv, sizeof(szEnv)) ? 1 : 0;
 	}
-	if (!s_enabled)
-	{
-		return;
-	}
+	return s_enabled == 1;
+}
 
+static void ReportFrameRate(float fDelta, float fUpdateMs, float fDrawMs)
+{
 	static const float s_fInterval = 5.0f;
 	static float s_fElapsed = 0.0f;
 	static float s_fWorst = 0.0f;
+	static float s_fUpdateMs = 0.0f;
+	static float s_fDrawMs = 0.0f;
+	static float s_fWorstCPUMs = 0.0f;
 	static uint32 s_uFrames = 0;
+	static uint32 s_uOver16ms = 0;
 
 	s_fElapsed += fDelta;
 	s_fWorst = Math::Max(s_fWorst, fDelta);
+	s_fUpdateMs += fUpdateMs;
+	s_fDrawMs += fDrawMs;
+	s_fWorstCPUMs = Math::Max(s_fWorstCPUMs, fUpdateMs + fDrawMs);
+	s_uOver16ms += fDelta > (1.0f / 60.0f) ? 1 : 0;
 	s_uFrames++;
 	if (s_fElapsed >= s_fInterval)
 	{
@@ -122,23 +133,42 @@ static void ReportFrameRate(float fDelta)
 		{
 			pDisplay->GetDisplayDimensions(uWidth, uHeight, false);
 		}
-		RELEASE_WARNING("FPS: %.1f average over %u frames at %ux%u, worst frame %.2f ms\n",
-			s_uFrames / s_fElapsed, s_uFrames, uWidth, uHeight, s_fWorst * 1000.0f);
+		RELEASE_WARNING("FPS: %.1f average over %u frames at %ux%u, worst frame %.2f ms, %u frames over 16.7 ms; "
+			"CPU update %.2f ms, draw %.2f ms (worst update+draw %.2f ms)\n",
+			s_uFrames / s_fElapsed, s_uFrames, uWidth, uHeight, s_fWorst * 1000.0f, s_uOver16ms,
+			s_fUpdateMs / s_uFrames, s_fDrawMs / s_uFrames, s_fWorstCPUMs);
 		s_fElapsed = 0.0f;
 		s_fWorst = 0.0f;
+		s_fUpdateMs = 0.0f;
+		s_fDrawMs = 0.0f;
+		s_fWorstCPUMs = 0.0f;
 		s_uFrames = 0;
+		s_uOver16ms = 0;
 	}
+}
+
+static float MillisecondsSince(uint64 uStart)
+{
+	return (float)((double)(TimeTracker::GetSystemTime() - uStart) * 1000.0 / (double)TimeTracker::GetTickFrequency());
 }
 
 void GameLoop()
 {
 	g_timer.Update();
-	ReportFrameRate(g_timer.GetDeltaRealTime());
+	const bool bReport = FrameRateReportEnabled();
+	uint64 uStart = TimeTracker::GetSystemTime();
 	Input::Update(g_pGFXDevice, g_timer.GetDeltaRealTime());
 	game->Update(g_pGFXDevice);
+	float fUpdateMs = MillisecondsSince(uStart);
+	uStart = TimeTracker::GetSystemTime();
 	if(GFX::HasFocus())
 	{
-		game->Draw(g_pGFXDevice);		
+		game->Draw(g_pGFXDevice);
+	}
+	float fDrawMs = MillisecondsSince(uStart);
+	if (bReport)
+	{
+		ReportFrameRate(g_timer.GetDeltaRealTime(), fUpdateMs, fDrawMs);
 	}
 	GFX::PostUpdate();
 	OS::Update();
