@@ -8,6 +8,7 @@
 #include "Engine/Graphics/Color.h"
 #include "Engine/Graphics/Viewports/Viewport.h"
 #include "Engine/Graphics/Textures/RenderTarget.h"
+#include <thread>
 
 namespace usg {
 
@@ -61,8 +62,7 @@ private:
 	VkFramebuffer*		m_pFramebuffers;
 	VkFramebuffer*		m_pFramebuffersNoCopy;
 	VSyncMode			m_eVsync;
-	HWND				m_hwnd;
-	HDC					m_hdc;
+	WindHndl			m_hwnd;
 	VkImage*			m_pSwapchainImages;
 	VkImageView*		m_pSwapchainImageViews;
 	VkSurfaceKHR		m_surface;

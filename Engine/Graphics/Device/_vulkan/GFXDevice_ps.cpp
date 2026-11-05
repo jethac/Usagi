@@ -6,6 +6,7 @@
 #include API_HEADER(Engine/Graphics/Device, AlphaState.h)
 #include API_HEADER(Engine/Graphics/Device, DepthStencilState.h)
 #include API_HEADER(Engine/Graphics/Device, GFXDevice_ps.h)
+#include API_HEADER(Engine/Graphics/Device, VulkanWindow.h)
 #include API_HEADER(Engine/Graphics/Device, VkGPUHeap.h)
 #include API_HEADER(Engine/Graphics/Device, VkMemAllocator.h)
 #include API_HEADER(Engine/Oculus, OculusVKExport.h)
@@ -420,8 +421,12 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	app_info.apiVersion = VK_API_VERSION_1_4;
 
 	vector<const char*> extensions;
-	extensions.push_back("VK_KHR_surface");
-	extensions.push_back("VK_KHR_win32_surface");
+	const char* surfaceExtensions[VulkanWindow::MAX_SURFACE_EXTENSIONS];
+	uint32 uSurfaceExtensions = VulkanWindow::GetSurfaceExtensions(surfaceExtensions);
+	for (uint32 i = 0; i < uSurfaceExtensions; i++)
+	{
+		extensions.push_back(surfaceExtensions[i]);
+	}
 	extensions.push_back("VK_EXT_swapchain_colorspace");
 #ifndef FINAL_BUILD
 	extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
@@ -447,12 +452,12 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	}
 
 	// TODO: Should come from HMD
-	typedef bool (far *GetHMDPhysicalDeviceVK)(VkInstance instance, VkPhysicalDevice* deviceOut);
+	typedef bool (*GetHMDPhysicalDeviceVK)(VkInstance instance, VkPhysicalDevice* deviceOut);
 	GetHMDPhysicalDeviceVK GetHMDPhysicalDeviceVKFn = nullptr;
 	if (pHmd)
 	{
-		HMODULE oculusModule = ModuleManager::Inst()->GetModule(pHmd);
-		GetHMDPhysicalDeviceVKFn = (GetHMDPhysicalDeviceVK)GetProcAddress(oculusModule, "GetHMDPhysicalDeviceVK");
+		ModuleHndl oculusModule = ModuleManager::Inst()->GetModule(pHmd);
+		GetHMDPhysicalDeviceVKFn = (GetHMDPhysicalDeviceVK)GetModuleSymbol(oculusModule, "GetHMDPhysicalDeviceVK");
 	}
 
 	GetHMDExtensionsForType(pHmd, IHeadMountedDisplay::ExtensionType::Instance, extensions);
@@ -973,83 +978,7 @@ bool GFXDevice_ps::DepthFormatSupported(VkFormat eFormat)
 
 void GFXDevice_ps::EnumerateDisplays()
 {
-	m_uDisplayCount = 0;
-
-	// TODO: Move this out into platform specific code
-	DISPLAY_DEVICE DispDev;
-	ZeroMemory(&DispDev, sizeof(DISPLAY_DEVICE));
-	DispDev.cb = sizeof(DISPLAY_DEVICE);
-
-	// Pass in a value over than zero to the second parameter to enumerate graphics cards
-	for (DWORD uDeviceIndex = 0; m_uDisplayCount < MAX_DISPLAY_COUNT && EnumDisplayDevices(NULL, uDeviceIndex, &DispDev, 0); uDeviceIndex++)
-	{
-		if (!(DispDev.StateFlags & DISPLAY_DEVICE_MIRRORING_DRIVER))
-		{
-			DisplaySettings* pSettings = &m_diplayInfo[m_uDisplayCount];
-			str::Copy(pSettings->name, DispDev.DeviceString, USG_IDENTIFIER_LEN);
-			DEVMODE dm;
-			ZeroMemory(&dm, sizeof(dm));
-			dm.dmSize = sizeof(dm);
-			if (EnumDisplaySettingsEx(DispDev.DeviceName, ENUM_CURRENT_SETTINGS, &dm, 0) == FALSE)
-			{
-				BOOL bReturn = EnumDisplaySettingsEx(DispDev.DeviceName, ENUM_REGISTRY_SETTINGS, &dm, 0);
-				ASSERT(bReturn == TRUE);
-			}
-
-			HMONITOR hm = 0;
-			MONITORINFO mi;
-			ZeroMemory(&mi, sizeof(mi));
-			mi.cbSize = sizeof(mi);
-			if (DispDev.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)
-			{
-				// display is enabled. only enabled displays have a monitor handle
-				POINT pt = { dm.dmPosition.x, dm.dmPosition.y };
-				hm = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
-				if (hm)
-				{
-					GetMonitorInfo(hm, &mi);
-					pSettings->screenDim.x = mi.rcMonitor.left;
-					pSettings->screenDim.y = mi.rcMonitor.top;
-					pSettings->screenDim.width = mi.rcMonitor.right - mi.rcMonitor.left;
-					pSettings->screenDim.height = Math::Abs(mi.rcMonitor.top - mi.rcMonitor.bottom);
-					m_uDisplayCount++;
-				}
-			}
-
-			// Get other supported resolutions
-			DWORD iMode = 0;
-			bool bFound = false;
-			while(EnumDisplaySettingsEx(DispDev.DeviceName, iMode, &dm, 0))
-			{
-				if (DispDev.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)
-				{
-					GFXBounds bounds;
-					bounds.x = 0;
-					bounds.y = 0;
-					bounds.width = dm.dmPelsWidth;
-					bounds.height = dm.dmPelsHeight;
-
-					bool bFound = false;
-					for (auto itr : pSettings->supportedResolutions)
-					{
-						if (itr.width == bounds.width && itr.height == bounds.height)
-						{
-							bFound = true;
-							break;
-						}
-					}
-
-					if(!bFound)
-					{
-						pSettings->supportedResolutions.push_back(bounds);
-					}
-				}
-
-				iMode++;
-
-			} while (bFound == true);
-		}
-	}
+	m_uDisplayCount = VulkanWindow::EnumerateDisplays(m_diplayInfo, MAX_DISPLAY_COUNT);
 }
 
 uint32 GFXDevice_ps::GetHardwareDisplayCount()

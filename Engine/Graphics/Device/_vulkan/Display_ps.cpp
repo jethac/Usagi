@@ -3,30 +3,22 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Graphics/Device/Display.h"
-#include "Engine/Core/_win/WinUtil.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/Device/GFXContext.h"
 #include "Engine/Graphics/Device/IHeadMountedDisplay.h"
 #include "Engine/Graphics/GFX.h"
 #include <thread>
+#include <algorithm>
 #include "Engine/Core/Modules/ModuleManager.h"
 #include OS_HEADER(Engine/Graphics/Device, VulkanIncludes.h)
 #include API_HEADER(Engine/Graphics/Device, GFXDevice_ps.h)
 #include API_HEADER(Engine/Graphics/Device, RenderPass.h)
+#include API_HEADER(Engine/Graphics/Device, VulkanWindow.h)
+#include "Engine/Core/Thread/Thread.h"
 #include "Engine/Core/stl/vector.h"
 
 
 
-#define DXGI_TEST_FOR_HDR 1
-
-#if DXGI_TEST_FOR_HDR
-#if defined(_WIN32)
-#include <dxgi.h> 
-#include <dxgi1_6.h>
-
-#pragma comment(lib, "dxgi.lib")
-#endif
-#endif
 
 extern bool	 g_bFullScreen;
 extern uint32 g_uWindowWidth;
@@ -127,33 +119,23 @@ void Display_ps::Initialise(usg::GFXDevice* pDevice, WindHndl hndl)
 	m_uID = 0;
 
 	bool bFullscreen = false;
-	m_hdc = ::GetDC(hndl);
-
-	RECT dim;
-	GetClientRect(hndl, &dim);
 	m_uWidth = m_uHeight = 0;
 
 	// Sometimes the window is getting minimized AS I'm creating it
 	while (m_uWidth == 0 || m_uHeight == 0)
 	{
-		GetClientRect(m_hwnd, &dim);
-		m_uWidth = dim.right - dim.left;
-		m_uHeight = dim.bottom - dim.top;
-		::Sleep(8);
+		VulkanWindow::GetClientSize(m_hwnd, m_uWidth, m_uHeight);
+		if (m_uWidth == 0 || m_uHeight == 0)
+		{
+			VulkanWindow::ProcessEvents();
+			Thread::Sleep(8);
+		}
 	}
 
 	VkResult res;
 
-	// BEGIN PC SPECIFIC CODE
-	VkWin32SurfaceCreateInfoKHR createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	createInfo.pNext = NULL;
-	createInfo.hinstance = WINUTIL::GetInstanceHndl();
-	createInfo.hwnd = m_hwnd;
-	res = vkCreateWin32SurfaceKHR(devicePS.GetVKInstance(), &createInfo, nullptr, &m_surface);
-	// END PC SPECIFIC CODE
-
-	ASSERT(res == VK_SUCCESS);
+	m_surface = VulkanWindow::CreateSurface(devicePS.GetVKInstance(), m_hwnd);
+	ASSERT(m_surface != VK_NULL_HANDLE);
 
 	
 
@@ -233,13 +215,6 @@ bool Display_ps::GetFallbackPresentMode(VkPresentModeKHR& eModeInOut)
 }
 
 
-static inline LONG InterSection(const RECT rect1, const RECT rect2)
-{
-	LONG xInterSect = Math::Max(0L, Math::Min(rect1.right, rect2.right) - Math::Max(rect1.left, rect2.left));
-	LONG yIntersect = Math::Max(0L, Math::Min(rect1.bottom, rect2.bottom) - Math::Max(rect1.top, rect2.top));
-	LONG intersection = xInterSect * yIntersect;
-	return intersection;
-}
 
 
 void Display_ps::CreateSwapChain(GFXDevice* pDevice)
@@ -281,48 +256,12 @@ void Display_ps::CreateSwapChain(GFXDevice* pDevice)
 	bool bAllowHDR = false;
 
 	// Enable the following to allow HDR
-#if DXGI_TEST_FOR_HDR
+	bAllowHDR = VulkanWindow::IsHDROutputEnabled(m_hwnd);
 
-	RECT windowBounds = {};
-	GetWindowRect((HWND)m_hwnd, &windowBounds);
-	IDXGIAdapter1* dxgiAdapter = NULL;
-	IDXGIFactory6* factory = nullptr;
-
-	if (SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&factory))))
-	{
-		HRCHECK( factory->EnumAdapters1(0, &dxgiAdapter));
-		UINT         i = 0;
-		IDXGIOutput* bestOutput = nullptr;
-		IDXGIOutput* output = nullptr;
-		LONG         bestAdapter = -1;
-		while (dxgiAdapter->EnumOutputs(i, &output) != DXGI_ERROR_NOT_FOUND)
-		{
-			DXGI_OUTPUT_DESC desc;
-			output->GetDesc(&desc);
-			LONG intersection = InterSection(windowBounds, desc.DesktopCoordinates);
-			if (intersection > bestAdapter)
-			{
-				bestAdapter = intersection;
-				bestOutput = output;
-			}
-			++i;
-		}
-		IDXGIOutput6* output6;
-		HRCHECK(bestOutput->QueryInterface(IID_PPV_ARGS(&output6)));
-		DXGI_OUTPUT_DESC1 desc1;
-		HRCHECK(output6->GetDesc1(&desc1));
-
-		// This will be true if the user has use HDR set to true in windows, false otherwise
-		bAllowHDR = desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
-
-		// The HDR output path on this branch has no tonemap/brightness control yet,
-		// so SDR-range scene colour maps to near-black on an ST2084 swap chain.
-		// Force the SDR (sRGB) swap chain until HDR tonemapping is implemented.
-		bAllowHDR = false;
-
-		factory->Release();
-	}
-#endif
+	// The HDR output path on this branch has no tonemap/brightness control yet,
+	// so SDR-range scene colour maps to near-black on an ST2084 swap chain.
+	// Force the SDR (sRGB) swap chain until HDR tonemapping is implemented.
+	bAllowHDR = false;
 	
 
 	// Get the list of VkFormats that are supported:
@@ -765,12 +704,41 @@ void Display_ps::SwapBuffers(GFXDevice* pDevice)
 	vkAcquireNextImageKHR(pDevice->GetPlatform().GetVKDevice(), m_swapChain, UINT64_MAX, m_imageAcquired, (VkFence)nullptr, &m_uActiveImage);
 }
 
+// The BMP file and DIB headers, laid out as Windows' BITMAPFILEHEADER and
+// BITMAPINFOHEADER so the DIB can also go to the clipboard
+PACK(struct BmpFileHeader
+{
+	uint16	bfType;
+	uint32	bfSize;
+	uint16	bfReserved1;
+	uint16	bfReserved2;
+	uint32	bfOffBits;
+});
+
+struct BmpInfoHeader
+{
+	uint32	biSize;
+	sint32	biWidth;
+	sint32	biHeight;
+	uint16	biPlanes;
+	uint16	biBitCount;
+	uint32	biCompression;
+	uint32	biSizeImage;
+	sint32	biXPelsPerMeter;
+	sint32	biYPelsPerMeter;
+	uint32	biClrUsed;
+	uint32	biClrImportant;
+};
+
+static_assert(sizeof(BmpFileHeader) == 14, "BmpFileHeader must match BITMAPFILEHEADER");
+static_assert(sizeof(BmpInfoHeader) == 40, "BmpInfoHeader must match BITMAPINFOHEADER");
+
 void WriteTexture(usg::string szFileName, VkDevice device, uint32 uWidth, uint32 uHeight, const uint8* pData, bool bColorSwizzle, VkDeviceMemory dstImageMemory, VkImage dstImage, int iRowPitch)
 {
 	// BMP rows are padded to a multiple of 4 bytes
 	const uint32 uRowPitch = (uWidth * 3 + 3) & ~3u;
 	const uint32 uImageSize = uRowPitch * uHeight;
-	uint8* pBMPData = (uint8*)mem::Alloc(MEMTYPE_STANDARD, ALLOC_GFX_TEXTURE, uImageSize + sizeof(BITMAPINFOHEADER));
+	uint8* pBMPData = (uint8*)mem::Alloc(MEMTYPE_STANDARD, ALLOC_GFX_TEXTURE, uImageSize + sizeof(BmpInfoHeader));
 	MemClear(pBMPData, uImageSize);
 
 
@@ -799,53 +767,35 @@ void WriteTexture(usg::string szFileName, VkDevice device, uint32 uWidth, uint32
 		pData += iRowPitch;
 	}
 
-	BITMAPINFOHEADER info = { };
+	BmpInfoHeader info = { };
 
-	info.biSize = sizeof(BITMAPINFOHEADER);
+	info.biSize = sizeof(BmpInfoHeader);
 	info.biWidth = uWidth;
 	info.biHeight = uHeight;
 	info.biPlanes = 1;
 	info.biBitCount = 24;
-	info.biCompression = BI_RGB;
+	info.biCompression = 0;	// BI_RGB
 	info.biXPelsPerMeter = 1;
 	info.biYPelsPerMeter = 1;
 	info.biClrImportant = 0;
 	info.biClrImportant = 0;
 
-	BITMAPFILEHEADER	fileHdr = {};
+	BmpFileHeader	fileHdr = {};
 	fileHdr.bfType = 'MB';
-	fileHdr.bfSize = sizeof(fileHdr) + sizeof(BITMAPINFOHEADER) + uImageSize;
-	fileHdr.bfOffBits = sizeof(fileHdr) + sizeof(BITMAPINFOHEADER);
+	fileHdr.bfSize = sizeof(fileHdr) + sizeof(BmpInfoHeader) + uImageSize;
+	fileHdr.bfOffBits = sizeof(fileHdr) + sizeof(BmpInfoHeader);
 
 	usg::File file(szFileName.c_str(), FILE_ACCESS_WRITE, FILE_TYPE_DEBUG_DATA);
 	if (file.IsOpen())
 	{
 		file.Write(sizeof(fileHdr), &fileHdr);
-		file.Write(sizeof(BITMAPINFOHEADER), &info);
+		file.Write(sizeof(BmpInfoHeader), &info);
 		file.Write(uImageSize, pBMPData);
 		file.Close();
 	}
 
 
-#if PLATFORM_PC
-	HANDLE handle = (HANDLE)::GlobalAlloc(GHND, sizeof(BITMAPINFOHEADER) + uImageSize);
-	if (handle != nullptr)
-	{
-		char* pHndlData = (char*) ::GlobalLock((HGLOBAL)handle);
-
-		BOOL RETB = OpenClipboard(nullptr);
-		RETB = EmptyClipboard();
-
-		memcpy(pHndlData, &info, sizeof(BITMAPINFOHEADER));
-
-		memcpy(pHndlData + sizeof(BITMAPINFOHEADER), pBMPData, uImageSize);
-
-		::GlobalUnlock((HGLOBAL)handle);
-
-		SetClipboardData(CF_DIB, handle);
-		CloseClipboard();
-	}
-#endif
+	VulkanWindow::CopyBitmapToClipboard(&info, sizeof(info), pBMPData, uImageSize);
 
 	mem::Free(pBMPData);
 
@@ -1065,22 +1015,19 @@ void Display_ps::SetVSyncMode(VSyncMode eVsync)
 
 void Display_ps::Resize(usg::GFXDevice* pDevice)
 {
-	RECT dim;
-	GetClientRect(m_hwnd, &dim);
+	uint32 uWidth, uHeight;
+	VulkanWindow::GetClientSize(m_hwnd, uWidth, uHeight);
 
-	Resize(pDevice, dim.right - dim.left, dim.bottom - dim.top);
+	Resize(pDevice, uWidth, uHeight);
 }
 
 void Display_ps::Minimized(usg::GFXDevice* pDevice)
 {
-	RECT dim;
-	int width = 0; int height = 0;
+	uint32 width = 0; uint32 height = 0;
 	while (width == 0 || height == 0) {
-		GetClientRect(m_hwnd, &dim);
-		width = dim.right - dim.left;
-		height = dim.bottom - dim.top;
+		VulkanWindow::GetClientSize(m_hwnd, width, height);
 		// Sleep for a frame at 120hz
-		::Sleep(8);
+		Thread::Sleep(8);
 		// Keep handling window message until we get the one that restores the window
 		GFX::PostUpdate();
 	}
