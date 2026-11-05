@@ -26,6 +26,22 @@ module UsagiModules
     end
   end
 
+  # Extra preprocessor flags for compiling a module's own sources with ninja
+  # (the counterpart of _msbuild/Module.props), from an optional manifest
+  # section:
+  #
+  #   ninja:
+  #     include_dirs: [_vendor/Foo/include]   # relative to the module
+  #     defines: [FOO_ENABLE_VULKAN]
+  #
+  # Returns '' for modules without one.
+  def self.ninja_cppflags(manifest, module_dir)
+    ninja = manifest['ninja'] || {}
+    flags = (ninja['include_dirs'] || []).map { |d| "-I#{File.join(module_dir, d)}" }
+    flags += (ninja['defines'] || []).map { |d| "-D#{d}" }
+    flags.join(' ')
+  end
+
   # MSBuild ProjectReference items for every add-on module, for use in a game's
   # .vcxproj.erb template:  <%= UsagiModules.project_references %>
   def self.project_references(usagi_dir = ENV['USAGI_DIR'])

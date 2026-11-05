@@ -23,7 +23,12 @@ n = Ninja::File.new()
 def compile_lib(config, n, lib, targets, standard_targets, bp_objects, order_only_deps)
   source_root = "Engine/#{lib}"
 
-  GeneratorUtil.compile_source(config, n, standard_targets, order_only_deps)
+  # Add-on modules can ask for extra include paths and defines
+  require_relative '../ruby/usagi_modules'
+  manifest = UsagiModules.manifests('.').find { |m| m['name'] == lib }
+  extra_cppflags = manifest ? UsagiModules.ninja_cppflags(manifest, source_root) : nil
+
+  GeneratorUtil.compile_source(config, n, standard_targets, order_only_deps, nil, extra_cppflags)
   proto_targets = targets.select{|c, o| c.end_with?('.pb.cpp') || c.end_with?('.lua.cpp')}
   GeneratorUtil.compile_source(config, n, proto_targets, order_only_deps)
 

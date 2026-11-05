@@ -387,12 +387,17 @@ module GeneratorUtil
     end
   end
 
-  def GeneratorUtil.compile_source(config, n, targets, order_only_deps, pch_file=nil)
+  def GeneratorUtil.compile_source(config, n, targets, order_only_deps, pch_file=nil, extra_cppflags=nil)
     parameters = {:order_only_deps => order_only_deps}
+    parameters[:variables] = {}
 
     if !pch_file.nil?
-      parameters[:variables] = {'use_pch' => "$pchflags --use_pch=#{pch_file}"}
+      parameters[:variables]['use_pch'] = "$pchflags --use_pch=#{pch_file}"
       parameters[:implicit_deps] = [pch_file]
+    end
+
+    if extra_cppflags && !extra_cppflags.empty?
+      parameters[:variables]['cppflags'] = "$cppflags #{extra_cppflags}"
     end
 
     targets.each do |input, output|
