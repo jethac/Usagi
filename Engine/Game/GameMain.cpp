@@ -8,6 +8,7 @@
 #include "Engine/Game/GameInterface.h"
 #include "Engine/Graphics/GFX.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
+#include "Engine/Graphics/Device/Display.h"
 #include "Engine/HID/Input.h"
 #include "Engine/Framework/ComponentGetter.h"
 #include "Engine/Framework/ComponentSystemInputOutputs.h"
@@ -90,9 +91,49 @@ bool GameInit()
 	return true;
 }
 
+// Frame rate report (opt-in via USAGI_FPS_LOG=1): average frame rate and
+// worst frame time every few seconds, in every build configuration.
+static void ReportFrameRate(float fDelta)
+{
+	static int s_enabled = -1;
+	if (s_enabled < 0)
+	{
+		char szEnv[8] = {};
+		s_enabled = OS::GetEnvVar("USAGI_FPS_LOG", szEnv, sizeof(szEnv)) ? 1 : 0;
+	}
+	if (!s_enabled)
+	{
+		return;
+	}
+
+	static const float s_fInterval = 5.0f;
+	static float s_fElapsed = 0.0f;
+	static float s_fWorst = 0.0f;
+	static uint32 s_uFrames = 0;
+
+	s_fElapsed += fDelta;
+	s_fWorst = Math::Max(s_fWorst, fDelta);
+	s_uFrames++;
+	if (s_fElapsed >= s_fInterval)
+	{
+		uint32 uWidth = 0, uHeight = 0;
+		Display* pDisplay = g_pGFXDevice->GetDisplay(0);
+		if (pDisplay)
+		{
+			pDisplay->GetDisplayDimensions(uWidth, uHeight, false);
+		}
+		RELEASE_WARNING("FPS: %.1f average over %u frames at %ux%u, worst frame %.2f ms\n",
+			s_uFrames / s_fElapsed, s_uFrames, uWidth, uHeight, s_fWorst * 1000.0f);
+		s_fElapsed = 0.0f;
+		s_fWorst = 0.0f;
+		s_uFrames = 0;
+	}
+}
+
 void GameLoop()
 {
 	g_timer.Update();
+	ReportFrameRate(g_timer.GetDeltaRealTime());
 	Input::Update(g_pGFXDevice, g_timer.GetDeltaRealTime());
 	game->Update(g_pGFXDevice);
 	if(GFX::HasFocus())
