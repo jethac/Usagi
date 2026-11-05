@@ -581,7 +581,11 @@ SoundHandle Audio::Prepare2DSound(uint32 crc, const float fVolume, bool bPlay)
 				// We only allow one instance, drop
 				if ((*it)->object.GetSoundFile() == pSoundFile)
 				{
+					// Release it the way Update does, so the pooled slot's
+					// handle and object are clean when it's next allocated
 					(*it)->hndl.Stop();
+					(*it)->hndl.Destroy(&(*it)->object);
+					(*it)->object.Reset();
 					it.RemoveElement();
 				}
 			}
