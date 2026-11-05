@@ -12,6 +12,8 @@ namespace usg
 	{
 		m_fNear			= 0.1;
 		m_fFar			= 1000.0f;
+		m_fOrthographicSize = 10.0f;
+		m_bOrthographic = false;
 	}
 
 	StandardCamera::~StandardCamera(void)
@@ -33,6 +35,28 @@ namespace usg
 
 		m_fNear		= fNear;
 		m_fFar		= fFar;
+		m_bOrthographic = false;
+
+		UpdateInternal();
+	}
+
+	void StandardCamera::SetUpOrthographic(const Matrix4x4& viewMat, float32 fAspect, float32 fHalfHeight, float32 fNear, float32 fFar)
+	{
+		m_mView = viewMat;
+		const float32 fHalfWidth = fHalfHeight * fAspect;
+		if (IsRightHanded())
+		{
+			m_mProjection.OrthographicRH(-fHalfWidth, fHalfWidth, -fHalfHeight, fHalfHeight, fNear, fFar);
+		}
+		else
+		{
+			m_mProjection.Orthographic(-fHalfWidth, fHalfWidth, -fHalfHeight, fHalfHeight, fNear, fFar);
+		}
+
+		m_fNear		= fNear;
+		m_fFar		= fFar;
+		m_fOrthographicSize = fHalfHeight;
+		m_bOrthographic = true;
 
 		UpdateInternal();
 	}
@@ -40,7 +64,7 @@ namespace usg
 	void StandardCamera::SetModelMatrix(const Matrix4x4& mModel)
 	{
 		m_mView.BuildCameraFromModel(mModel);
-		m_mModel = m_mModel;
+		m_mModel = mModel;
 
 		// Rebuild the frustum
 		m_frustum.SetUp(m_mProjection, m_mView);
@@ -54,6 +78,8 @@ namespace usg
 
 		m_mView = viewMat;
 		m_mProjection = projMat;
+		// An affine (w-preserving) projection is orthographic
+		m_bOrthographic = projMat._34 == 0.0f && projMat._44 == 1.0f;
 
 		Frustum testFrustum;
 		testFrustum.SetUp(projMat);
@@ -64,8 +90,6 @@ namespace usg
 
 		UpdateInternal();
 	}
-
-
 	void StandardCamera::UpdateInternal()
 	{
 		m_mModel.BuildModelFromCamera(m_mView);

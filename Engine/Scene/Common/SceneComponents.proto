@@ -81,6 +81,14 @@ message ModelMgrComponent
 	required float fDummy = 1 [default=1.0];
 }
 
+enum CameraProjection
+{
+	option (nanopb_enumopt).long_names = false;
+
+	CAMERA_PROJECTION_PERSPECTIVE = 0;
+	CAMERA_PROJECTION_ORTHOGRAPHIC = 1;
+}
+
 message CameraComponent
 {
 	// NOTE THESE VALUES ARE TIED TO PROCESS HIERARCHY.
@@ -88,6 +96,7 @@ message CameraComponent
 	option (nanopb_msgopt).has_ondeactivate = true;
 	option (nanopb_msgopt).has_onloaded = true;
 
+	// fFOV is the vertical field of view in degrees (perspective only).
 	required float fFOV = 1 [default = 90.0];
 	required float fAspectRatio = 2 [default = 1.7777];
 	required float fNearPlaneDist = 3 [default = 0.1];
@@ -96,6 +105,10 @@ message CameraComponent
 	required uint32 uCamId = 6 [default = 0];
 	required bool bForceSwitch = 7 [default = false];
 	required bool bActive = 8 [default = false];
+	required CameraProjection eProjection = 9 [default = CAMERA_PROJECTION_PERSPECTIVE];
+	// Half of the visible height in world units (orthographic only); the visible
+	// width is this times fAspectRatio.
+	required float fOrthographicSize = 10 [default = 10.0];
 }
 
 message HMDCameraComponent

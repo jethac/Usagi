@@ -165,7 +165,14 @@ namespace usg
 
 			usg::Matrix4x4 m = usg::Matrix4x4::Identity();
 			p.GetRuntimeData().pCamera = vnew(ALLOC_OBJECT) usg::StandardCamera;
-			p.GetRuntimeData().pCamera->SetUp(m, p->fAspectRatio, p->fFOV, p->fNearPlaneDist, p->fFarPlaneDist);
+			if (p->eProjection == CAMERA_PROJECTION_ORTHOGRAPHIC)
+			{
+				p.GetRuntimeData().pCamera->SetUpOrthographic(m, p->fAspectRatio, p->fOrthographicSize, p->fNearPlaneDist, p->fFarPlaneDist);
+			}
+			else
+			{
+				p.GetRuntimeData().pCamera->SetUp(m, p->fAspectRatio, p->fFOV, p->fNearPlaneDist, p->fFarPlaneDist);
+			}
 			p.GetRuntimeData().pCamera->SetRenderMask(p->uRenderMask);
 			p.GetRuntimeData().pCamera->SetID(p->uCamId);
 
