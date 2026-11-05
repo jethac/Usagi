@@ -29,6 +29,19 @@ enum SystemCategory {
 	SYSTEM_FETCH_VEHICLE_SIMULATION_RESULTS, // Any system depending on physics should come after this.
 	SYSTEM_DEFAULT_PRIORITY = 0, // Default
 	SYSTEM_POST_GAMEPLAY,
+	// Procedural camera pipeline (Engine/Cameraman). Runs after gameplay has
+	// moved everything and before transforms are resolved, so the output camera
+	// shows this frame's world.
+	SYSTEM_CAMERA_TARGETS,		// Tracked entities publish their pose
+	SYSTEM_CAMERA_SHOT_BEGIN,	// Virtual cameras reset their working state
+	SYSTEM_CAMERA_BODY,			// Position stage
+	SYSTEM_CAMERA_FRAMING,		// Lens / framing adjustments after the body
+	SYSTEM_CAMERA_CONFINE,		// Confinement after the body
+	SYSTEM_CAMERA_AIM,			// Orientation stage
+	SYSTEM_CAMERA_BODY_LATE,	// Position stages that depend on the aim
+	SYSTEM_CAMERA_NOISE,		// Shake / impulse corrections
+	SYSTEM_CAMERA_FINALIZE,		// Publish the virtual camera result
+	SYSTEM_CAMERA_BRAIN,		// Select, blend and drive the output camera
 	SYSTEM_TRANSFORM,
 	SYSTEM_HIERARCHY,
 	SYSTEM_POST_TRANSFORM,
