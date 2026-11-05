@@ -244,7 +244,9 @@ class BuildConfig
 
   # TODO: add option to include project .proto files
   def protocol_definitions(should_use_relative=true)
-    list = FileList[build_path("Engine/**/*.proto")].exclude(build_path("Engine/ThirdParty/nanopb/**/*")).exclude(build_path("Engine/Core/usagipb*"))
+    # 'Engine/*/**' rather than 'Engine/**': Ruby's ** does not descend into
+    # symlinks/junctions, which is how add-on modules are usually mounted
+    list = FileList[build_path("Engine/*/**/*.proto")].exclude(build_path("Engine/ThirdParty/nanopb/**/*")).exclude(build_path("Engine/Core/usagipb*"))
     list = FileList["#{@project}/**/*.proto"] if ! should_use_relative
 
     list
