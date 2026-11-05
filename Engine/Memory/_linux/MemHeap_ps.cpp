@@ -3,6 +3,7 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Memory/MemHeap.h"
+#include "Engine/Maths/MathUtil.h"
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
@@ -49,16 +50,14 @@ void* MemHeap_ps::Alloc(memsize uSize, memsize uAlign, bool bGPUUse)
 	return pData;
 }
 
-void* MemHeap_ps::ReAlloc(void* pData, memsize uSize)
+void* MemHeap_ps::ReAlloc(void* pData, memsize uSize, memsize uAlign)
 {
-	if (pData)
+	// realloc doesn't preserve posix_memalign alignment, so move the block
+	void* pNew = Alloc(uSize, uAlign, false);
+	if (pNew && pData)
 	{
-		m_uAllocated -= malloc_usable_size(pData);
-	}
-	void* pNew = realloc(pData, uSize);
-	if (pNew)
-	{
-		m_uAllocated += malloc_usable_size(pNew);
+		memcpy(pNew, pData, Math::Min((memsize)malloc_usable_size(pData), uSize));
+		Free(pData, uAlign, false);
 	}
 	return pNew;
 }
