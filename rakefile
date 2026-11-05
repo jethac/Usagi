@@ -1,8 +1,13 @@
 require 'tempfile'
 require 'fileutils'
 
-DEFAULT_PLATFORM = RUBY_PLATFORM =~ /darwin/ ? "osx" : "win"
-NINJA_PREFIX = RUBY_PLATFORM =~ /darwin/ ? "" : "Tools/bin/"
+DEFAULT_PLATFORM = case RUBY_PLATFORM
+                   when /darwin/ then "osx"
+                   when /linux/ then "linux"
+                   else "win"
+                   end
+# Windows uses the ninja checked in to Tools/bin; elsewhere it comes from PATH
+NINJA_PREFIX = Gem.win_platform? ? "Tools/bin/" : ""
 
 BUILDS          = (ENV["build"]    || "debug").split(",")
 TARGET_PLATFORM = ENV["platform"]  || DEFAULT_PLATFORM
@@ -60,6 +65,12 @@ end
 
 task :data => :ninja do
 	BUILDS.each{ |b| sh "#{ninja b} data" }
+end
+
+# Runs the Windows-only code generators for a platform that is compiled
+# elsewhere (e.g. 'rake platform=linux codegen' on Windows)
+task :codegen => :ninja do
+	BUILDS.each{ |b| sh "#{ninja b} codegen" }
 end
 
 task :libs => :ninja do

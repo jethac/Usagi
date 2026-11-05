@@ -19,7 +19,8 @@ class BuildConfig
 
   # Here 'nxe' refers to the Windows platform using the Nintendo APIs,
   # while 'nx' refers to the Switch hardware using the same APIs.
-  VALID_PLATFORMS = ["win", "nxe", "nx"]
+  # 'linux' is native x86_64 Linux, compiled and linked by ninja.
+  VALID_PLATFORMS = ["win", "nxe", "nx", "linux"]
 
   # maps file extensions to the command used to compile them
   COMPILERS = {".c" => "cc", ".cpp" => "cxx", ".m" => "cm", ".mm" => "cmm"}
@@ -95,6 +96,19 @@ class BuildConfig
     end
 
     path.to_path
+  end
+
+  # True when ninja, rather than MSBuild, compiles and links the code
+  def compiles_with_ninja?
+    @target_platform == 'linux'
+  end
+
+  # Some code generators are Windows-only binaries: protoc 2.5 with the
+  # nanopb .bat plugins, and systems-scanner.exe. On other hosts their
+  # outputs (protocol buffer sources and per-system .yml files) must be
+  # generated on Windows ('rake platform=<p> codegen') and copied over.
+  def can_run_windows_codegen?
+    Gem.win_platform?
   end
 
   #####################################################################

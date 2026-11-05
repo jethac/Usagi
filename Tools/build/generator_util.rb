@@ -17,7 +17,7 @@ module GeneratorUtil
     n.variable('builddir', config.working_dir)
     n.variable('project', config.project)
 
-    n.variable('msbuild', config.msbuild)
+    n.variable('msbuild', config.msbuild) unless config.compiles_with_ninja?
 
     n.variable('cc', platform.cc)
     n.variable('cxx', platform.cxx)
@@ -39,7 +39,7 @@ module GeneratorUtil
     n.variable('protoc_gen_c', config.protoc_gen_c)
     n.variable('protoc_gen_cs', config.protoc_gen_cs)
     n.variable('protoc_gen_lua', config.protoc_gen_lua)
-    n.variable('protoc_gen_ruby', config.protoc_gen_ruby)
+    n.variable('protoc_gen_ruby', config.protoc_gen_ruby || '')
     n.variable('nanopb_proto_dir', config.nanopb_proto_dir)
   end
 
@@ -83,7 +83,7 @@ module GeneratorUtil
 
     all_ld_flags = "$ldflags"
     all_ld_flags += " #{platform.additional_ld_flags}" if config.target_platform == 'ctr'
-    n.rule('ld', "$ld #{all_ld_flags} -o $out --via $out.rsp",
+    n.rule('ld', "$ld #{all_ld_flags} -o $out #{platform.ld_response_file_arg}",
            {:description => 'LINK $out', :rspfile => '$out.rsp',
              :rspfile_content => '$in $syslibs'})
 
@@ -259,7 +259,9 @@ module GeneratorUtil
 
     proto_files.zip(lua_h, lua_cpp, lua_o, include_lua_h).each do |proto, h, cpp, o, include_h|
       FileUtils.mkdir_p(File.dirname(cpp))
-      n.build('protoc_lua', {cpp => [proto]}, protoc_options(config, config.protocol_output_dir(false), config.nanopb_lua_generator))
+      if config.can_run_windows_codegen?
+        n.build('protoc_lua', {cpp => [proto]}, protoc_options(config, config.protocol_output_dir(false), config.nanopb_lua_generator))
+      end
       n.alias(h, cpp)
 
       FileUtils.mkdir_p(File.dirname(include_h))
@@ -329,7 +331,9 @@ module GeneratorUtil
 
     proto_files.zip(pb_h, pb_cpp, pb_o, include_pb_h).each do |proto, h, cpp, o, include_h|
       FileUtils.mkdir_p(File.dirname(cpp))
-      n.build('protoc_cpp', {cpp => [proto]}, protoc_options(config, config.protocol_output_dir(false), config.nanopb_generator))
+      if config.can_run_windows_codegen?
+        n.build('protoc_cpp', {cpp => [proto]}, protoc_options(config, config.protocol_output_dir(false), config.nanopb_generator))
+      end
       n.alias(h, cpp)
 
       FileUtils.mkdir_p(File.dirname(include_h))
@@ -337,6 +341,43 @@ module GeneratorUtil
     end
 
     pb_h
+  end
+
+  # Files produced by protoc 2.5 and the nanopb plugins, which only run
+  # on Windows (see BuildConfig#can_run_windows_codegen?)
+  def GeneratorUtil.windows_protobuf_outputs(config, proto_files)
+    proto_files.flat_map do |p|
+      ['.pb', '.lua'].flat_map do |ext|
+        base = File.join(config.protocol_output_dir(false), p.sub(/\.proto$/, ext))
+        ["#{base}.cpp", "#{base}.h"]
+      end
+    end
+  end
+
+  # Files produced by systems-scanner.exe, which only runs on Windows
+  def GeneratorUtil.windows_system_scan_outputs(config, system_sources)
+    system_sources.map { |src| "#{config.code_working_dir}/#{src.tr('\\', '/')}.yml" }
+  end
+
+  # For platforms that ninja compiles. On Windows, 'codegen' builds the
+  # files that need the Windows-only generators, so they can be copied
+  # to the target machine. Elsewhere those files must already exist.
+  def GeneratorUtil.windows_codegen_targets(config, n, outputs, default_target = 'libs')
+    if config.can_run_windows_codegen?
+      n.alias('codegen', outputs)
+      n.defaults('codegen')
+      return
+    end
+
+    missing = outputs.reject { |f| File.exist?(f) }
+    if !missing.empty?
+      abort("#{missing.length} generated files are missing, starting with " \
+            "#{missing.first}. They come from Windows-only tools: run " \
+            "'rake platform=#{config.target_platform} build=#{config.build} codegen' " \
+            "on Windows and copy _build/proto and #{config.code_working_dir} here.")
+    end
+
+    n.defaults(default_target)
   end
 
   def GeneratorUtil.compile_cpp_protobuf(config, n, targets, order_only_deps)
@@ -546,9 +587,11 @@ module GeneratorUtil
       o = cpp.sub(/\.cpp$/, ".o")
 
       FileUtils.mkdir_p(File.dirname yml)
-      n.build('boilerplate', {yml => [src]},
-              {:implicit_deps => [config.boilerplate_scan, config.boilerplate_tool],
-              :order_only_deps => order_only_deps})
+      if config.can_run_windows_codegen?
+        n.build('boilerplate', {yml => [src]},
+                {:implicit_deps => [config.boilerplate_scan, config.boilerplate_tool],
+                :order_only_deps => order_only_deps})
+      end
       FileUtils.mkdir_p(File.dirname cpp)
       n.build('boilerplate_template', {cpp => [config.system_boilerplate_template]},
               {:implicit_deps => [yml], :variables => {'yml' => yml}})
@@ -556,6 +599,10 @@ module GeneratorUtil
       GeneratorUtil.copy_boilerplate_to_vs_build_dir(config, n, cpp, win_bp_cpp)
 
       if src =~ /\.h/
+        if config.compiles_with_ninja?
+          GeneratorUtil.compile_source(config, n, {cpp => o}, order_only_deps, existing_pch_file)
+        end
+
 #        if config.target_platform == 'ctr'
 #          pch_file = nil
 

@@ -9,6 +9,11 @@ class Platform
     []
   end
 
+  # Engine libraries (directories under Engine/) not built for this platform
+  def excluded_libs
+    []
+  end
+
   def cc
     ''
   end
@@ -75,6 +80,11 @@ class Platform
 
   def system_libs
     []
+  end
+
+  # How the linker is handed the response file listing its inputs
+  def ld_response_file_arg
+    '--via $out.rsp'
   end
 
   def layout_converter_flags

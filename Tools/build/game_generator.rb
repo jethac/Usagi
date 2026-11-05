@@ -776,7 +776,7 @@ end
 
 
 def boilerplate(config, n, generated_code, win_bp_cpp)
-  system_sources = grep(["namespace.Systems", "public.*System"], [config.project], ["*.h", "*.cpp"])
+  system_sources = grep(["namespace.Systems"], [config.project], ["*.h", "*.cpp"])
   project_systems = system_sources.map{ |h| "#{(h + ".bp.cpp").gsub("\\", "/")}" }
 
   project_system_ymls = project_systems.map{ |s| "#{config.code_working_dir}/#{s.sub(/\.bp\.cpp$/, ".yml")}" }

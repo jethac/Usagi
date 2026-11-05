@@ -1,6 +1,7 @@
 # Usagi Engine, Copyright (c) Vitei, Inc. 2013
 require_relative 'generator_util.rb'
 require_relative 'platform.win.rb'
+require_relative 'platform.linux.rb'
 
 NINJA_FILE = ARGV[5]
 $engine = BuildConfig.new(ENV['USAGI_DIR'], ARGV)
@@ -8,6 +9,8 @@ $engine = BuildConfig.new(ENV['USAGI_DIR'], ARGV)
 case $engine.target_platform
 when 'win'
   $platform = PlatformWin.new
+when 'linux'
+  $platform = PlatformLinux.new($engine)
 end
 
 n = Ninja::File.new()
@@ -15,6 +18,23 @@ n = Ninja::File.new()
 #####################################################################
 # Engine-Specific Functions                                         #
 #####################################################################
+# Compile one engine library's sources and archive them, along with its
+# system boilerplate objects. Returns the library path.
+def compile_lib(config, n, lib, targets, standard_targets, bp_objects, order_only_deps)
+  source_root = "Engine/#{lib}"
+
+  GeneratorUtil.compile_source(config, n, standard_targets, order_only_deps)
+  proto_targets = targets.select{|c, o| c.end_with?('.pb.cpp') || c.end_with?('.lua.cpp')}
+  GeneratorUtil.compile_source(config, n, proto_targets, order_only_deps)
+
+  libOut = config.get_lib_filename lib
+  FileUtils.mkdir_p(File.dirname libOut)
+  lib_bp_obj = bp_objects.select{|o| o.start_with? "#{config.code_working_dir}/#{source_root}/"}
+  n.build('ar', {libOut => targets.values + lib_bp_obj})
+
+  libOut
+end
+
 def build_corepbs_dll(config, n)
   coreproto_files = FileList['Engine/Core/usagipb.proto', 'Engine/ThirdParty/nanopb/generator/proto/nanopb.proto']
   write_file_list(coreproto_files, config.csharp_engine_root, "", '.coreproto.txt')
@@ -60,7 +80,7 @@ def build_corepbs_dll(config, n)
   dllpath
 end
 
-def libs(config, platform, n, bp_objects, order_only_deps)
+def libs(config, platform, n, bp_objects, order_only_deps, codegen_outputs)
   pbs = []
   pbs_csharp = []
   # We only build C# files for our Windows build, so we shouldn't build CorePBs on others.
@@ -69,8 +89,7 @@ def libs(config, platform, n, bp_objects, order_only_deps)
   # TODO: If we ever want a command-line NX build, we'll have to check
   # to see VISUAL_STUDIO_BUILD is defined in the environment when the
   # platform is 'nx'
-  should_skip_compilation = config.target_platform == 'win' ||
-    config.target_platform == 'nxe' || config.target_platform == 'nx'
+  should_skip_compilation = !config.compiles_with_ninja?
 
   libs = config.libs().map do |lib|
     source_root = "Engine/#{lib}"
@@ -103,26 +122,24 @@ def libs(config, platform, n, bp_objects, order_only_deps)
     pbs.concat pb_cpp
     pb_lua = GeneratorUtil.lua_protobuf(config, n, proto_files)
     pbs.concat pb_lua
-    pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
-    pbs.concat pb_rb
-    pb_py = GeneratorUtil.python_protobuf(config, n, proto_files)
-    pbs.concat pb_py
-    pb_csharp = GeneratorUtil.csharp_protobuf(config, n, proto_files, dllpath)
-    pbs_csharp.concat(pb_csharp);
+    codegen_outputs.concat GeneratorUtil.windows_protobuf_outputs(config, proto_files)
 
-    next if should_skip_compilation
+    # The Ruby, Python and C# classes are only used by the data tools,
+    # which run on Windows against the 'win' build, so platforms that
+    # ninja compiles leave them out
+    if !config.compiles_with_ninja?
+      pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
+      pbs.concat pb_rb
+      pb_py = GeneratorUtil.python_protobuf(config, n, proto_files)
+      pbs.concat pb_py
+      pb_csharp = GeneratorUtil.csharp_protobuf(config, n, proto_files, dllpath)
+      pbs_csharp.concat(pb_csharp);
+    end
 
-    GeneratorUtil.compile_source(config, n, standard_targets, order_only_deps, pch_file)
-    proto_targets = targets.select{|c, o| c.end_with?('.pb.cpp') || c.end_with?('.lua.cpp')}
-    GeneratorUtil.compile_source(config, n, proto_targets, order_only_deps, pch_file)
+    next if should_skip_compilation || platform.excluded_libs.include?(lib)
 
-    libOut = config.get_lib_filename lib
-    FileUtils.mkdir_p(File.dirname libOut)
-    lib_bp_obj = bp_objects.select{|o| o.start_with? "#{config.code_working_dir}/#{source_root}"}
-    n.build('ar', {libOut => targets.values + lib_bp_obj})
-
-    libOut
-  end
+    compile_lib(config, n, lib, targets, standard_targets, bp_objects, order_only_deps)
+  end.compact
   #if config.target_platform == 'win'
   n.alias('pbs_csharp', pbs_csharp)    
   pbs.concat(pbs_csharp)
@@ -312,8 +329,9 @@ def build_windows_files(config, n, generated_files, win_bp_cpp)
   n.defaults('exe_files')
 end
 
-def boilerplate(config, n, generated_code, win_bp_cpp)
-  system_sources = grep(["namespace.Systems", "public.*System"], ['Engine'], ["*.h", "*.cpp"])
+def boilerplate(config, n, generated_code, win_bp_cpp, codegen_outputs)
+  system_sources = grep(["namespace.Systems"], ['Engine'], ["*.h", "*.cpp"])
+  codegen_outputs.concat GeneratorUtil.windows_system_scan_outputs(config, system_sources)
 
   lib_ymls = []
 
@@ -345,6 +363,12 @@ def boilerplate(config, n, generated_code, win_bp_cpp)
             :variables => {'yml' => lib_yml}})
 
     GeneratorUtil.copy_boilerplate_to_vs_build_dir(config, n, lib_registersystems_cpp, win_bp_cpp)
+
+    if config.compiles_with_ninja?
+      GeneratorUtil.compile_source(config, n,
+                                   {lib_registersystems_cpp => lib_registersystems_o},
+                                   generated_code)
+    end
 
 #    if config.target_platform == 'ctr'
 #      GeneratorUtil.compile_source(config, n,
@@ -398,11 +422,19 @@ generated_headers.push(*includes)
 n.alias('includes', generated_headers)
 
 win_bp_cpp = []
-bp_objects, bp_generated_headers = boilerplate($engine, n, generated_headers, win_bp_cpp)
+codegen_outputs = []
+bp_objects, bp_generated_headers = boilerplate($engine, n, generated_headers, win_bp_cpp, codegen_outputs)
 
-libs($engine, $platform, n, bp_objects, generated_headers + bp_generated_headers)
-GeneratorUtil.nanopb_protocols($engine, n)
-GeneratorUtil.usagi_protocols($engine, n)
+libs($engine, $platform, n, bp_objects, generated_headers + bp_generated_headers, codegen_outputs)
+
+if $engine.can_run_windows_codegen?
+  GeneratorUtil.nanopb_protocols($engine, n)
+  GeneratorUtil.usagi_protocols($engine, n)
+end
+
+if $engine.compiles_with_ninja?
+  GeneratorUtil.windows_codegen_targets($engine, n, codegen_outputs)
+end
 
 # TODO: If we ever want a command-line NX build, we'll have to check
 # to see VISUAL_STUDIO_BUILD is defined in the environment when the
