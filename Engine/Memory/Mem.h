@@ -8,7 +8,7 @@
 #include "Engine/Memory/ScratchObj.h"
 #include "Engine/Memory/Allocator.h"
 
-#if defined PLATFORM_OSX || defined PLATFORM_LINUX || defined TOOL_BUILD || defined PLATFORM_SWITCH_DEVICE
+#if defined PLATFORM_POSIX || defined TOOL_BUILD || defined PLATFORM_SWITCH_DEVICE
 #include <new>
 #endif
 
@@ -64,7 +64,7 @@ namespace mem
 	MemHeap* GetMainHeap();
 	MemHeap* GetNetHeap();
 
-#if defined (PLATFORM_PC) || defined(PLATFORM_LINUX) || defined(PLATFORM_SWITCH)
+#if defined (PLATFORM_PC) || defined(PLATFORM_POSIX) || defined(PLATFORM_SWITCH)
 	extern void setConventionalMemManagement(bool b);
 #endif
 }
@@ -93,7 +93,7 @@ namespace mem
 #define vdelete					delete
 #endif
 
-#if (!defined PLATFORM_OSX) && (!defined PLATFORM_SWITCH_DEVICE)
+#if (!defined PLATFORM_SWITCH_DEVICE)
 void* operator new(size_t size);
 void  operator delete(void* ptr);
 #endif
@@ -101,7 +101,7 @@ void  operator delete(void* ptr);
 
 
 // <new> already provides placement new outside MSVC
-#if (!defined PLATFORM_WIIU && !defined PLATFORM_PS4 && !defined PLATFORM_OSX && !defined PLATFORM_LINUX && !defined PLATFORM_SWITCH_DEVICE)
+#if (!defined PLATFORM_WIIU && !defined PLATFORM_PS4 && !defined PLATFORM_POSIX && !defined PLATFORM_SWITCH_DEVICE)
 
 #ifndef __PLACEMENT_NEW_INLINE
 	#define __PLACEMENT_NEW_INLINE

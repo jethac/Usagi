@@ -35,7 +35,7 @@ bool SockMultiLink::Shutdown()
 	closesocket(m_serverSocket);
 	shutdown(m_serverSocket, 2);
 
-#elif defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
+#elif defined(PLATFORM_POSIX)
 	close(m_clientSocket);
 	shutdown(m_clientSocket, 2);
 	
@@ -116,7 +116,7 @@ bool SockMultiLink::InitializeServer()
 	m_serverSaddr.sin_family = PF_INET;
 	m_serverSaddr.sin_port = htons(MULTICAST_PORT);
 	m_serverSaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-#ifdef PLATFORM_OSX
+#if defined(PLATFORM_OSX) || defined(PLATFORM_IOS)
 	m_serverSaddr.sin_len = sizeof(sockaddr_in);
 	m_serverSaddr.sin_addr.s_addr = inet_addr(MULTICAST_IP_ADDRESS);
 #endif
@@ -140,7 +140,7 @@ bool SockMultiLink::InitializeServer()
 	
 	setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&unused, sizeof(unused));
 
-#ifdef PLATFORM_OSX
+#if defined(PLATFORM_OSX) || defined(PLATFORM_IOS)
   setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEPORT, (char*)&unused, sizeof(unused));
 #endif
 

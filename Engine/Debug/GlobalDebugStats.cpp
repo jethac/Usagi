@@ -135,7 +135,7 @@ namespace usg {
 		m_fGPUTime = pDevice->GetGPUTime();
 		m_warnings[WARNING_GPU_HEAVY].bActive = m_fGPUTime > 15.5f;
 
-		#if defined(PLATFORM_PC) || defined(PLATFORM_LINUX)
+		#if defined(PLATFORM_PC) || defined(PLATFORM_POSIX)
 		m_warnings[WARNING_MEMORY].bActive = false;
 		#else
 		m_warnings[WARNING_MEMORY].bActive = ((float)mem::GetMainHeap()->GetFreeSize() / (float)mem::GetMainHeap()->GetSize()) < 0.05f;

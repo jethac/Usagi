@@ -396,7 +396,7 @@ void SockNetworkManager::FillName(char* nameOut)
 		sprintf(nameOut, "OSX#%i%i", (int)(m_UID >> 32), (int)(m_UID & 0xffffffff));
 	else
 		sprintf(nameOut, "OSX#%s", username);
-#elif defined(PLATFORM_LINUX)
+#elif defined(PLATFORM_POSIX)
 	const char* username = getenv("USER");
 	if (username == 0)
 		snprintf(nameOut, 32, "Linux#%i%i", (int)(m_UID >> 32), (int)(m_UID & 0xffffffff));

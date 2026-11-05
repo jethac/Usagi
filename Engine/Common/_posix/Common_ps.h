@@ -11,6 +11,9 @@
 #define DEBUG_BUILD TRUE
 #endif
 
+// A Unix-like OS: the _posix directories provide its services
+#define PLATFORM_POSIX
+
 #define USE_VULKAN
 // The window, Vulkan surface and input come from SDL (the _sdl directories)
 #define USE_SDL

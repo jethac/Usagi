@@ -36,7 +36,7 @@ bool SockClientLink::Shutdown()
 	// Close the server
 	closesocket(m_serverSocket);
 	shutdown(m_serverSocket, 2);
-#elif defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
+#elif defined(PLATFORM_POSIX)
 	// Close the client link
 	close(m_clientSocket);
 	shutdown(m_clientSocket, 2);
@@ -55,7 +55,7 @@ bool SockClientLink::InitializeSend()
 	memset(&m_clientSaddr, 0, sizeof(SocketIn));
 	m_clientSocket = -1;
 
-#if defined(PLATFORM_PC) || defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
+#if defined(PLATFORM_PC) || defined(PLATFORM_POSIX)
 
 	// Allocate the socket
 	m_clientSocket = socket(PF_INET, SOCK_DGRAM, 0);
@@ -78,7 +78,7 @@ bool SockClientLink::InitializeReceive()
 	memset(&m_serverSaddr, 0, sizeof(SocketIn));
 	memset(&m_serverInAddr, 0, sizeof(SocketIn));
 
-#if defined(PLATFORM_PC) || defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
+#if defined(PLATFORM_PC) || defined(PLATFORM_POSIX)
 	// Create the socket
 	m_serverSocket = socket(PF_INET, SOCK_DGRAM, 0);
 	if (m_serverSocket == -1) { return false; }
@@ -130,7 +130,7 @@ bool SockClientLink::Recv(NetPacket* inPacket)
 	if (m_isInitialized == false) { return false; }
 
 	int ret = 0;
-#if defined(PLATFORM_PC) || defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
+#if defined(PLATFORM_PC) || defined(PLATFORM_POSIX)
 
 	// Test connection
 	fd_set m_serverWdfs;
@@ -167,7 +167,7 @@ bool SockClientLink::Recv(NetPacket* inPacket)
 	inPacket->IP = m_serverInAddr.sin_addr.S_un.S_addr;
 	inPacket->port = m_serverInAddr.sin_port;
 
-#elif defined(PLATFORM_OSX) || defined(PLATFORM_LINUX)
+#elif defined(PLATFORM_POSIX)
 
 	// Data was rec'd 
 	unsigned int senderSize = sizeof(sockaddr_in);
