@@ -618,6 +618,26 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 		m_primaryPhysicalDevice = m_gpus[uBestIndex];
 	}
 
+	// The rest of the backend reads the memory types and limits of GPU 0, so
+	// make the device we render with GPU 0. On a machine with an integrated
+	// and a discrete GPU the enumeration order puts either first.
+	for (uint32 i = 0; i < m_uGPUCount; i++)
+	{
+		if (m_gpus[i] == m_primaryPhysicalDevice)
+		{
+			uBestIndex = i;
+			break;
+		}
+	}
+	if (uBestIndex != 0)
+	{
+		eastl::swap(m_gpus[0], m_gpus[uBestIndex]);
+		eastl::swap(m_memoryProperites[0], m_memoryProperites[uBestIndex]);
+		eastl::swap(m_deviceProperties[0], m_deviceProperties[uBestIndex]);
+		uBestIndex = 0;
+	}
+	DEBUG_PRINT("Rendering with %s (GPU %u of %u)\n", m_deviceProperties[0].deviceName, 0, m_uGPUCount);
+
 	const auto& limits = m_deviceProperties[uBestIndex].limits;
 	m_deviceCaps.maxPushConstantsSize = limits.maxPushConstantsSize;
 	m_deviceCaps.maxTessellationPatchSize = limits.maxTessellationPatchSize;
