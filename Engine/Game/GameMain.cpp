@@ -26,6 +26,7 @@
 #include "Engine/Core/_linux/LinuxUtil.h"
 #endif
 #include "Engine/Core/OS.h"
+#include <EASTL/sort.h>
 
 namespace usg {
 
@@ -107,8 +108,58 @@ static bool FrameRateReportEnabled()
 	return s_enabled == 1;
 }
 
+// Every frame time of the run (up to an hour at 120 fps), for the
+// distribution reported at shutdown
+static const uint32 MAX_RECORDED_FRAMES = 120 * 60 * 60;
+static float s_recordedFrameMs[MAX_RECORDED_FRAMES];
+static uint32 s_uRecordedFrames = 0;
+
+static float FrameTimePercentile(float* pSorted, uint32 uCount, float fPercentile)
+{
+	uint32 uIndex = Math::Min((uint32)(fPercentile * 0.01f * (float)uCount), uCount - 1);
+	return pSorted[uIndex];
+}
+
+// Logs the distribution of frame times over the whole run, skipping the
+// first seconds (loading and shader warm-up)
+static void ReportFrameTimeDistribution()
+{
+	if (!FrameRateReportEnabled())
+	{
+		return;
+	}
+
+	const uint32 uSkip = Math::Min(s_uRecordedFrames, 300U);
+	float* pFrames = s_recordedFrameMs + uSkip;
+	const uint32 uCount = s_uRecordedFrames - uSkip;
+	if (uCount == 0)
+	{
+		return;
+	}
+
+	eastl::sort(pFrames, pFrames + uCount);
+	double fTotal = 0.0;
+	for (uint32 i = 0; i < uCount; i++)
+	{
+		fTotal += pFrames[i];
+	}
+	uint32 uOver16 = 0;
+	for (uint32 i = 0; i < uCount; i++)
+	{
+		uOver16 += pFrames[i] > 1000.0f / 60.0f ? 1 : 0;
+	}
+	RELEASE_WARNING("Frame times over %u frames (first %u skipped): mean %.2f ms, p50 %.2f, p90 %.2f, p99 %.2f, p99.9 %.2f, max %.2f ms; %u over 16.7 ms\n",
+		uCount, uSkip, (float)(fTotal / uCount), FrameTimePercentile(pFrames, uCount, 50.0f), FrameTimePercentile(pFrames, uCount, 90.0f),
+		FrameTimePercentile(pFrames, uCount, 99.0f), FrameTimePercentile(pFrames, uCount, 99.9f), pFrames[uCount - 1], uOver16);
+}
+
 static void ReportFrameRate(float fDelta, float fUpdateMs, float fDrawMs)
 {
+	if (s_uRecordedFrames < MAX_RECORDED_FRAMES)
+	{
+		s_recordedFrameMs[s_uRecordedFrames++] = fDelta * 1000.0f;
+	}
+
 	static const float s_fInterval = 5.0f;
 	static float s_fElapsed = 0.0f;
 	static float s_fWorst = 0.0f;
@@ -176,6 +227,7 @@ void GameLoop()
 
 void GameCleanup()
 {
+	ReportFrameTimeDistribution();
 	game->Cleanup(g_pGFXDevice);
 	vdelete game;
 	game = nullptr;
