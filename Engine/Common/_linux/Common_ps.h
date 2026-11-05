@@ -35,8 +35,7 @@
 #define API_HEADER(PATH, FILE) STRINGIFY(PATH/_vulkan/FILE)
 #define FRAGMENT_HEADER(PATH, FILE) STRINGIFY(PATH/_fragment/FILE)
 #define OS_HEADER(PATH, FILE) STRINGIFY(PATH/_linux/FILE)
-// No native audio backend yet; see Documents/LinuxPort.md
-#define AUDIO_HEADER(PATH, FILE) STRINGIFY(PATH/_dummy/FILE)
+#define AUDIO_HEADER(PATH, FILE) STRINGIFY(PATH/_sdl/FILE)
 
 #ifndef ALIGNED_VAR
 #define ALIGNED_VAR(varType, varAlign, varDef) alignas(varAlign) varType varDef

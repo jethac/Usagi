@@ -21,7 +21,7 @@ class PlatformLinux < Platform
   end
 
   def underscore_dirs_whitelist
-    ['_linux', '_vulkan', '_fragment', '_dummy']
+    ['_linux', '_vulkan', '_fragment', '_sdl']
   end
 
   # The Oculus module is built on LibOVR, which is Windows-only
