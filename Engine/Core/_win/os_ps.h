@@ -22,6 +22,7 @@ public:
 	static CriticalSection& GetSaveDataCriticalSection();
 	static void RequestExit();
 	static void ShowManual();
+	static bool GetEnvVar(const char* szName, char* szValueOut, memsize uSize);
 private:
 	static bool m_bExitRequested;
 };

@@ -24,6 +24,9 @@ namespace usg
 		static bool ShouldQuit();
 		static void RequestExit();
 		static void ShowManual();
+		// Copies an environment variable's value into szValueOut (truncating
+		// if needed). Returns false if the variable is not set.
+		static bool GetEnvVar(const char* szName, char* szValueOut, memsize uSize);
 	};
 
 }

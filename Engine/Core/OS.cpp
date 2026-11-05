@@ -15,6 +15,11 @@ namespace usg
 		OS_ps::ShowManual();
 	}
 
+	bool OS::GetEnvVar(const char* szName, char* szValueOut, memsize uSize)
+	{
+		return OS_ps::GetEnvVar(szName, szValueOut, uSize);
+	}
+
 	void OS::Initialize()
 	{
 		OS_ps::Initialize();

@@ -104,6 +104,15 @@ namespace usg {
 		DEBUG_PRINT("trying to show manual on windows...\n");
 	}
 
+	bool OS_ps::GetEnvVar(const char* szName, char* szValueOut, memsize uSize)
+	{
+		// A non-zero length means the variable is set, even when szValueOut
+		// is too small to hold it
+		size_t len = 0;
+		getenv_s(&len, szValueOut, uSize, szName);
+		return len > 0;
+	}
+
 	void OS_ps::Initialize()
 	{
 		InstallCrashHandler();
