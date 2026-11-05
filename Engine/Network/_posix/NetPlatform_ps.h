@@ -1,8 +1,8 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
-#ifndef NET_PLATFORM_LINUX_H
-#define NET_PLATFORM_LINUX_H
+#ifndef NET_PLATFORM_POSIX_H
+#define NET_PLATFORM_POSIX_H
 
 #include <sys/types.h>
 #include <sys/socket.h>

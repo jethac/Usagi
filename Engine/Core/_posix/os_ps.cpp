@@ -2,7 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
-#include "Engine/Core/_linux/os_ps.h"
+#include "Engine/Core/_posix/os_ps.h"
 #include "Engine/Debug/Exception.h"
 #include "Engine/Core/String/String_Util.h"
 
@@ -19,7 +19,7 @@ namespace usg {
 
 	void OS_ps::ShowManual()
 	{
-		DEBUG_PRINT("No manual to show on Linux\n");
+		DEBUG_PRINT("No manual to show on this platform\n");
 	}
 
 	bool OS_ps::GetEnvVar(const char* szName, char* szValueOut, memsize uSize)

@@ -1,8 +1,8 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
-#ifndef _USG_ENGINE_MEMORY_MEMTYPE_LINUX_PS_H_
-#define _USG_ENGINE_MEMORY_MEMTYPE_LINUX_PS_H_
+#ifndef _USG_ENGINE_MEMORY_MEMTYPE_POSIX_PS_H_
+#define _USG_ENGINE_MEMORY_MEMTYPE_POSIX_PS_H_
 
 
 // FIXME: Just a wrapper for new and delete at the moment

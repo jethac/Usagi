@@ -36,7 +36,8 @@
 #define XSTR(s) STRINGIFY(s)
 #define API_HEADER(PATH, FILE) STRINGIFY(PATH/_vulkan/FILE)
 #define FRAGMENT_HEADER(PATH, FILE) STRINGIFY(PATH/_fragment/FILE)
-#define OS_HEADER(PATH, FILE) STRINGIFY(PATH/_linux/FILE)
+// OS services are the POSIX ones shared with the other Unix-like platforms
+#define OS_HEADER(PATH, FILE) STRINGIFY(PATH/_posix/FILE)
 #define AUDIO_HEADER(PATH, FILE) STRINGIFY(PATH/_sdl/FILE)
 #define HID_HEADER(PATH, FILE) STRINGIFY(PATH/_sdl/FILE)
 

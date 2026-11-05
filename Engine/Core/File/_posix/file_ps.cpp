@@ -1,6 +1,6 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Linux file access. Paths are relative to the working
+//	Description: POSIX file access. Paths are relative to the working
 //	directory, as on Windows. Resource names are matched case-insensitively
 //	and may use either separator, because cooked data was authored on a
 //	case-insensitive file system.
@@ -140,7 +140,7 @@ FILE_STATUS File_ps::FileStatus(const char* szName, const FILE_TYPE eFileType)
 
 bool File_ps::UserFileOpenPath(const FileOpenPath& pathIn, usg::vector<FilePathResult>& result)
 {
-	// File dialogs are an editor feature, not yet supported on Linux
+	// File dialogs are an editor feature, not yet supported here
 	return false;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Linux crash handling and backtraces (glibc execinfo)
+//	Description: POSIX crash handling and backtraces (execinfo)
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Debug/Exception.h"

@@ -1,6 +1,6 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
-//	Description: Linux assert and debug output functions. Messages go to
+//	Description: POSIX assert and debug output functions. Messages go to
 //	stderr; fatal errors break into an attached debugger or exit.
 *****************************************************************************/
 #ifndef __USG_DEBUG_PS_H__

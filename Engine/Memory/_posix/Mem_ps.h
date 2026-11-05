@@ -3,8 +3,8 @@
 ****************************************************************************/
 #pragma once
 
-#ifndef USG_ENGINE_MEMORY_LINUX_MEM_PS_H
-#define USG_ENGINE_MEMORY_LINUX_MEM_PS_H
+#ifndef USG_ENGINE_MEMORY_POSIX_MEM_PS_H
+#define USG_ENGINE_MEMORY_POSIX_MEM_PS_H
 
 namespace usg {
 
@@ -51,4 +51,4 @@ namespace mem
 
 } // namespace usg
 
-#endif // USG_ENGINE_MEMORY_LINUX_MEM_PS_H
+#endif // USG_ENGINE_MEMORY_POSIX_MEM_PS_H
