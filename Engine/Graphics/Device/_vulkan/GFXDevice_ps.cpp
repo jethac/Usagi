@@ -732,15 +732,35 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	m_enabledFeatures.shaderClipDistance = VK_TRUE;
 
 
-	extensions.clear();
-	extensions.push_back("VK_KHR_swapchain");
-	extensions.push_back("VK_EXT_hdr_metadata");
-	extensions.push_back("VK_KHR_format_feature_flags2");
-
 	uint32_t extensionCount;
 	vkEnumerateDeviceExtensionProperties(m_primaryPhysicalDevice, nullptr, &extensionCount, nullptr);
 	usg::vector<VkExtensionProperties> deviceExt(extensionCount);
 	vkEnumerateDeviceExtensionProperties(m_primaryPhysicalDevice, nullptr, &extensionCount, deviceExt.data());
+
+	auto HasDeviceExtension = [&deviceExt](const char* szName)
+	{
+		for (const auto& extension : deviceExt)
+		{
+			if (strcmp(extension.extensionName, szName) == 0)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	extensions.clear();
+	extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+	// Optional: not every driver exposes these (e.g. NVIDIA on Linux has no
+	// VK_EXT_hdr_metadata), and asking for a missing one fails device creation
+	if (HasDeviceExtension(VK_EXT_HDR_METADATA_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_EXT_HDR_METADATA_EXTENSION_NAME);
+	}
+	if (HasDeviceExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME))
+	{
+		extensions.push_back(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+	}
 
 #ifdef USE_DEBUG_MARKERS
 
