@@ -42,7 +42,7 @@
 ------------------------------------------------------------------------ */
 
 #include "Engine/Common/Common.h"
-#include "utf.h"
+#include "Utf.h"
 #ifdef CVTUTF_DEBUG
 #include <stdio.h>
 #endif

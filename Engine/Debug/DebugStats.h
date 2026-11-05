@@ -8,7 +8,7 @@
 #define USG_DEBUG_STATS_H
 
 #include "Engine/Debug/Rendering/DebugRender.h"
-#include "Engine/Core/stl/Vector.h"
+#include "Engine/Core/stl/vector.h"
 #include API_HEADER(Engine/Debug, DebugStats_ps.h)
 #include "Engine/Debug/GlobalDebugStats.h"
 #include "Engine/Core/String/FixedString.h"

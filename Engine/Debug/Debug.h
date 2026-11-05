@@ -35,9 +35,9 @@ void FatalInFinal(const char* format, ...);
 #endif
 
 #ifndef FINAL_BUILD
-#define FATAL_RELEASE(in, format, ...) { if(!(in)) { cDebugprintf(__FILE__, __LINE__, __FUNCTION__, DEBUG_MSG_ERROR, format, __VA_ARGS__); } }
+#define FATAL_RELEASE(in, ...) { if(!(in)) { cDebugprintf(__FILE__, __LINE__, __FUNCTION__, DEBUG_MSG_ERROR, __VA_ARGS__); } }
 #else
-#define FATAL_RELEASE(in, format, ...) { if(!(in)) { FatalInFinal(format, __VA_ARGS__); } }
+#define FATAL_RELEASE(in, ...) { if(!(in)) { FatalInFinal(__VA_ARGS__); } }
 #endif
 
 #endif

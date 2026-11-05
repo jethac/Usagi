@@ -3,7 +3,7 @@
 ****************************************************************************/
 #ifndef _USG_GRAPHICS_TEXTURE_H
 #define _USG_GRAPHICS_TEXTURE_H
-#include API_HEADER(Engine/Graphics/Textures, texture_ps.h)
+#include API_HEADER(Engine/Graphics/Textures, Texture_ps.h)
 
 #include "Engine/Resource/ResourceBase.h"
 

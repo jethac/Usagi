@@ -11,6 +11,11 @@ namespace usg
 {
 
 typedef class ComponentEntity* Entity;
+
+// Defined in GameComponents.h
+template<typename T, typename SearchMask>
+struct ComponentGetterInt;
+
 class ComponentGetter
 {
 public:

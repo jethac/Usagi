@@ -6,7 +6,6 @@
 #include "Engine/Graphics/Device/GFXContext.h"
 #include "GuiItems.h"
 #include "Engine/Core/String/String_Util.h"
-#include <commdlg.h>
 
 namespace usg
 {

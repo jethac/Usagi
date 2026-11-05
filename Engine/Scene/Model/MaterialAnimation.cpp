@@ -52,18 +52,6 @@ namespace usg
 	}
 
 
-template<typename T>
-void StoreProtocolBuffer(FILE* pHandle, T* pPB, size_t pbSize, const pb_field_t pbFields[])
-{
-	void* pBuf = aya::Alloc(pbSize);
-
-	pb_ostream_t streamOut = pb_ostream_from_buffer((uint8_t*)pBuf, pbSize);
-	pb_encode(&streamOut, pbFields, pPB);
-	fwrite(pBuf, streamOut.bytes_written, 1, pHandle);
-
-	aya::Free(pBuf);
-}
-
 void StorePBDelimiter(FILE* pHandle, char delimiter)
 {
 	fwrite(&delimiter, 1, 1, pHandle);

@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include "Engine/Core/String/String_Util.h"
 #if 1
 #include "Engine/Maths/Vector2f.h"
 #include "Engine/PostFX/PostFXSys.h"
@@ -123,7 +124,7 @@ void DeferredShading::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSy
 	for (uint32 i = 0; i < MAX_EXTRA_DIR_LIGHTS; i++)
 	{
 		char name[256];
-		sprintf_s(name, "Deferred.DirExtraShadow.%d", i + 1);
+		str::ParseVariableArgsC(name, sizeof(name), "Deferred.DirExtraShadow.%d", i + 1);
 		pipelineDecl.pEffect = pRes->GetEffect(pDevice, name);
 		m_additionalShadowPass[i].decl = pipelineDecl;
 	}

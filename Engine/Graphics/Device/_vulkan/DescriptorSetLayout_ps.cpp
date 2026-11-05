@@ -2,7 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
-#include "Engine/Memory/Memutil.h"
+#include "Engine/Memory/MemUtil.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/Device/DescriptorSetLayout.h"
 #include API_HEADER(Engine/Graphics/Device, GFXDevice_ps.h)

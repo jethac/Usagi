@@ -187,7 +187,7 @@ uint32 Gamepad::Vibrate(float fLeft, float fRight, float fDuration)
 
 void Gamepad::UpdateVibration(uint32 uHandle, float fLeft, float fRight)
 {
-	auto& itr = m_vibrations.find(uHandle);
+	auto itr = m_vibrations.find(uHandle);
 	if (itr != m_vibrations.end())
 	{
 		itr->second.fLeftStrength = fLeft;
@@ -197,7 +197,7 @@ void Gamepad::UpdateVibration(uint32 uHandle, float fLeft, float fRight)
 
 void Gamepad::StopEffect(uint32 uHandle)
 {
-	auto& itr = m_vibrations.find(uHandle);
+	auto itr = m_vibrations.find(uHandle);
 	if (itr != m_vibrations.end())
 	{
 		m_vibrations.erase(itr);

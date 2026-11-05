@@ -104,7 +104,6 @@ private:
 	void UpdateRenderMaskInt();
 
 	struct MaterialInfo;
-	class RenderMesh;
 	class BonePaletteMesh;
 
 	ConstantSet				m_skinnedBones;

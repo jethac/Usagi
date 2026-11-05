@@ -1,7 +1,7 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
-#include "Engine/Common/common.h"
+#include "Engine/Common/Common.h"
 #include "Engine/Maths/MathUtil.h"
 #include "Engine/Graphics/Textures/Texture.h"
 #include "Engine/Scene/Scene.h"

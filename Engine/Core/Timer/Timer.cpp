@@ -2,8 +2,8 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
-#include "engine/maths/mathutil.h"
-#include "timer.h"
+#include "Engine/Maths/MathUtil.h"
+#include "Timer.h"
 
 namespace usg {
 

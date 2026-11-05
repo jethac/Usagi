@@ -1,4 +1,5 @@
 ﻿#include "Engine/Common/Common.h"
+#include "Engine/Core/String/String_Util.h"
 #include "Engine/Layout/Global2D.h"
 #include "Engine/Audio/Audio.h"
 #include "Engine/Resource/CustomEffectResource.h"
@@ -122,9 +123,9 @@ void UIWindow::Init(usg::GFXDevice* pDevice, usg::ResourceMgr* pRes, const usg::
 				m_pUIItemsDefs[uImageId].def.cColor *= pDef->cNoHighlightColor;
 				m_pUIItemsDefs[uImageId].def.eHAlign = pInstDef->eHAlign;
 				m_pUIItemsDefs[uImageId].def.eVAlign = pInstDef->eVAlign;
-				strcpy_s(m_pUIItemsDefs[uImageId].def.name, pInstDef->name);
-				strcpy_s(m_pUIItemsDefs[uImageId].def.textureName, pDef->textureName);
-				strcpy_s(m_pUIItemsDefs[uImageId].def.tags, pInstDef->tags);
+				str::Copy(m_pUIItemsDefs[uImageId].def.name, pInstDef->name, sizeof(m_pUIItemsDefs[uImageId].def.name));
+				str::Copy(m_pUIItemsDefs[uImageId].def.textureName, pDef->textureName, sizeof(m_pUIItemsDefs[uImageId].def.textureName));
+				str::Copy(m_pUIItemsDefs[uImageId].def.tags, pInstDef->tags, sizeof(m_pUIItemsDefs[uImageId].def.tags));
 				m_pUIItemsDefs[uImageId].def.vPos = pInstDef->vPos;
 				m_pUIItemsDefs[uImageId].def.vSize = pInstDef->vSize;
 				m_pUIItemsDefs[uImageId].def.bVisible = pInstDef->bVisible;

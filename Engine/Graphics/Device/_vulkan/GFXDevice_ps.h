@@ -180,8 +180,8 @@ namespace usg {
 
 		CriticalSection						m_criticalSection;
 		usg::queue<DestroyRequest>			m_destroyQueue;
-		VkFormat							m_colorFormats[ColorFormat::COUNT];
-		VkFormat							m_depthFormats[DepthFormat::COUNT];
+		VkFormat							m_colorFormats[(uint32)ColorFormat::COUNT];
+		VkFormat							m_depthFormats[(uint32)DepthFormat::COUNT];
 
 		GFXDevice* m_pParent;
 		VkFence								m_drawFence;

@@ -10,7 +10,7 @@
 #include "Engine/Graphics/Textures/DepthStencilBuffer.h"
 #include "Engine/Graphics/Device/DescriptorSet.h"
 #include "Engine/Graphics/Device/PipelineState.h"
-#include "Engine/Graphics/Device/IHeadmountedDisplay.h"
+#include "Engine/Graphics/Device/IHeadMountedDisplay.h"
 #include API_HEADER(Engine/Graphics/Device, PipelineLayout.h)
 #include API_HEADER(Engine/Graphics/Device, RenderPass.h)
 #include API_HEADER(Engine/Graphics/Device, RasterizerState.h)

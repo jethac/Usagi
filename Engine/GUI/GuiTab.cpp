@@ -4,7 +4,7 @@
 #include "Engine/Common/Common.h"
 #include "Engine/Core/String/String_Util.h"
 #include "Engine/ThirdParty/imgui/imgui.h"
-#include "GUITab.h"
+#include "GuiTab.h"
 
 namespace usg
 {

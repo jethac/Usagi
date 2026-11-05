@@ -10,7 +10,7 @@
 #include "Engine/Graphics/Textures/DepthStencilBuffer.h"
 #include "Engine/Graphics/Textures/RenderTarget.h"
 #include "Engine/Core/stl/list.h"
-#include "Engine/Core/stl/Vector.h"
+#include "Engine/Core/stl/vector.h"
 #include "Engine/Memory/FastPool.h"
 #include "Engine/Graphics/Color.h"
 
@@ -124,7 +124,7 @@ private:
 
 		LightType* GetLight(GFXDevice* pDevice, Scene* pScene, bool bSupportsShadow)
 		{
-			for (usg::vector<LightType*>::reverse_iterator it = m_freeLights.rbegin(); it != m_freeLights.rend(); it++)
+			for (typename usg::vector<LightType*>::reverse_iterator it = m_freeLights.rbegin(); it != m_freeLights.rend(); it++)
 			{
 				if ((*it)->SupportsShadow() == bSupportsShadow)
 				{

@@ -26,7 +26,7 @@ public:
 	const VkPipelineShaderStageCreateInfo* GetShaderStageCreateInfo() const { return m_stageCreateInfo; }
 
 private:
-	VkPipelineShaderStageCreateInfo m_stageCreateInfo[ShaderType::COUNT];
+	VkPipelineShaderStageCreateInfo m_stageCreateInfo[(uint32)ShaderType::COUNT];
 	uint32							m_uStageCount;
 
 	PRIVATIZE_COPY(Effect_ps)

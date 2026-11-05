@@ -5,6 +5,7 @@
 #include "Engine/Network/NetCommon.h"
 #include "Engine/Network/UsagiInetCore.h"
 #include "Engine/Core/String/String_Util.h"
+#include <algorithm>
 
 #define NEX_REQUIRED_MEMORY_SIZE (1 * 1024 * 1024)
 #define NEX_EMERGENCY_MEMORY_SIZE ( 64 * 1024)

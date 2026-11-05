@@ -32,7 +32,7 @@ class PakFile;
 typedef ResourcePointer<const ResourceBase> BaseResHandle;
 
 template <class AssetType>
-const AssetType* GetAs(BaseResHandle& hndl)
+const AssetType* GetAs(const BaseResHandle& hndl)
 {
 	if (hndl.get() && hndl.get()->GetResourceType() == AssetType::StaticResType)
 	{
@@ -59,7 +59,7 @@ public:
 	{
 		return (HighLevelType*)(BaseResHandle::get());
 	}
-	HighLevelType& operator*() const { return *((HighLevelType*)data()); }
+	HighLevelType& operator*() const { return *((HighLevelType*)BaseResHandle::get()); }
 	HighLevelType* get() const { return (HighLevelType*)BaseResHandle::get(); }
 };
 

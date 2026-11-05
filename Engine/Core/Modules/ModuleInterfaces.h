@@ -38,11 +38,11 @@ namespace usg
 	};
 
 	// Called when the module is loaded, may not be valid if dependent on core initialization (e.g. graphics)
-	typedef ModuleInterfaceSet* (far *OnModuleLoad)(ModuleLoadData& pInitData);
+	typedef ModuleInterfaceSet* (*OnModuleLoad)(ModuleLoadData& pInitData);
 	// The function called once the engine has been properly initialized
-	typedef bool (far *InitModule)(ModuleInitData& pInitData, ModuleInterfaceSet* interfaceSet);
+	typedef bool (*InitModule)(ModuleInitData& pInitData, ModuleInterfaceSet* interfaceSet);
 	// Called to clean up the data
-	typedef void				(far *DestroyModule)(ModuleInitData& pInitData, ModuleInterfaceSet* Set);
+	typedef void				(*DestroyModule)(ModuleInitData& pInitData, ModuleInterfaceSet* Set);
 	
 }
 

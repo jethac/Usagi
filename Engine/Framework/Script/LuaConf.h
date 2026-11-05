@@ -5,6 +5,7 @@
 #define _LUA_CONF_H
 
 #include "Engine/Debug/DebugMsgType.h"
+#include <stdlib.h>
 
 // Default to 32 bits
 #define LUA_32BITS

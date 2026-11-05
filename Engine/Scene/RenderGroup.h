@@ -10,7 +10,7 @@
 #include "Engine/Graphics/Effects/ConstantSet.h"
 #include "Engine/Scene/TransformNode.h"
 #include "Engine/Graphics/Device/GFXHandles.h"
-#include "Engine/Core/stl/Vector.h"
+#include "Engine/Core/stl/vector.h"
 
 namespace usg{
 

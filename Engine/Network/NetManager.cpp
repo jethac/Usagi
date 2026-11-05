@@ -3,7 +3,7 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Network/NetCommon.h"
-#include "Engine/Debug/rendering/DebugRender.h"
+#include "Engine/Debug/Rendering/DebugRender.h"
 #include "Engine/Core/Timer/Timer.h"
 #include "Engine/Memory/Mem.h"
 #include "Engine/Core/Containers/Queue.h"

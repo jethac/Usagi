@@ -8,6 +8,7 @@
 #define	_USG_CORE_CONTAINERS_RESOURCE_POINTER_H_
 
 #include "Engine/Memory/ArrayPool.h"
+#include <mutex>
 
 template <class PointerType>
 class ResourcePointer
