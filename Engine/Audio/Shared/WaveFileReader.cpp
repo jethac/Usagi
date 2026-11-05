@@ -152,13 +152,17 @@ void WaveFileReader::ReadInfo()
         ASSERT(false);
     }
 
-    // Find fmt and data
+    // Walk every chunk. Each handler may read as much or as little of its chunk
+    // as it needs; we always resume from the declared chunk size (plus the RIFF
+    // pad byte for odd sizes), so chunk order and unknown chunks don't matter.
     bool isFormatChunkFound = false;
     bool isDataChunkFound = false;
-    bool isEOF = false;
-    while (!isEOF)
+    bool isSmplLoopFound = false;	// a 'smpl' forward loop takes precedence over 'cue ' points
+    while (GetPos() + sizeof(WaveChunk) <= uReaderSize)
     {
         Read(sizeof(WaveChunk), &chunk);
+        const memsize chunkStart = GetPos();
+        const memsize chunkEnd = chunkStart + chunk.size + (chunk.size & 1);
 
         // "fmt"
         if (chunk.tag == GetTagValue("fmt "))
@@ -166,30 +170,21 @@ void WaveFileReader::ReadInfo()
             WaveFormat format;
             Read(sizeof(format), &format);
 			m_format = format;
-
-            // If it is an extended region, read and ignore.
-            if (chunk.size > sizeof(format))
-            {
-                uint16 ext_size;
-                Read(sizeof(ext_size), &ext_size);
-                AdvanceBytes(ext_size);
-            }
             isFormatChunkFound = true;
         }
         // "data"
         else if (chunk.tag == GetTagValue("data"))
         {
-            m_DataSize = chunk.size;
-            m_DataOffset = GetPos();
+            // Clamp a size that runs past the buffer (some writers leave it unset)
+            m_DataSize = usg::Math::Min((memsize)chunk.size, uReaderSize - chunkStart);
+            m_DataOffset = chunkStart;
             isDataChunkFound = true;
-            AdvanceBytes(chunk.size);
         }
 		else if (chunk.tag == GetTagValue("smpl"))
 		{
 			RIFFMIDISample sample;
 			Read(sizeof(RIFFMIDISample), (void*)&sample);
-			memsize smplPos = GetPos();
-			for (uint32 idx = 0; idx < sample.loopCount; idx++)
+			for (uint32 idx = 0; idx < sample.loopCount && !isSmplLoopFound; idx++)
 			{
 				MIDILoop loop;
 				Read(sizeof(MIDILoop), &loop);
@@ -199,14 +194,11 @@ void WaveFileReader::ReadInfo()
 					m_bLooped = true;
 					m_loopStart = loop.start;
 					m_loopLength = loop.end - loop.start + 1;
-
-					return;
+					isSmplLoopFound = true;
 				}
 			}
-			SeekPos(smplPos + chunk.size);
-
 		}
-        else if (chunk.tag == GetTagValue("cue "))
+        else if (chunk.tag == GetTagValue("cue ") && !isSmplLoopFound)
         {
             uint32 uCueCount;
             Read(sizeof(uCueCount), (void*)&uCueCount);
@@ -222,16 +214,14 @@ void WaveFileReader::ReadInfo()
                 else if (i == 1)
                     m_loopLength = point.sampleStart - m_loopStart + 1;
             }
-
-        }
-        // Skip over everything else
-        else
-        {
-            AdvanceBytes(chunk.size);
         }
 
-        isEOF = GetPos() >= uReaderSize;
+        if (chunkEnd > uReaderSize)
+            break;	// truncated final chunk
+        SeekPos(chunkEnd);
     }
+
+    ASSERT(isFormatChunkFound && isDataChunkFound);
 }
 
 sint64 WaveFileReader::ReadData(void* pData, sint64 size)

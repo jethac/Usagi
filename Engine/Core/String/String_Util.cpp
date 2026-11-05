@@ -193,7 +193,8 @@ namespace str
 
 	void TruncateExtension(usg::string& string)
 	{
-		for (memsize i = string.length()-1; i > 0; i--)
+		// length()-1 would wrap for an empty string
+		for (memsize i = string.length(); i-- > 1; )
 		{
 			if (string.at(i) == '.')
 			{
@@ -205,7 +206,9 @@ namespace str
 
 	void RemovePath(usg::string& string)
 	{
-		for (memsize i = (string.length()) - 2; i > 0; i--)
+		// Scan from the second-to-last character (a trailing separator is kept);
+		// written so strings shorter than two characters don't wrap
+		for (memsize i = string.length() > 1 ? string.length() - 1 : 0; i-- > 1; )
 		{
 			if (string.at(i) == '\\' || string.at(i) == '/')
 			{

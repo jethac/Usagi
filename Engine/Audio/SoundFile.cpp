@@ -24,6 +24,7 @@ void SoundFile::InitInt(const SoundFileDef* pSoundFile, const string& strName, A
 	m_fDopplerFactor = pSoundFile->has_dopplerFactor ? pSoundFile->dopplerFactor : 0.0f;
 	m_fPitch = pSoundFile->has_basePitch ? pSoundFile->basePitch : 1.0f;
 	m_uPriority = pSoundFile->has_priority ? pSoundFile->priority : 128;
+	m_uMaxInstances = pSoundFile->has_maxInstances ? pSoundFile->maxInstances : 0;
 	m_uCRC = pSoundFile->crc;
 
 	m_pFilter = pSoundFile->filterCRC ? pAudio->GetFilter(pSoundFile->filterCRC) : nullptr;
