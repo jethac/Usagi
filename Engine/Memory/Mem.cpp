@@ -260,7 +260,7 @@ const char* mem::GetAllocString(MemAllocType eType)
 
 void* operator new(size_t size) NEW_THROW
 {
-	return usg::mem::Alloc(usg::MEMTYPE_STANDARD, usg::ALLOC_DONT_USE, size, 4);
+	return usg::mem::Alloc(usg::MEMTYPE_STANDARD, usg::ALLOC_DONT_USE, size, USG_DEFAULT_NEW_ALIGNMENT);
 }
 
 void operator delete(void* ptr) NEW_THROW
@@ -275,7 +275,7 @@ void* operator new[](size_t size)
 	//if (usg::mem::s_bConventionalMemManagement)
 	{
 		// Only for External programs(e.g. Ayataka, ...) use
-		return usg::mem::Alloc(usg::MEMTYPE_STANDARD, usg::ALLOC_OBJECT, size, 4);
+		return usg::mem::Alloc(usg::MEMTYPE_STANDARD, usg::ALLOC_OBJECT, size, USG_DEFAULT_NEW_ALIGNMENT);
 	}
 #else
 	ASSERT(false);	// Not allowing the global allocator

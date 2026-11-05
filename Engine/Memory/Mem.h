@@ -18,6 +18,11 @@
 
 #include OS_HEADER(Engine/Memory, Mem_ps.h)
 
+// Memory from operator new must be aligned for any type without an
+// alignas larger than this, and compilers rely on it (e.g. using aligned
+// SSE stores to construct objects). 16 bytes on x86-64.
+#define USG_DEFAULT_NEW_ALIGNMENT __STDCPP_DEFAULT_NEW_ALIGNMENT__
+
 // FIXME: This is a bit ugly, just getting the functionality in place until
 // someone volunteers to write a proper memory manager ;)
 // Oh bollocks, turns out that's me. It's likely to remain ugly.
@@ -115,7 +120,7 @@ void  operator delete(void* ptr);
 
 inline void* operator new(size_t size, usg::MemAllocType eType, usg::MemType eHeap, const char* szFileName) NEW_THROW
 {
-	void* pData = usg::mem::Alloc(eHeap, eType, size, 8);
+	void* pData = usg::mem::Alloc(eHeap, eType, size, USG_DEFAULT_NEW_ALIGNMENT);
 	return pData;
 }
 
@@ -145,7 +150,7 @@ inline void* operator new(size_t size, size_t uAlign, usg::MemAllocType eType, u
 
 inline void* operator new[](size_t size, usg::MemAllocType eType, usg::MemType eHeap, const char* szFileName) NEW_THROW
 {
-	return usg::mem::Alloc(eHeap, eType, size, 8);
+	return usg::mem::Alloc(eHeap, eType, size, USG_DEFAULT_NEW_ALIGNMENT);
 }
 
 inline void* operator new[](size_t size, size_t align, usg::MemAllocType eType, usg::MemType eHeap, const char* szFileName) NEW_THROW
@@ -176,7 +181,7 @@ inline void* operator new[](size_t size, uint32 uAlign, usg::MemAllocType eType,
 
 inline void* operator new(size_t size, usg::MemAllocType eType, usg::MemType eHeap)
 {
-	void* pData = usg::mem::Alloc(eHeap, eType, size, 4);
+	void* pData = usg::mem::Alloc(eHeap, eType, size, USG_DEFAULT_NEW_ALIGNMENT);
 	return pData;
 }
 
@@ -189,7 +194,7 @@ inline void* operator new(size_t size, size_t align, usg::MemAllocType eType, us
 
 inline void* operator new[](size_t size, usg::MemAllocType eType, usg::MemType eHeap)
 {
-	return usg::mem::Alloc(eHeap, eType, size, 4);
+	return usg::mem::Alloc(eHeap, eType, size, USG_DEFAULT_NEW_ALIGNMENT);
 }
 
 
