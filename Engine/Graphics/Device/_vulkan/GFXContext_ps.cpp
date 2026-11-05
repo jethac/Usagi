@@ -55,10 +55,17 @@ namespace usg {
 
 		m_pParent = pParent;
 
+		// Only the immediate context is submitted each frame (see GFXDevice_ps::End)
+		if (!bDeferred)
+		{
+			const VkPhysicalDeviceProperties* pProps = pDevice->GetPlatform().GetPhysicalProperties();
+			m_profiler.Init(pDevice->GetPlatform().GetVKDevice(), pProps ? pProps->limits.timestampPeriod : 1.0f);
+		}
 	}
 
 	void GFXContext_ps::Cleanup(GFXDevice* pDevice)
 	{
+		m_profiler.Cleanup(pDevice->GetPlatform().GetVKDevice());
 		vkFreeCommandBuffers(pDevice->GetPlatform().GetVKDevice(), m_cmdPool, 1, &m_cmdBuff);
 		vkDestroyCommandPool(pDevice->GetPlatform().GetVKDevice(), m_cmdPool, NULL);
 	}
@@ -89,10 +96,13 @@ namespace usg {
 
 		err = vkBeginCommandBuffer(m_cmdBuff, &cmd_buf_info);
 		FATAL_RELEASE(err == VK_SUCCESS, "vkBeginCommandBuffer returned %d", err);
+
+		m_profiler.BeginFrame(m_cmdBuff);
 	}
 
 	void GFXContext_ps::End()
 	{
+		m_profiler.EndFrame(m_cmdBuff);
 		VkResult res = vkEndCommandBuffer(m_cmdBuff);
 		FATAL_RELEASE(res == VK_SUCCESS, "vkEndCommandBuffer returned %d", res);
 	}
@@ -290,10 +300,12 @@ namespace usg {
 			markerInfo.pMarkerName = szName;
 			m_pfnCmdDebugMarkerBegin(m_cmdBuff, &markerInfo);
 		}
+		m_profiler.Push(m_cmdBuff, szName);
 	}
 
 	void GFXContext_ps::EndGPUTag()
 	{
+		m_profiler.Pop(m_cmdBuff);
 		if (m_pfnCmdDebugMarkerEnd)
 		{
 			m_pfnCmdDebugMarkerEnd(m_cmdBuff);

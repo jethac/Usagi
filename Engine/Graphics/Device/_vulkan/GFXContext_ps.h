@@ -7,6 +7,7 @@
 #include "Engine/Graphics/Device/Display.h"
 #include "Engine/Graphics/Primitives/VertexBuffer.h"
 #include OS_HEADER(Engine/Graphics/Device, VulkanIncludes.h)
+#include "GPUProfiler.h"
 
 namespace usg {
 
@@ -80,6 +81,8 @@ private:
 
 	PFN_vkCmdDebugMarkerBeginEXT m_pfnCmdDebugMarkerBegin;
 	PFN_vkCmdDebugMarkerEndEXT m_pfnCmdDebugMarkerEnd;
+
+	GPUProfiler			m_profiler;
 };
 
 }
