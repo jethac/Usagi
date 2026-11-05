@@ -132,7 +132,11 @@ namespace usg
 		}
 
 		TextureHndl pTex = handles.pResourceMgr->GetTextureAbsolutePath(handles.pDevice, c->replacement);
-		if (!pModel->OverrideTexture(c->original, pTex))
+		if (pModel->OverrideTexture(c->original, pTex))
+		{
+			pModel->UpdateDescriptors(handles.pDevice);
+		}
+		else
 		{
 			DEBUG_PRINT("ModelTextureOverride: %s has no texture %s\n", modelComp->name, c->original);
 		}

@@ -718,7 +718,10 @@ bool Model::OverrideTexture(const char* szTextureName, TextureHndl pOverrideTex)
 				SamplerHndl origSamp = pSrcMesh->samplers[uTex];
 				string cmpName = pOrigTex->GetName().c_str();
 				str::RemovePath(cmpName);
-				if ((cmpName == texNameU8))
+				// Accept the name with or without its extension (pak textures are .vtx)
+				string cmpNoExt = cmpName;
+				str::TruncateExtension(cmpNoExt);
+				if (cmpName == texNameU8 || cmpNoExt == texNameU8)
 				{
 					pMaterial->SetImageSamplerPairAtBinding(uTex, pOverrideTex, origSamp);
 					bFound = true;

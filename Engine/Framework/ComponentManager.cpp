@@ -107,6 +107,8 @@ namespace usg
 		m_systemCoordinator.RegisterComponent<usg::SleepTag>();
 		m_systemCoordinator.RegisterComponent<usg::ModelMgrComponent>();
 		m_systemCoordinator.RegisterComponent<usg::PhysicsAggregate>();
+		// Load-time only components that no system references
+		m_systemCoordinator.RegisterComponent<usg::Components::ModelTextureOverride>();
 
 	}
 
