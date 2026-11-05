@@ -54,6 +54,8 @@ extern void DumpDebugLog(const char* szBuildId);
 
 
 // For file loading only, will quit the game on failure, even in release mode
+// Exits with _Exit: running static destructors after a fatal error can
+// re-enter the logging and memory code that has just failed
 inline void FATAL_RELEASE_INT( const TCHAR* msg )
 {
 	// In headless / automation runs a modal MessageBox blocks forever. When
@@ -69,7 +71,7 @@ inline void FATAL_RELEASE_INT( const TCHAR* msg )
 			fflush(f);
 			fclose(f);
 		}
-		exit(-1);
+		_Exit(-1);
 	}
 
 	if(IsDebuggerPresent())
@@ -79,7 +81,7 @@ inline void FATAL_RELEASE_INT( const TCHAR* msg )
 	else
 	{
 		MessageBox(0, msg, TEXT("FATAL"), 0);
-		exit(-1);
+		_Exit(-1);
 	}
 }
 
