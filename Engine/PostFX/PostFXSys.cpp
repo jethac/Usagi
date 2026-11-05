@@ -112,7 +112,16 @@ RenderTarget* PostFXSys::BeginScene(GFXContext* pContext, uint32 uTransferFlags)
 	pContext->DisableScissor();
 	if(uTransferFlags & TRANSFER_FLAGS_CLEAR)
 	{
-		pContext->ClearRenderTarget(RenderTarget::RT_FLAG_DS|RenderTarget::RT_FLAG_COLOR_0|RenderTarget::RT_FLAG_COLOR_1 );
+		// Every colour target: in the deferred path the initial target is the
+		// G-buffer (diffuse, linear depth, normal, emissive, specular), and an
+		// uncleared emissive/specular buffer shows old frames wherever nothing is
+		// drawn this frame (e.g. the sky above a scene's horizon).
+		uint32 uClearFlags = RenderTarget::RT_FLAG_DS;
+		for (uint32 i = 0; i < pTarget->GetTargetCount(); i++)
+		{
+			uClearFlags |= (RenderTarget::RT_FLAG_COLOR_0 << i);
+		}
+		pContext->ClearRenderTarget(uClearFlags);
 	}
 	
 	return pTarget;
