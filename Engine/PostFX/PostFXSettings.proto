@@ -34,6 +34,9 @@ message LightingSettings
 	required float fContactShadowThickness = 8 [default = 0.05];
 	required uint32 uContactShadowSteps = 9 [default = 8];
 	required float fContactShadowStrength = 10 [default = 1.0];
+	// Moves the shadow lookup along the surface normal (world units) to
+	// remove acne on surfaces at a grazing angle to the light
+	required float fShadowNormalOffset = 11 [default = 0.0];
 }
 
 message BloomSettings

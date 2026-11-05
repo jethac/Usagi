@@ -25,7 +25,7 @@ void main(void)
 	int iCascadeSet = LIGHT_INDEX - iCascadeLightStart;
 	if (vPos.z < cascades[iCascadeSet].vSplitDistance.w)
 	{
-		vec3 vWorldPos = (vec4(vPos, 1.0) * mInvViewMat).xyz;
+		vec3 vWorldPos = (vec4(vPos + s.vNormal * vShadowParams.y, 1.0) * mInvViewMat).xyz;
 		vLit *= SampleShadowmap(vPos.z, vWorldPos.xyz, iCascadeSet);
 	}
 

@@ -83,6 +83,10 @@ void main(void)
 	float fVig = 1.0 - vParams.w * smoothstep(0.35, 1.1, dot(vD, vD) * 2.2);
 	vDisplay *= fVig;
 
+	// Dither by +-0.5 of an 8 bit step to break up banding in smooth gradients
+	float fNoise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+	vDisplay = clamp(vDisplay + (fNoise - 0.5) / 255.0, 0.0, 1.0);
+
 	vColor = SRGBToLinear(vDisplay);
 	// Luma in alpha for FXAA
 	colorOut = vec4(vColor, sqrt(dot(vColor, vec3(0.299, 0.587, 0.114))));

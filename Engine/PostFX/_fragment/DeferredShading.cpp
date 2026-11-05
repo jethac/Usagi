@@ -334,7 +334,7 @@ void DeferredShading::UpdateParams(GFXDevice* pDevice)
 	pParams->vEnvParams.Assign(m_lighting.fIBLIntensity, g_fEnvRoughnessMips, m_lighting.fAmbientScale, m_lighting.fHorizonFade);
 	pParams->vContactShadow.Assign(m_lighting.fContactShadowLength, m_lighting.fContactShadowThickness,
 		(float)Math::Max(m_lighting.uContactShadowSteps, 1U), m_lighting.fContactShadowLength > 0.0f ? m_lighting.fContactShadowStrength : 0.0f);
-	pParams->vShadowParams.Assign(1.0f, 0.0f, 0.0f, (float)m_uDebugView);
+	pParams->vShadowParams.Assign(1.0f, m_lighting.fShadowNormalOffset, 0.0f, (float)m_uDebugView);
 	pParams->vAOParams.Assign(m_ao.fRadius, m_ao.fStrength, m_ao.fPower, 0.0f);
 	m_paramsConstants.Unlock();
 	m_paramsConstants.UpdateData(pDevice);

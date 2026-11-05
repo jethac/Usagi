@@ -19,7 +19,7 @@ float SampleDirShadow(in vec3 vPos, in vec3 vNormal, in vec3 L, in int iCascadeS
 	float fShadow = 1.0;
 	if (vPos.z < cascades[iCascadeSet].vSplitDistance.w)
 	{
-		vec3 vWorldPos = (vec4(vPos, 1.0) * mInvViewMat).xyz;
+		vec3 vWorldPos = (vec4(vPos + vNormal * vShadowParams.y, 1.0) * mInvViewMat).xyz;
 		fShadow = SampleShadowmap(vPos.z, vWorldPos.xyz, iCascadeSet);
 	}
 	return min(fShadow, ContactShadow(vPos, vNormal, L));
@@ -68,6 +68,12 @@ void main(void)
 	else if (iDebug == 5) colorOut = vec4(vec3(iCascadeLightStart >= 0 ? SampleDirShadow(vPos, s.vNormal, lights[iCascadeLightStart].vDirection.xyz, 0) : 1.0), 1.0);
 	else if (iDebug == 6) colorOut = vec4(fract(vPos * 0.1), 1.0);
 	else if (iDebug == 7) colorOut = vec4(vec3(fOcclusion), 1.0);
+	else if (iDebug == 8) colorOut = vec4(vec3(SampleShadowmap(vPos.z, (vec4(vPos, 1.0) * mInvViewMat).xyz, 0)), 1.0);
+	else if (iDebug == 9)
+	{
+		vec4 vSP = vec4((vec4(vPos, 1.0) * mInvViewMat).xyz, 1.0) * cascades[0].mCascadeMtx[0];
+		colorOut = vec4(fract(vSP.xyz / vSP.w * vec3(8.0, 8.0, 1.0)), 1.0);
+	}
 }
 
 #endif
