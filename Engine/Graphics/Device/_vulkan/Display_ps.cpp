@@ -749,13 +749,17 @@ void Display_ps::SwapBuffers(GFXDevice* pDevice)
 
 void WriteTexture(usg::string szFileName, VkDevice device, uint32 uWidth, uint32 uHeight, const uint8* pData, bool bColorSwizzle, VkDeviceMemory dstImageMemory, VkImage dstImage, int iRowPitch)
 {
-	uint8* pBMPData = (uint8*)mem::Alloc(MEMTYPE_STANDARD, ALLOC_GFX_TEXTURE, (uWidth * uHeight * 3) + sizeof(BITMAPINFOHEADER));
+	// BMP rows are padded to a multiple of 4 bytes
+	const uint32 uRowPitch = (uWidth * 3 + 3) & ~3u;
+	const uint32 uImageSize = uRowPitch * uHeight;
+	uint8* pBMPData = (uint8*)mem::Alloc(MEMTYPE_STANDARD, ALLOC_GFX_TEXTURE, uImageSize + sizeof(BITMAPINFOHEADER));
+	MemClear(pBMPData, uImageSize);
 
 
 	for (uint32_t y = 0; y < uHeight; y++)
 	{
 		uint32 uLine = uHeight - y - 1;
-		uint8* pDest = &pBMPData[uWidth * uLine * 3];
+		uint8* pDest = &pBMPData[uRowPitch * uLine];
 		uint32* row = (uint32*)pData;
 		for (uint32_t x = 0; x < uWidth; x++)
 		{
@@ -792,7 +796,7 @@ void WriteTexture(usg::string szFileName, VkDevice device, uint32 uWidth, uint32
 
 	BITMAPFILEHEADER	fileHdr = {};
 	fileHdr.bfType = 'MB';
-	fileHdr.bfSize = sizeof(fileHdr) + sizeof(BITMAPINFOHEADER) + (3 * uWidth * uHeight);
+	fileHdr.bfSize = sizeof(fileHdr) + sizeof(BITMAPINFOHEADER) + uImageSize;
 	fileHdr.bfOffBits = sizeof(fileHdr) + sizeof(BITMAPINFOHEADER);
 
 	usg::File file(szFileName.c_str(), FILE_ACCESS_WRITE, FILE_TYPE_DEBUG_DATA);
@@ -800,13 +804,13 @@ void WriteTexture(usg::string szFileName, VkDevice device, uint32 uWidth, uint32
 	{
 		file.Write(sizeof(fileHdr), &fileHdr);
 		file.Write(sizeof(BITMAPINFOHEADER), &info);
-		file.Write(uWidth * uHeight * 3, pBMPData);
+		file.Write(uImageSize, pBMPData);
 		file.Close();
 	}
 
 
 #if PLATFORM_PC
-	HANDLE handle = (HANDLE)::GlobalAlloc(GHND, sizeof(BITMAPINFOHEADER) + (uWidth * uHeight * 3));
+	HANDLE handle = (HANDLE)::GlobalAlloc(GHND, sizeof(BITMAPINFOHEADER) + uImageSize);
 	if (handle != nullptr)
 	{
 		char* pHndlData = (char*) ::GlobalLock((HGLOBAL)handle);
@@ -816,7 +820,7 @@ void WriteTexture(usg::string szFileName, VkDevice device, uint32 uWidth, uint32
 
 		memcpy(pHndlData, &info, sizeof(BITMAPINFOHEADER));
 
-		memcpy(pHndlData + sizeof(BITMAPINFOHEADER), pBMPData, uWidth * uHeight * 3);
+		memcpy(pHndlData + sizeof(BITMAPINFOHEADER), pBMPData, uImageSize);
 
 		::GlobalUnlock((HGLOBAL)handle);
 
