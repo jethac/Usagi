@@ -32,7 +32,7 @@ struct StreamingSoundDef
 {
 	uint32 uChannels = 2;
 	uint32 uBitsPerSample = 16;
-	uint32 uSampleRate = 4800;
+	uint32 uSampleRate = 48000;
 	usg::weak_ptr<SoundCallbacks> pCallbacks;
 };
 
