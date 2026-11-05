@@ -607,4 +607,9 @@ def shader_pack
     "#{romfiles_dir}/nameDataHash.bin"
   end
 
+  # The executable for platforms that ninja links
+  def game_executable
+    "#{ROM_DIR}/#{@target_platform}/#{@build}/#{@project}"
+  end
+
 end

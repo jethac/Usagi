@@ -46,6 +46,9 @@ end
 def process_data(config, platform, n)
   data_deps = Set.new
 
+  # The data tools only run on Windows; Linux uses the data cooked for 'win'
+  return data_deps if config.compiles_with_ninja?
+
 
   # Do this first to ensure we have the hierarchy information
   # Convert models
@@ -614,7 +617,7 @@ def build_levels(config, n, deps)
   hierarchy_targets.values + pos_targets.values + instance_targets.values
 end
 
-def project_code(config, platform, n, order_only_deps)
+def project_code(config, platform, n, order_only_deps, codegen_outputs = [])
   # Assume that engine headers have been created,
   # either by running the engine generator or downloading
   pbs = []
@@ -637,10 +640,17 @@ def project_code(config, platform, n, order_only_deps)
   pbs.concat pb_cpp
   pb_lua = GeneratorUtil.lua_protobuf(config, n, proto_files)
   pbs.concat pb_lua
-  pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
-  pbs.concat pb_rb
-  pb_csharp = GeneratorUtil.csharp_protobuf(config, n, proto_files)
-  pbs.concat pb_csharp
+  codegen_outputs.concat GeneratorUtil.windows_protobuf_outputs(config, proto_files)
+
+  if config.compiles_with_ninja?
+    GeneratorUtil.compile_source(config, n, targets, order_only_deps)
+  else
+    # Only the Windows data tools use these
+    pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
+    pbs.concat pb_rb
+    pb_csharp = GeneratorUtil.csharp_protobuf(config, n, proto_files)
+    pbs.concat pb_csharp
+  end
   # These are only needed by the level processing script, which we
   # don't use in this project
   # pb_py = GeneratorUtil.python_protobuf(config, n, proto_files)
@@ -652,7 +662,21 @@ def project_code(config, platform, n, order_only_deps)
 end
 
 def project_exe(config, platform, n, project_obj)
-  # Currently building through VS
+  # Windows builds the executable through Visual Studio
+  return if !config.compiles_with_ninja?
+
+  exe = config.game_executable
+  FileUtils.mkdir_p(File.dirname(exe))
+
+  # The engine libraries depend on each other, so link them as a group
+  engine_libs = config.libs.reject { |l| platform.excluded_libs.include?(l) }
+                           .map { |l| config.get_lib_filename(l) }
+  syslibs = (['-Wl,--start-group'] + engine_libs + ['-Wl,--end-group'] +
+             platform.physx_libs + platform.system_libs).join(' ')
+
+  n.build('ld', {exe => project_obj},
+          {:implicit_deps => engine_libs, :variables => {'syslibs' => syslibs}})
+  n.alias('exe', exe)
 end
 
 def project_includes(config, platform, n)
@@ -775,8 +799,9 @@ def vs_project(config, n, order_only_deps)
 end
 
 
-def boilerplate(config, n, generated_code, win_bp_cpp)
+def boilerplate(config, n, generated_code, win_bp_cpp, codegen_outputs = [])
   system_sources = grep(["namespace.Systems"], [config.project], ["*.h", "*.cpp"])
+  codegen_outputs.concat GeneratorUtil.windows_system_scan_outputs(config, system_sources)
   project_systems = system_sources.map{ |h| "#{(h + ".bp.cpp").gsub("\\", "/")}" }
 
   project_system_ymls = project_systems.map{ |s| "#{config.code_working_dir}/#{s.sub(/\.bp\.cpp$/, ".yml")}" }
@@ -797,6 +822,11 @@ def boilerplate(config, n, generated_code, win_bp_cpp)
 
   GeneratorUtil.copy_boilerplate_to_vs_build_dir(config, n, project_registersystems_cpp, win_bp_cpp)
 
+  if config.compiles_with_ninja?
+    GeneratorUtil.compile_source(config, n,
+                                 {project_registersystems_cpp => project_registersystems_o},
+                                 generated_code)
+  end
 
   project_system_cpps, project_system_hs = project_systems.partition{ |s| s =~ /\.cpp\.bp\.cpp/ }
   write_file_list(project_system_hs + [project_registersystems_cpp_bp], config.code_working_dir, config.project, '.boilerplate.txt')

@@ -54,6 +54,12 @@ task :data => :ninja do
   BUILDS.each{ |b| sh "#{ninja b} data" }
 end
 
+# Runs the Windows-only code generators for a platform that is compiled
+# elsewhere (e.g. 'rake platform=linux codegen' on Windows)
+task :codegen => :ninja do
+  BUILDS.each{ |b| sh "#{ninja b} codegen" }
+end
+
 task :libs => :ninja do
   BUILDS.each{ |b| sh "#{ninja b} libs" }
 end
