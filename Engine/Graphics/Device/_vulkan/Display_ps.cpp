@@ -343,6 +343,8 @@ void Display_ps::CreateSwapChain(GFXDevice* pDevice)
 		m_eVkSwapChainFormat = eFormat;
 
 	}
+	DEBUG_PRINT("Swap chain format %d, colour space %d, HDR %d, colour correction %d (%u formats offered)\n",
+		(int)eFormat, (int)colorSpace, m_bHDR ? 1 : 0, (int)m_eColorCorrect, formatCount);
 
 	VkSurfaceCapabilitiesKHR surfCapabilities;
 
