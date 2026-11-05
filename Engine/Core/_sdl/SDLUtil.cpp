@@ -8,6 +8,7 @@
 #include "Engine/HID/Input.h"
 #include "Engine/HID/_sdl/Input_ps.h"
 #include <SDL3/SDL.h>
+#include <unistd.h>
 
 namespace usg
 {
@@ -38,6 +39,27 @@ namespace SDLUTIL
 			g_wndHndl = nullptr;
 		}
 		SDL_Quit();
+	}
+
+	bool UsePackagedData()
+	{
+		// The resource directory of an app bundle, or the executable's
+		// directory elsewhere
+		const char* szBase = SDL_GetBasePath();
+		if (!szBase)
+		{
+			return false;
+		}
+
+		char szPath[USG_MAX_PATH];
+		SDL_snprintf(szPath, sizeof(szPath), "%sromfiles", szBase);
+		SDL_PathInfo info;
+		if (!SDL_GetPathInfo(szPath, &info) || info.type != SDL_PATHTYPE_DIRECTORY)
+		{
+			return false;
+		}
+
+		return chdir(szPath) == 0;
 	}
 
 	WindHndl GetWindow()

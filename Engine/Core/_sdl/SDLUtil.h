@@ -16,6 +16,12 @@ namespace SDLUTIL
 	bool Init();
 	void Shutdown();
 
+	// Packaged applications (a macOS or iOS app bundle) carry their cooked
+	// data in a 'romfiles' directory next to the executable's resources.
+	// If there is one, it becomes the working directory, which is where
+	// the engine opens resources from. Returns true if it changed.
+	bool UsePackagedData();
+
 	WindHndl		GetWindow();
 	void			SetWindow(WindHndl hndl);
 	void			SetInFocus(bool bInFocus);
