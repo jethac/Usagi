@@ -241,7 +241,7 @@ from `_romfiles\win`.
 
 ## Status
 
-All five milestones are done; audio is still silent.
+All five milestones are done, and audio plays.
 
 - The engine libraries build on Linux with clang 23 (debug and release)
   and still build on Windows with MSBuild.
@@ -256,13 +256,15 @@ All five milestones are done; audio is still silent.
   and RADV don't. Found by replaying a RenderDoc capture on the GTX 1070
   through renderdoccmd's remote server.
 - Frame rate, release build, 1920×1080 fullscreen, mailbox present mode,
-  table mode on the start grid: 116 to 127 fps. GPU frame 7.2 ms
-  average, 8.5 ms max (USAGI_GPU_PROFILE). The largest pass is the
-  shadow cascade, at 2.5 ms (GP_BenchWood alone is 2.3 ms). CPU update
-  is 0.4 ms. Draw is about 8 ms of CPU time, which is mostly waiting on
-  the GPU. Not yet measured: a full race with eight cars moving and
-  VFX playing.
-- Audio is the `_dummy` backend (silent); an SDL3 backend is next.
+  150-second autopilot races (whole-run distribution, first 300 frames
+  skipped):
+  - couch mode: p50 7.30 ms, p99 8.58 ms, max 14.35 ms; GPU 3.9 ms
+  - table mode with the VFX stress test (`USAGIGP_FXTEST`): p50 8.25 ms,
+    p99 9.43 ms, max 12.52 ms; GPU 7.2 ms (the shadow cascade is 2.5 ms,
+    GP_BenchWood alone 2.3 ms)
+  - no frame over 16.7 ms in either mode
+- Audio: the SDL3 backend (`Engine/Audio/_sdl`) plays the game's sounds,
+  up to about 30 voices in a race. Reverb effects and rooms play dry.
 
 RenderDoc on Linux: it doesn't support Wayland surfaces, so run the game
 with `SDL_VIDEO_DRIVER=x11` (XWayland) under `renderdoccmd capture`.
