@@ -211,7 +211,6 @@ void LightingContext::Update(GFXDevice* pDevice, SceneContext* pCtxt)
 		uLightCount++;
 	}
 
-
 	m_lightingConstants.Unlock();
 	m_lightingConstants.UpdateData(pDevice);
 }

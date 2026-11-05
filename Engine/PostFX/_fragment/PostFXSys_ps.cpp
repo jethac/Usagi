@@ -12,6 +12,8 @@
 #include "LinearDepth.h"
 #include "SetSceneTarget.h"
 #include "DeferredShading.h"
+#include "ToneMap.h"
+#include "TiltShift.h"
 #include "Engine/Scene/SceneConstantSets.h"
 #include "Engine/PostFX/PostFXSys.h"
 #include "Engine/Graphics/StandardVertDecl.h"
@@ -87,6 +89,8 @@ PostFXSys_ps::PostFXSys_ps()
 	m_pSSAO = nullptr;
 	m_pBloom = nullptr;
 	m_pDeferredShading = nullptr;
+	m_pToneMap = nullptr;
+	m_pTiltShift = nullptr;
 	m_pSetNoDepthTarget = nullptr;
 	m_pSetLinDepthTarget = nullptr;
 	m_fPixelScale = 1.0f;
@@ -171,11 +175,11 @@ void PostFXSys_ps::Init(PostFXSys* pParent, ResourceMgr* pResMgr, GFXDevice* pDe
 
 	if(bDeferred)
 	{
-		m_colorBuffer[BUFFER_DIFFUSE].Init(pDevice, uWidth, uHeight, ColorFormat::RGBA_8888, SAMPLE_COUNT_1_BIT, TU_FLAGS_OFFSCREEN_COLOR, 0); // 4th component is specular power
+		m_colorBuffer[BUFFER_DIFFUSE].Init(pDevice, uWidth, uHeight, ColorFormat::SRGBA, SAMPLE_COUNT_1_BIT, TU_FLAGS_OFFSCREEN_COLOR, 0); // Base colour, a = material AO (see deferred.inc)
 		m_colorBuffer[BUFFER_NORMAL].Init(pDevice, uWidth, uHeight, ColorFormat::NORMAL, SAMPLE_COUNT_1_BIT, TU_FLAGS_OFFSCREEN_COLOR, 2);
 		// We have emissive in SRGBA because it's going to be 1:1 with out final format and we want to avoid losing precision
 		m_colorBuffer[BUFFER_EMISSIVE].Init(pDevice, uWidth, uHeight, ColorFormat::SRGBA, SAMPLE_COUNT_1_BIT, TU_FLAGS_OFFSCREEN_COLOR, 3);
-		m_colorBuffer[BUFFER_SPECULAR].Init(pDevice, uWidth, uHeight, ColorFormat::RGBA_5551, SAMPLE_COUNT_1_BIT, TU_FLAGS_OFFSCREEN_COLOR, 4);
+		m_colorBuffer[BUFFER_SPECULAR].Init(pDevice, uWidth, uHeight, ColorFormat::RGBA_8888, SAMPLE_COUNT_1_BIT, TU_FLAGS_OFFSCREEN_COLOR, 4);
 	}
 	
 
@@ -223,6 +227,16 @@ void PostFXSys_ps::Init(PostFXSys* pParent, ResourceMgr* pResMgr, GFXDevice* pDe
 	{
 		m_pBloom = vnew(ALLOC_OBJECT) Bloom();
 		m_pDefaultEffects[m_uDefaultEffects++] = m_pBloom;
+	}
+	if (uInitFlags & PostFXSys::EFFECT_TONEMAP)
+	{
+		m_pToneMap = vnew(ALLOC_OBJECT) ToneMap();
+		m_pDefaultEffects[m_uDefaultEffects++] = m_pToneMap;
+	}
+	if (uInitFlags & PostFXSys::EFFECT_TILT_SHIFT)
+	{
+		m_pTiltShift = vnew(ALLOC_OBJECT) TiltShift();
+		m_pDefaultEffects[m_uDefaultEffects++] = m_pTiltShift;
 	}
 	if(uInitFlags & PostFXSys::EFFECT_DEFERRED_SHADING )
 	{
@@ -713,6 +727,10 @@ void PostFXSys_ps::EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags)
 		m_pSetLinDepthTarget->SetEnabled((uEffectFlags & PostFXSys::EFFECT_DEFERRED_SHADING) != 0);
 	if(m_pBloom)
 		m_pBloom->SetEnabled((uEffectFlags & PostFXSys::EFFECT_BLOOM) != 0);
+	if (m_pToneMap)
+		m_pToneMap->SetEnabled((uEffectFlags & PostFXSys::EFFECT_TONEMAP) != 0);
+	if (m_pTiltShift)
+		m_pTiltShift->SetEnabled((uEffectFlags & PostFXSys::EFFECT_TILT_SHIFT) != 0);
 	if(m_pFXAA)
 		m_pFXAA->SetEnabled((uEffectFlags & PostFXSys::EFFECT_FXAA) != 0);
 	if(m_pSMAA)
@@ -730,6 +748,24 @@ void PostFXSys_ps::EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags)
 	EnableEffectsInt(pDevice, uEffectFlags);
 	
 
+}
+
+
+void PostFXSys_ps::SetSettings(GFXDevice* pDevice, ResourceMgr* pResource, const PostFXSettings& settings)
+{
+	if (m_pDeferredShading)
+	{
+		m_pDeferredShading->SetLightingSettings(pDevice, pResource, settings.lighting);
+		m_pDeferredShading->SetAOSettings(pDevice, settings.ssao);
+	}
+	if (m_pToneMap)
+		m_pToneMap->SetSettings(pDevice, pResource, settings.toneMap);
+	if (m_pTiltShift)
+		m_pTiltShift->SetSettings(pDevice, settings.tiltShift);
+	if (m_pBloom)
+		m_pBloom->SetParams(pDevice, settings.bloom.fThreshold, settings.bloom.fScale);
+	if (m_pSSAO)
+		m_pSSAO->SetParams(settings.ssao.fRadius, settings.ssao.fStrength, settings.ssao.fPower, settings.ssao.fFadeOutFrom, settings.ssao.fFadeOutTo);
 }
 
 

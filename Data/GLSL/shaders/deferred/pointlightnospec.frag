@@ -1,5 +1,6 @@
 #include "../includes/platformdefines.inc"
 #include "../includes/global_3d.inc"
+#include "../includes/pbr.inc"
 #include "../includes/deferred_read.inc"
 #include "../includes/lighting_structs.inc"
 

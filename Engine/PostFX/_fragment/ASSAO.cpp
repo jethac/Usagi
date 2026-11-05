@@ -422,7 +422,10 @@ namespace usg
 		pipelineDecl.alphaState.bBlendEnable = true;
 		pipelineDecl.alphaState.srcBlend = BLEND_FUNC_ZERO;
 		pipelineDecl.alphaState.srcBlendAlpha = BLEND_FUNC_ZERO;
-		pipelineDecl.alphaState.dstBlend = BLEND_FUNC_SRC_COLOR;
+		// Forward: scale the lit colour. Deferred: scale only the G-buffer's
+		// material occlusion channel (albedo alpha), so the AO darkens ambient and
+		// image based lighting but not direct light.
+		pipelineDecl.alphaState.dstBlend = m_bDeferred ? BLEND_FUNC_ONE : BLEND_FUNC_SRC_COLOR;
 		pipelineDecl.alphaState.dstBlendAlpha = BLEND_FUNC_SRC_ALPHA;
 
 		m_applyDesc.Init(pDevice, desc1Tex);

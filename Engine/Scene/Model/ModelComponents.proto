@@ -36,6 +36,19 @@ message BoneComponent
 	required uint32 uIndex = 4;
 }
 
+// Swaps one of a dynamic model's textures for another when the entity loads,
+// e.g. a per-instance paint colour on a shared car model. The replacement is
+// a resource path such as "Models/HotHatch/albedo_blue"; it must be loaded
+// (in the model's pak, or as a loose file). Requires ModelComponent.bDynamic.
+message ModelTextureOverride
+{
+	option (nanopb_msgopt).has_onloaded = true;
+
+	// Texture name as cooked into the model, without path or extension
+	required string original = 1 [(nanopb).max_size = 64];
+	required string replacement = 2 [(nanopb).max_size = 96];
+}
+
 // This is a placeholder component which helps us set up billboarded
 // bones. Essentially, we create a new entity with this component and
 // insert it into the hierarchy between the billboarded bone entity

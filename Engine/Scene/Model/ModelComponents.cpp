@@ -105,6 +105,44 @@ namespace usg
 	}
 
 	template<>
+	void OnLoaded<ModelTextureOverride>(Component<ModelTextureOverride>& c, ComponentLoadHandles& handles, bool bWasPreviouslyCalled)
+	{
+		if (bWasPreviouslyCalled)
+		{
+			return;
+		}
+
+		Optional<ModelComponent> model;
+		handles.GetComponent(c.GetEntity(), model);
+		ASSERT(model.Exists());
+		if (!model.Exists())
+		{
+			return;
+		}
+		Component<ModelComponent>& modelComp = model.Force();
+		if (modelComp.GetRuntimeData().pModel == NULL)
+		{
+			InitModel(modelComp, handles);
+		}
+		Model* pModel = modelComp.GetRuntimeData().pModel;
+		ASSERT_MSG(modelComp->bDynamic, "ModelTextureOverride on %s needs a dynamic model", modelComp->name);
+		if (!pModel || !modelComp->bDynamic)
+		{
+			return;
+		}
+
+		TextureHndl pTex = handles.pResourceMgr->GetTextureAbsolutePath(handles.pDevice, c->replacement);
+		if (pModel->OverrideTexture(c->original, pTex))
+		{
+			pModel->UpdateDescriptors(handles.pDevice);
+		}
+		else
+		{
+			DEBUG_PRINT("ModelTextureOverride: %s has no texture %s\n", modelComp->name, c->original);
+		}
+	}
+
+	template<>
 	void OnLoaded<UVRotation>(Component<UVRotation>& rotation, ComponentLoadHandles& handles, bool bWasPreviouslyCalled)
 	{
 		if (bWasPreviouslyCalled)

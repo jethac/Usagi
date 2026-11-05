@@ -1,0 +1,72 @@
+/****************************************************************************
+//	Usagi Engine, Copyright © Vitei, Inc. 2013
+//	Description: Look settings for the post process chain and deferred
+//	lighting. Distances are in world units (view space).
+****************************************************************************/
+import 'nanopb.proto';
+
+package usg;
+
+message ToneMapSettings
+{
+	required float fExposure = 1 [default = 1.0];		// Linear scale applied before the tone curve
+	required float fSaturation = 2 [default = 1.0];
+	required float fContrast = 3 [default = 1.0];		// Applied around mid grey after the tone curve
+	required float fVignette = 4 [default = 0.0];		// 0 = off, 1 = corners fully dark
+	required float fLUTStrength = 5 [default = 1.0];
+	// Colour grading LUT: a 256x16 strip of 16 16x16 slices (red across, green
+	// down, blue by slice), applied in display (sRGB) space. Empty = no LUT.
+	required string lutName = 6 [(nanopb).max_size = 64];
+}
+
+message LightingSettings
+{
+	required float fIBLIntensity = 1 [default = 1.0];
+	required float fAmbientScale = 2 [default = 1.0];		// Scales the scene's flat ambient light
+	required float fHorizonFade = 3 [default = 1.3];		// Fades reflections that point below the surface
+	// Environment for image based lighting; empty = the engine's default studio
+	required string envRadianceName = 4 [(nanopb).max_size = 64];
+	required string envIrradianceName = 5 [(nanopb).max_size = 64];
+	required float fEnvRotation = 6 [default = 0.0];		// Yaw of the environment, radians
+
+	// Screen space contact shadows for the primary shadowed directional light
+	required float fContactShadowLength = 7 [default = 0.0];	// 0 disables
+	required float fContactShadowThickness = 8 [default = 0.05];
+	required uint32 uContactShadowSteps = 9 [default = 8];
+	required float fContactShadowStrength = 10 [default = 1.0];
+	// Moves the shadow lookup along the surface normal (world units) to
+	// remove acne on surfaces at a grazing angle to the light
+	required float fShadowNormalOffset = 11 [default = 0.0];
+}
+
+message BloomSettings
+{
+	required float fThreshold = 1 [default = 0.9];		// Linear scene luminance where bloom starts
+	required float fScale = 2 [default = 1.0];
+}
+
+message SSAOSettings
+{
+	required float fRadius = 1 [default = 1.2];			// World units
+	required float fStrength = 2 [default = 1.0];
+	required float fPower = 3 [default = 1.5];
+	required float fFadeOutFrom = 4 [default = 50.0];		// View distance where AO starts to fade
+	required float fFadeOutTo = 5 [default = 300.0];
+}
+
+message TiltShiftSettings
+{
+	required float fFocusCenter = 1 [default = 0.5];		// Screen height fraction, 0 = top
+	required float fFocusHalfHeight = 2 [default = 0.18];	// Sharp band half height, screen fraction
+	required float fTransition = 3 [default = 0.3];		// Distance over which the blur ramps to full
+	required float fMaxRadius = 4 [default = 6.0];		// Blur radius in pixels at 1080 lines
+}
+
+message PostFXSettings
+{
+	required ToneMapSettings toneMap = 1;
+	required LightingSettings lighting = 2;
+	required BloomSettings bloom = 3;
+	required SSAOSettings ssao = 4;
+	required TiltShiftSettings tiltShift = 5;
+}

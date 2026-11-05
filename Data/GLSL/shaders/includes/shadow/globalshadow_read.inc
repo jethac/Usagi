@@ -88,7 +88,8 @@ float SampleShadowmap(in float fViewDepth, in vec3 vPosition, in int shadowIdx)
     }
 
     // Fall off the shadow if it's beyond our maximum distance
-    float decay = smoothstep(0.8 * cascades[shadowIdx].vSplitDistance.w, cascades[shadowIdx].vSplitDistance.w, fViewDepth);
+    float fLast = cascades[shadowIdx].vSplitDistance.w;
+    float decay = smoothstep(fLast - 0.05 * (fLast - cascades[shadowIdx].vSplitDistance.z), fLast, fViewDepth);
 
     return max(d, decay);
 }

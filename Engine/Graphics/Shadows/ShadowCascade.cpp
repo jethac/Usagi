@@ -53,6 +53,15 @@ ShadowCascade::ShadowCascade()
 	m_pRenderTarget = nullptr;
     m_fMaxShadowDist = 1000.f;
     m_fResolutionMultiplier = 1.0f;
+	m_bFitReceivers = false;
+	m_fPCFRadius = 3.0f;
+	m_fSplitStart = 0.0f;
+	m_fReceiverMinY = 0.0f;
+	m_fReceiverMaxY = 0.0f;
+	for (int i = 0; i < MAX_CASCADES; i++)
+	{
+		m_fSplitDist[i] = 0.0f;
+	}
 
 	for (int i = 0; i < MAX_CASCADES; i++)
 	{
@@ -145,16 +154,19 @@ void ShadowCascade::Update(const Camera& sceneCam)
 	float fBiasMul = 5.0f / m_fResolutionMultiplier;
 
     readData->vBias.Assign(-0.000002f*fBiasMul, -0.000004f*fBiasMul, -0.000007f*fBiasMul, -0.000009f*fBiasMul);
-	readData->vSampleRange.Assign(3.0f, 2.5f, 2.0f, 0.5f);
+	// Coarser cascades get a smaller texel radius to keep the world-space penumbra similar
+	readData->vSampleRange.Assign(m_fPCFRadius, m_fPCFRadius * 0.85f, m_fPCFRadius * 0.7f, m_fPCFRadius * 0.5f);
 
 	float fadeDistances[MAX_CASCADES];
 	float invFadeRange[MAX_CASCADES];
 	for (uint32 i = 0; i < MAX_CASCADES; i++)
 	{
-		fadeDistances[i] = m_fPartitions0To1[i] * FADE_BUFFER;
-		invFadeRange[i] = 1.f/(m_fPartitions0To1[i] - fadeDistances[i]);
+		// Fade over the last part of each cascade's depth interval
+		float fPrev = i > 0 ? m_fSplitDist[i - 1] : m_fSplitStart;
+		fadeDistances[i] = m_fSplitDist[i] - (m_fSplitDist[i] - fPrev) * (1.0f - FADE_BUFFER) * 4.0f;
+		invFadeRange[i] = 1.f/Math::Max(m_fSplitDist[i] - fadeDistances[i], 0.0001f);
 	}
-    readData->vSplitDist.Assign(m_fPartitions0To1[0], m_fPartitions0To1[1], m_fPartitions0To1[2], m_fPartitions0To1[3]);
+    readData->vSplitDist.Assign(m_fSplitDist[0], m_fSplitDist[1], m_fSplitDist[2], m_fSplitDist[3]);
 	readData->vFadeSplitDist.Assign(fadeDistances[0], fadeDistances[1], fadeDistances[2], fadeDistances[3]);
 	readData->vInvFadeLength.Assign(invFadeRange[0], invFadeRange[1], invFadeRange[2], invFadeRange[3]);
 	readData->vInvShadowDim.Assign(1.f / (float)m_pRenderTarget->GetWidth(), 1.f / (float)m_pRenderTarget->GetHeight());
@@ -233,36 +245,91 @@ void ShadowCascade::ComputeFrustumFromProjection( PointFrustum* pOut, const Matr
     pOut->fFar = vPoints[5].z;
 }
 
-void ShadowCascade::CreateFrustumPointsFromInterval( float fIntervalBegin, float fIntervalEnd,const Matrix4x4& mViewProj, Vector4f* pvPointsWorld ) 
+// View space corner of the camera frustum at a given view depth. Uses two
+// points on each corner ray through the inverse projection, so it is valid for
+// perspective and orthographic projections alike.
+static Vector4f FrustumCornerAtDepth(const Matrix4x4& mInvProj, float fX, float fY, float fDepth)
 {
-	PointFrustum viewFrust;
-    ComputeFrustumFromProjection(&viewFrust, &mViewProj);
-
-    viewFrust.fNear = fIntervalBegin;
-    viewFrust.fFar = fIntervalEnd;
-
-
-    Vector4f vRightTop(viewFrust.fRightSlope,viewFrust.fTopSlope,1.0f,1.0f);
-    Vector4f vLeftBottom(viewFrust.fLeftSlope,viewFrust.fBottomSlope,1.0f,1.0f);
-    Vector4f vNear(viewFrust.fNear,viewFrust.fNear,viewFrust.fNear,1.0f);
-    Vector4f vFar(viewFrust.fFar,viewFrust.fFar,viewFrust.fFar,1.0f);
-    Vector4f vRightTopNear		= vRightTop * vNear;
-    Vector4f vRightTopFar		= vRightTop * vFar;
-    Vector4f vLeftBottomNear	= vLeftBottom * vNear;
-    Vector4f vLeftBottomFar		= vLeftBottom * vFar;
-
-    pvPointsWorld[0] = vRightTopNear;
-    pvPointsWorld[1] = Vector4f(vLeftBottomNear.x, vRightTopNear.y, vRightTopNear.z, vRightTopNear.w );
-    pvPointsWorld[2] = vLeftBottomNear;
-    pvPointsWorld[3] = Vector4f( vRightTopNear.x, vLeftBottomNear.y, vRightTopNear.z, vRightTopNear.w );
-
-    pvPointsWorld[4] = vRightTopFar;
-    pvPointsWorld[5] = Vector4f( vLeftBottomFar.x, vRightTopFar.y, vRightTopFar.z, vRightTopFar.w);
-    pvPointsWorld[6] = vLeftBottomFar;
-    pvPointsWorld[7] = Vector4f( vRightTopFar.x, vLeftBottomFar.y, vRightTopFar.z, vRightTopFar.w );
-
+	Vector4f vA = Vector4f(fX, fY, 0.0f, 1.0f) * mInvProj;
+	Vector4f vB = Vector4f(fX, fY, 1.0f, 1.0f) * mInvProj;
+	vA = vA / vA.w;
+	vB = vB / vB.w;
+	Vector4f vDir = vB - vA;
+	float fT = Math::IsEqual(vDir.z, 0.0f) ? 0.0f : (fDepth - vA.z) / vDir.z;
+	Vector4f vOut = vA + vDir * fT;
+	vOut.w = 1.0f;
+	return vOut;
 }
 
+void ShadowCascade::CreateFrustumPointsFromInterval( float fIntervalBegin, float fIntervalEnd,const Matrix4x4& mProj, Vector4f* pvPointsWorld ) 
+{
+	Matrix4x4 mInvProj;
+	mProj.GetInverse(mInvProj);
+
+	// Right top, left top, left bottom, right bottom; near then far
+	const float fCorners[4][2] = { { 1.0f, 1.0f }, { -1.0f, 1.0f }, { -1.0f, -1.0f }, { 1.0f, -1.0f } };
+	for (uint32 i = 0; i < 4; i++)
+	{
+		pvPointsWorld[i] = FrustumCornerAtDepth(mInvProj, fCorners[i][0], fCorners[i][1], fIntervalBegin);
+		pvPointsWorld[i + 4] = FrustumCornerAtDepth(mInvProj, fCorners[i][0], fCorners[i][1], fIntervalEnd);
+	}
+}
+
+void ShadowCascade::SetReceiverHeightRange(bool bEnable, float fMinY, float fMaxY)
+{
+	m_bFitReceivers = bEnable;
+	m_fReceiverMinY = Math::Min(fMinY, fMaxY);
+	m_fReceiverMaxY = Math::Max(fMinY, fMaxY);
+}
+
+// The view depth range over which the camera frustum overlaps the receiver
+// slab (world Y in [min, max]). For a top-down camera this is a thin range
+// around the ground, so the cascades cover just the visible table.
+void ShadowCascade::GetReceiverDepthRange(const Camera& sceneCam, float& fStartOut, float& fEndOut) const
+{
+	Matrix4x4 mInvProj, mInvView;
+	sceneCam.GetProjection().GetInverse(mInvProj);
+	sceneCam.GetViewMatrix().GetInverse(mInvView);
+
+	float fMin = FLT_MAX;
+	float fMax = -FLT_MAX;
+	const float fCorners[5][2] = { { 1.0f, 1.0f }, { -1.0f, 1.0f }, { -1.0f, -1.0f }, { 1.0f, -1.0f }, { 0.0f, 0.0f } };
+	for (uint32 i = 0; i < 5; i++)
+	{
+		// Corner ray in world space
+		Vector4f vA = FrustumCornerAtDepth(mInvProj, fCorners[i][0], fCorners[i][1], sceneCam.GetNear()) * mInvView;
+		Vector4f vB = FrustumCornerAtDepth(mInvProj, fCorners[i][0], fCorners[i][1], m_fMaxShadowDist) * mInvView;
+		float fDepthA = sceneCam.GetNear();
+		float fDepthB = m_fMaxShadowDist;
+		float fDY = vB.y - vA.y;
+		float fT0 = 0.0f, fT1 = 1.0f;
+		if (Math::IsEqual(fDY, 0.0f))
+		{
+			if (vA.y < m_fReceiverMinY || vA.y > m_fReceiverMaxY)
+				continue;
+		}
+		else
+		{
+			float fTa = (m_fReceiverMinY - vA.y) / fDY;
+			float fTb = (m_fReceiverMaxY - vA.y) / fDY;
+			fT0 = Math::Max(fT0, Math::Min(fTa, fTb));
+			fT1 = Math::Min(fT1, Math::Max(fTa, fTb));
+			if (fT0 > fT1)
+				continue;
+		}
+		fMin = Math::Min(fMin, fDepthA + (fDepthB - fDepthA) * fT0);
+		fMax = Math::Max(fMax, fDepthA + (fDepthB - fDepthA) * fT1);
+	}
+
+	if (fMin > fMax)
+	{
+		// The slab isn't visible; fall back to the full range
+		fMin = sceneCam.GetNear();
+		fMax = m_fMaxShadowDist;
+	}
+	fStartOut = Math::Max(fMin, sceneCam.GetNear());
+	fEndOut = Math::Max(fMax, fStartOut + 0.01f);
+}
 
 void ShadowCascade::InitFrame(const Camera& sceneCam)
 {
@@ -292,7 +359,14 @@ void ShadowCascade::InitFrame(const Camera& sceneCam)
     float fFrustumIntervalBegin, fFrustumIntervalEnd;
     Vector4f vLightCameraOrthoMin;  // light space frustrum aabb 
     Vector4f vLightCameraOrthoMax;
-    float fCameraNearFarRange = /*sceneCam.GetFar()*/ m_fMaxShadowDist - sceneCam.GetNear();
+    float fRangeStart = 0.0f;
+    float fRangeEnd = m_fMaxShadowDist;
+    if (m_bFitReceivers)
+    {
+        GetReceiverDepthRange(sceneCam, fRangeStart, fRangeEnd);
+    }
+    float fCameraNearFarRange = fRangeEnd - fRangeStart;
+    m_fSplitStart = fRangeStart;
 
 	Vector4f vWorldUnitsPerTexel = Vector4f(0.0f, 0.0f, 0.0f, 0.0f); 
 
@@ -305,15 +379,17 @@ void ShadowCascade::InitFrame(const Camera& sceneCam)
 		}
 		else
 		{
-			fFrustumIntervalBegin = m_fPartitions0To1[uCascade - 1] * FADE_BUFFER;
+			// Overlap the previous cascade's fade band
+			fFrustumIntervalBegin = m_fPartitions0To1[uCascade - 1] - (m_fPartitions0To1[uCascade - 1] - (uCascade > 1 ? m_fPartitions0To1[uCascade - 2] : 0.0f)) * (1.0f - FADE_BUFFER) * 4.0f;
 		}
 
 
         // Scale the intervals between 0 and 1. They are now percentages that we can scale with.
         fFrustumIntervalEnd		= m_fPartitions0To1[ uCascade ] / m_fCascadePartitionsMax;        
         fFrustumIntervalBegin 	= fFrustumIntervalBegin / m_fCascadePartitionsMax;
-        fFrustumIntervalBegin	= fFrustumIntervalBegin * fCameraNearFarRange;
-        fFrustumIntervalEnd		= fFrustumIntervalEnd * fCameraNearFarRange;
+        fFrustumIntervalBegin	= fRangeStart + fFrustumIntervalBegin * fCameraNearFarRange;
+        fFrustumIntervalEnd		= fRangeStart + fFrustumIntervalEnd * fCameraNearFarRange;
+        m_fSplitDist[uCascade]	= fFrustumIntervalEnd;
         Vector4f vFrustumPoints[8];
 
         // Get the 8 points for the frustum of this particular cascade interval

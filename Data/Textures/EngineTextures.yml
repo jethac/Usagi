@@ -11,3 +11,6 @@ Resources:
   - File: particles/water_circle.dds
   - File: ribbon/round_quarter.dds
   - File: ribbon/trail.dds
+  - File: env_studio_radiance.dds
+  - File: env_studio_irradiance.dds
+  - File: lut_neutral.dds

@@ -1,64 +1,79 @@
 #ifndef _DEFERRED_LIGHTING_INC
 #define _DEFERRED_LIGHTING_INC
 
+// Deferred base pass: every unshadowed directional light plus the first
+// shadowed one (further shadowed lights are added by deferred_dirshadow.inc),
+// image based lighting, flat ambient and emissive.
+
+// Requires ../includes/deferred_env.inc to be included first
 
 ATTRIB_LOC(0) in vec2 vo_vTexCoord;
 ATTRIB_LOC(1) in vec3 vo_vFSVector;
-
+ATTRIB_LOC(2) in vec3 vo_vRayNear;
+ATTRIB_LOC(3) in vec3 vo_vRayFar;
 
 layout(location = 0) out vec4 colorOut;
 
-void CalculateDirectionalLighting(int iLight, vec3 vNormal, vec3 vViewDir, float fSpecPow, inout vec4 vDiffuse, inout vec4 vSpecular)
+float SampleDirShadow(in vec3 vPos, in vec3 vNormal, in vec3 L, in int iCascadeSet)
 {
-	vec3 vLightDir		= lights[iLight].vDirection.xyz;
-	float nDotL			= max( dot( vNormal, vLightDir ), 0.0); 
-   
-	vec3  vReflection	= reflect( vNormal, - vLightDir ); 
-	float fRDotV		= max( 0.0, dot( vReflection, vViewDir ) );
-
-	float fSpecular = ( pow( max( fRDotV, 0.0001 ), fSpecPow ) );
-
-	vDiffuse  += lights[iLight].vDiffuse*nDotL;
-	vSpecular += lights[iLight].vSpecular*fSpecular;
+	float fShadow = 1.0;
+	if (vPos.z < cascades[iCascadeSet].vSplitDistance.w)
+	{
+		vec3 vWorldPos = (vec4(vPos + vNormal * vShadowParams.y, 1.0) * mInvViewMat).xyz;
+		fShadow = SampleShadowmap(vPos.z, vWorldPos.xyz, iCascadeSet);
+	}
+	return min(fShadow, ContactShadow(vPos, vNormal, L));
 }
 
 void main(void)
 {
-	vec3 vPos, vNormal, vColor, vSpecCol;
-	float fSpecPow;
-	GetDeferredDataSpecFS(vo_vTexCoord, vo_vFSVector, vPos, vNormal, vColor, vSpecCol, fSpecPow);
+	float fDepth = GetDeferredLinearDepth(vo_vTexCoord);
+	vec3 vPos = GetViewPosFromRay(fDepth, vo_vRayNear, vo_vRayFar);
+	PBRSurface s = GetDeferredSurface(vo_vTexCoord);
+	// Toward the eye along this pixel's ray (constant for orthographic views)
+	vec3 V = normalize(vo_vRayNear - vo_vRayFar);
 
-	vec3 vFSVector = normalize(vo_vFSVector);
-	vec4 vSpecular = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-	vec4 vDiffuse = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	vec3 vColor = vec3(0.0);
 
-
-	int count = iCascadeLightStart;
-
-	if(iCascadeLightStart < iDirLightCount)
+	int iLastLight = iDirLightCount - 1;
+	if (iCascadeLightStart >= 0 && iCascadeLightStart < iDirLightCount)
 	{
-		// Apply the first shadowed light
-		CalculateDirectionalLighting(iCascadeLightStart, vNormal, vFSVector, fSpecPow, vDiffuse, vSpecular);	
-		if(vPos.z < cascades[0].vSplitDistance.w)
+		iLastLight = iCascadeLightStart;
+	}
+
+	for (int i = 0; i <= iLastLight; i++)
+	{
+		vec3 L = lights[i].vDirection.xyz;
+		vec3 vLit = PBR_DirectLight(s, V, L) * lights[i].vDiffuse.rgb;
+		if (i == iCascadeLightStart)
 		{
-			vec3 vWorldPos = (vec4(vPos,1.0) * mInvViewMat).xyz;
-			float fShadow = SampleShadowmap(vPos.z, vWorldPos.xyz, 0);
-			vec4 vShadowMul = mix(vShadowColor, vec4(1.0), fShadow);
-
-			vDiffuse *= vShadowMul;
-			vSpecular *= vShadowMul;
+			vLit *= SampleDirShadow(vPos, s.vNormal, L, 0);
 		}
-
+		vColor += vLit;
 	}
 
-	for(int i=0; i<count; i++)
+	float fOcclusion = s.fOcclusion * ScreenSpaceAO(vPos, s.vNormal);
+	vColor += EvaluateIBL(s, V, fOcclusion);
+	vColor += vAmbientLight.rgb * vEnvParams.z * PBR_DiffuseColor(s) * fOcclusion;
+	vColor += GetDeferredEmissive(vo_vTexCoord);
+
+	colorOut = vec4(vColor, 1.0);
+
+	// Debug views (USAGI_DEFERRED_DEBUG)
+	int iDebug = int(vShadowParams.w);
+	if (iDebug == 1) colorOut = vec4(s.vAlbedo, 1.0);
+	else if (iDebug == 2) colorOut = vec4(s.vNormal * 0.5 + 0.5, 1.0);
+	else if (iDebug == 3) colorOut = vec4(s.fRoughness, s.fMetallic, s.fClearCoat, 1.0);
+	else if (iDebug == 4) colorOut = vec4(EvaluateIBL(s, V, s.fOcclusion), 1.0);
+	else if (iDebug == 5) colorOut = vec4(vec3(iCascadeLightStart >= 0 ? SampleDirShadow(vPos, s.vNormal, lights[iCascadeLightStart].vDirection.xyz, 0) : 1.0), 1.0);
+	else if (iDebug == 6) colorOut = vec4(fract(vPos * 0.1), 1.0);
+	else if (iDebug == 7) colorOut = vec4(vec3(fOcclusion), 1.0);
+	else if (iDebug == 8) colorOut = vec4(vec3(SampleShadowmap(vPos.z, (vec4(vPos, 1.0) * mInvViewMat).xyz, 0)), 1.0);
+	else if (iDebug == 9)
 	{
-		CalculateDirectionalLighting(i, vNormal, vFSVector, fSpecPow, vDiffuse, vSpecular);
+		vec4 vSP = vec4((vec4(vPos, 1.0) * mInvViewMat).xyz, 1.0) * cascades[0].mCascadeMtx[0];
+		colorOut = vec4(fract(vSP.xyz / vSP.w * vec3(8.0, 8.0, 1.0)), 1.0);
 	}
-
-	vec3 vEmissive = GetDeferredEmissive(vo_vTexCoord);
-	colorOut = vec4((vColor * ((vDiffuse.xyz) + vAmbientLight.xyz )) + (vSpecular.xyz * vSpecCol) + vEmissive, 1.0);
 }
 
 #endif
-

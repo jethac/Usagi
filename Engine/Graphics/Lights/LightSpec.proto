@@ -58,6 +58,18 @@ message ProjectionLightSpec
 	required float fAspect = 3 [default = 1]; 
 };
 
+// Cascaded shadow fitting for a directional light
+message DirShadowSpec
+{
+	required float fMaxDistance = 1 [default = 1000.0];		// View distance the cascades cover
+	// Fit the cascades to where the camera sees world Y in [fReceiverMinY, fReceiverMaxY]
+	// (the ground and whatever stands on it). Best for top-down / long lens views.
+	required bool  bFitReceivers = 2 [default = false];
+	required float fReceiverMinY = 3 [default = 0.0];
+	required float fReceiverMaxY = 4 [default = 1.0];
+	required float fPCFRadius = 5 [default = 3.0];			// Soft shadow filter radius, shadow map texels
+};
+
 message LightSpec
 {
 	required LightSpecBase base = 1;
@@ -67,4 +79,5 @@ message LightSpec
 
 	// Spot and direction only
 	required Vector3f direction = 5;
+	required DirShadowSpec dirShadow = 6;
 };

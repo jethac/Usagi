@@ -718,7 +718,10 @@ bool Model::OverrideTexture(const char* szTextureName, TextureHndl pOverrideTex)
 				SamplerHndl origSamp = pSrcMesh->samplers[uTex];
 				string cmpName = pOrigTex->GetName().c_str();
 				str::RemovePath(cmpName);
-				if ((cmpName == texNameU8))
+				// Accept the name with or without its extension (pak textures are .vtx)
+				string cmpNoExt = cmpName;
+				str::TruncateExtension(cmpNoExt);
+				if (cmpName == texNameU8 || cmpNoExt == texNameU8)
 				{
 					pMaterial->SetImageSamplerPairAtBinding(uTex, pOverrideTex, origSamp);
 					bFound = true;
@@ -735,30 +738,16 @@ void Model::GPUUpdate(GFXDevice* pDevice, bool bVisible)
 	// Should internally check for any relevant changes, drop out if nothing needs changing
 	AddToSceneInt(pDevice);
 
-	// A NO_SKINNING mesh takes its vertex-shader model matrix (mModelMat) from its
-	// root bone's constant set. That constant is normally filled by a per-bone
-	// entity (BoneComponent). A plain rigid ModelComponent (e.g. static props or
-	// physics-driven bodies) has no such bone entities, so without this the root
-	// bone constant is never written and every vertex collapses to the origin.
-	// Push the model's world transform into any root bone that nothing else drives.
-	if (bVisible && m_pSkeleton && m_pTransformNode)
+	// Bones that no BoneComponent entity drives follow the model rigidly in their
+	// bind pose (see SetTransform); their constants are refreshed here.
+	if (bVisible && m_pSkeleton)
 	{
-		const Matrix4x4& mWorld = m_pTransformNode->GetMatrix();
-		const uint32 uMeshCount = m_pResource->GetMeshCount();
-		for (uint32 i = 0; i < uMeshCount; i++)
+		const uint32 uBoneCount = m_pSkeleton->GetBoneCount();
+		for (uint32 i = 0; i < uBoneCount; i++)
 		{
-			const ModelResource::Mesh* pMesh = m_pResource->GetMesh(i);
-			if (pMesh->primitive.eSkinningMode != usg::exchange::SkinningType_NO_SKINNING)
-				continue;
-
-			// A NO_SKINNING mesh's root bone maps 1:1 to the model, so the model's
-			// authoritative world matrix is the correct mModelMat. The auto-generated
-			// per-bone entity feeds a collapsed matrix here (its bind pose never gets
-			// the model transform), so always drive the constant from the model.
-			Bone* pBone = m_pSkeleton->GetBone(pMesh->primitive.uRootIndex);
-			if (pBone)
+			Bone* pBone = m_pSkeleton->GetBone(i);
+			if (!pBone->IsExternallyDriven() && pBone->GetTransformNode())
 			{
-				pBone->SetTransform(mWorld);
 				pBone->UpdateConstants(pDevice);
 			}
 		}
@@ -809,6 +798,24 @@ void Model::SetTransform(const Matrix4x4 &trans)
 {
 	m_pTransformNode->SetMatrix( trans );
 
+	// Entities cooked from a model get one BoneComponent entity per bone, which
+	// drives that bone's transform. Any bone left undriven (a model created
+	// without that hierarchy) would otherwise keep its resource-local bind
+	// matrix, so its geometry and its per-bone culling sphere would sit near the
+	// world origin. Place it rigidly in its bind pose under the model instead.
+	if (m_pSkeleton)
+	{
+		const uint32 uBoneCount = m_pSkeleton->GetBoneCount();
+		for (uint32 i = 0; i < uBoneCount; i++)
+		{
+			Bone* pBone = m_pSkeleton->GetBone(i);
+			if (!pBone->IsExternallyDriven() && pBone->GetTransformNode())
+			{
+				pBone->SetTransform(pBone->GetDefaultMatrix(true) * trans);
+			}
+		}
+	}
+
 	//else
 		//ASSERT(false);
 }
@@ -820,6 +827,20 @@ void Model::UpdateScaleBounds(float fScale)
 	sphere.SetRadius(sphere.GetRadius() * fScale);
 	// Pos will get transformed by the matrix
 	m_pTransformNode->SetBoundingSphere(sphere);
+
+	// Undriven bones inherit the model's matrix (see SetTransform), so they
+	// inherit its scale too. Driven bones get theirs from UpdateBoneBounds.
+	if (m_pSkeleton)
+	{
+		for (uint32 i = 0; i < m_pSkeleton->GetBoneCount(); i++)
+		{
+			Bone* pBone = m_pSkeleton->GetBone(i);
+			if (!pBone->IsExternallyDriven() && pBone->GetTransformNode())
+			{
+				pBone->UpdateScaleBounds(fScale);
+			}
+		}
+	}
 }
 
 void Model::RestoreDefaultLayer()

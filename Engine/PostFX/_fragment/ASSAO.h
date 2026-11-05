@@ -39,6 +39,12 @@ public:
 	virtual void SetTexture(GFXDevice* pDevice, Input eInput, const TextureHndl& texture) override;
 	virtual bool WritesTexture(Input eInput) const;
 
+	void SetParams(float fRadius, float fStrength, float fPower, float fFadeOutFrom, float fFadeOutTo)
+	{
+		m_settings.Radius = fRadius; m_settings.ShadowMultiplier = fStrength; m_settings.ShadowPower = fPower;
+		m_settings.FadeOutFrom = fFadeOutFrom; m_settings.FadeOutTo = fFadeOutTo;
+	}
+
 
 private:
 	void UpdateConstants(uint32 uWidth, uint32 uHeight, const usg::Camera* pCamera);

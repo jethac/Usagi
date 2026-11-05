@@ -83,8 +83,13 @@ void main(void)
 	if(uMaterial.bBumpMap)
 	{
         // FIXME: Use 2 component dxt5 at some point
-        vec3 nrm_l = texture(sampler1, vo_vTexCoord01.zw).xyz;
+        // PBR materials sample every map with the first UV set
+        vec3 nrm_l = texture(sampler1, uMaterial.bPBR ? vo_vTexCoord01.xy : vo_vTexCoord01.zw).xyz;
         nrm_l.xyz = normalize((nrm_l * 2.0) - 1.0);
+        if (uMaterial.bFlipNormalY)
+        {
+            nrm_l.y = -nrm_l.y;
+        }
         vec3 tan_v = normalize(vo_vTangent);
         vec3 binrm_v = normalize(vo_vBinormal);
         vNormal = normalize(nrm_l.x * tan_v + nrm_l.y * binrm_v + nrm_l.z * vNormal);
@@ -160,8 +165,26 @@ void main(void)
 #endif
 
 #ifdef DEFERRED_SHADING
-	// TODO: Make all specular single channel only
-	OutputDeferredDataLinDepth(-vo_vViewDir.z, vNormal, vDiffuse.rgb, vEmissive, vSpecular.rgb, uMaterial.specularpow);
+	if (uMaterial.bPBR)
+	{
+		float fRoughness = uMaterial.roughness;
+		float fMetallic = uMaterial.metallic;
+		float fOcclusion = 1.0;
+		if (uMaterial.bMetalRoughMap)
+		{
+			vec3 vORM = texture(sampler5, vo_vTexCoord01.xy).rgb;
+			fOcclusion = mix(1.0, vORM.r, uMaterial.occlusionStrength);
+			fRoughness *= vORM.g;
+			fMetallic *= vORM.b;
+		}
+		OutputDeferredPBR(-vo_vViewDir.z, vNormal, vDiffuse.rgb, vEmissive, fRoughness, fMetallic, uMaterial.reflectance,
+			uMaterial.clearcoat, uMaterial.clearcoatRoughness, fOcclusion);
+	}
+	else
+	{
+		// TODO: Make all specular single channel only
+		OutputDeferredDataLinDepth(-vo_vViewDir.z, vNormal, vDiffuse.rgb, vEmissive, vSpecular.rgb, uMaterial.specularpow);
+	}
 #else
 	vec4 vOut;
 	vOut.rgb = (vDiffuse.rgb * vFragPrimaryColor.rgb) + (vSpecular.rgb * vFragSecondaryColor.rgb);

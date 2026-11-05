@@ -1,3 +1,4 @@
 *.cpp
 _vr/*.cpp
 _fragment/*.cpp
+*.proto
