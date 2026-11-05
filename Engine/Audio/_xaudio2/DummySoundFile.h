@@ -18,8 +18,10 @@ namespace usg{
 		DummySoundFile() {}
 		~DummySoundFile() {}
 
-		virtual void Init(const SoundFileDef* pSoundFile, const PakFileRaw* pPak, Audio* pAudio, const char* pszLocalizedSubdir = NULL) { }
-		virtual void InitRaw(const SoundFileDef* pSoundFile, const void* pData, size_t rawDataSize, Audio* pAudio) { }
+		// No device, so no data, but the definition (type, priority, instance
+		// cap, ...) is still needed: Audio indexes per-type volumes with it.
+		virtual void Init(const SoundFileDef* pSoundFile, const PakFileRaw* pPak, Audio* pAudio, const char* pszLocalizedSubdir = NULL) { InitInt(pSoundFile, pSoundFile->filename, pAudio); }
+		virtual void InitRaw(const SoundFileDef* pSoundFile, const void* pData, size_t rawDataSize, Audio* pAudio) { InitInt(pSoundFile, pSoundFile->filename, pAudio); }
 		virtual void Cleanup(Audio* pAudio) { }
 		virtual void BindToSoundObject(class SoundObject* pSoundObject, bool bPositional) {}
 
