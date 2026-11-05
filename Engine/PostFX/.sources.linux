@@ -1,2 +1,3 @@
 *.cpp
+*.proto
 _fragment/*.cpp
