@@ -87,6 +87,9 @@ def process_data(config, platform, n)
   particle_paks = build_paks_for_directory(config, n, platform, "Data/Particle/", config.particle_out_dir)
   data_deps.merge particle_paks
 
+  effekseer_data = build_effekseer_data(config, n)
+  data_deps.merge effekseer_data
+
   if config.build != "final"
     entities = build_engine_entities(config, n, protocol_ruby_classes)
     data_deps.merge entities
@@ -181,6 +184,45 @@ def build_shader_pak_for_dir(config, n, effect_dir, shader_dir, api, includes)
   end
 end
 
+
+# Effekseer effects (Engine/Effekseer module). Everything under Data/Effekseer/
+# is copied to <romfiles>/Effekseer/ with its relative paths kept, since an
+# .efkefc references its textures, models and curves by relative path. Missing
+# references are reported here rather than at runtime.
+EFFEKSEER_DATA_EXTENSIONS = %w[efkefc efk efkmodel efkcurve png dds tga]
+
+def effekseer_references(efkefc)
+  # Resource paths are stored as UTF-16LE strings; pick out the ones with a
+  # known resource extension
+  data = File.binread(efkefc)
+  data = data[0...-1] if data.bytesize.odd?
+  text = data.force_encoding('UTF-16LE').encode('UTF-8', invalid: :replace, undef: :replace)
+  text.scan(/[\w\-. \/\\]+\.(?:png|dds|tga|efkmodel|efkcurve)/i).map { |p| p.tr('\\', '/').strip }.uniq
+rescue StandardError
+  []
+end
+
+def build_effekseer_data(config, n)
+  root = "Data/Effekseer"
+  return [] unless File.directory?(root)
+
+  pattern = "#{root}/**/*.{#{EFFEKSEER_DATA_EXTENSIONS.join(',')}}"
+  pairs = FileList[pattern].exclude { |f| File.directory?(f) }.map do |input|
+    [input, "#{config.romfiles_dir}/Effekseer/#{input.sub(/^#{root}\//, '')}"]
+  end
+  targets = Hash[pairs]
+
+  targets.keys.select { |f| f.end_with?('.efkefc', '.efk') }.each do |effect|
+    dir = File.dirname(effect)
+    effekseer_references(effect).each do |ref|
+      next if File.exist?(File.join(dir, ref))
+      puts "WARNING: #{effect} references missing file #{ref}"
+    end
+  end
+
+  GeneratorUtil.copy_files(n, targets)
+  targets.values
+end
 
 def build_paks_for_audio(config, n, platform)
   targets = FileList["Data/Audio/**/*.yml"].exclude{|f| File.directory?(f)}.map do |input|
