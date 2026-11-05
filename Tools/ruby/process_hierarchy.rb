@@ -107,7 +107,12 @@ def merge_with_defaults(protocol, hash)
       pname = f.proxy_class.name.gsub(/^.*::/, '').to_sym
       defaultVals = $defaults[pname] ? $defaults[pname] : {}
       passedVals = hash[f.name] ? hash[f.name] : {}
-      [f.name, merge_with_defaults(f.proxy_class, defaultVals.deep_merge(passedVals))]
+      # Repeated message fields arrive as arrays (as handled in yml2vpb.rb)
+      if passedVals.is_a? Array
+        [f.name, passedVals.map{|v| merge_with_defaults(f.proxy_class, defaultVals.deep_merge(v ? v : {}))}]
+      else
+        [f.name, merge_with_defaults(f.proxy_class, defaultVals.deep_merge(passedVals))]
+      end
     else
       [f.name, hash.has_key?(f.name) ? hash[f.name] : f.default_value]
     end
