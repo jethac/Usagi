@@ -249,16 +249,20 @@ scene renders black (details below).
 - `Tools/Tests/LinuxClear` opens an SDL3/Wayland window on the GTX 1070,
   creates the device and swap chain, and clears and presents at
   1920×1080.
-- UsagiGP builds, links and runs with `_romfiles/win` cooked on Windows.
-  It loads every pak, model and entity file and runs game logic, and
-  the 2D debug overlay draws correctly. **The 3D scene is black.**
-  Vulkan validation (1.4.363) reports no errors. The cause is not post
-  effects (a forward-only run is also black), not a resize, and not the
-  swap chain format (B8G8R8A8_SRGB, sRGB non-linear, as on Windows).
-  Next step: capture a frame with RenderDoc and compare it with Windows.
-- Frame rate, fullscreen 1920×1080, mailbox present mode: about 465 fps
-  in release and 430 fps in debug. This is not meaningful until the
-  scene draws.
+- UsagiGP (develop as of 120a727f, with the Cameraman, Effekseer,
+  Livingroom and UXML modules) builds, links and runs with
+  `_romfiles/win` cooked on Windows. Game logic, Effekseer init, the
+  UXML HUD and the 2D debug overlay all work, and a 30-second run is
+  stable. **The 3D scene is still black.** It has been ruled out that
+  this is caused by post effects (a forward-only run is also black), a
+  resize, the swap chain format (B8G8R8A8_SRGB, as on Windows), missing
+  files, culling (the scene reports its nodes visible and the data has
+  `bPerBoneCulling: false`), or the camera and model matrices (checked
+  on the CPU). Validation reports one swap chain sync hazard. The
+  iGPU (RADV) is black too, so the cause isn't the NVIDIA driver.
+  Next step: a RenderDoc capture.
+- Frame rate, fullscreen 1920×1080, debug build, mailbox present mode:
+  about 110 fps. Not meaningful until the scene draws.
 - Audio is the `_dummy` backend (silent).
 
 ### Building and running
@@ -274,7 +278,15 @@ Copy the tree, `_build/proto`, `_build/linux/<build>` and
     rake platform=linux build=debug         # engine: generate + build libs
     Tools/Tests/LinuxClear/build.sh debug   # bring-up test
     rake platform=linux build=debug         # in the game directory
+                                            # (after the engine libs: the
+                                            # game rake only regenerates
+                                            # the engine's ninja file)
     cd _romfiles/win && ../../_rom/linux/debug/UsagiGP [--fullscreen]
+
+Add-on modules (Engine/<Name>) build like engine libraries. Modules that
+need extra include paths or defines declare them in `usagi_module.yml`
+under `ninja:` (`include_dirs`, `defines`). That's the counterpart of
+`_msbuild/Module.props`.
 
 PhysX 4.1.2 for Linux: generate with the `linux` preset (snippets and
 samples off, static libraries), using CMake 3.x. Its CMake flags
