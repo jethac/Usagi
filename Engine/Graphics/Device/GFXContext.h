@@ -73,6 +73,10 @@ public:
 
 	void	InvalidatePipelineOnly();
 	void	InvalidateStates();
+	// Call after external code (e.g. middleware renderers) has recorded commands into this context's
+	// command buffer. Forces the pipeline, vertex buffers and descriptor sets to be re-bound on the next
+	// draw, while keeping the currently assigned descriptor sets.
+	void	InvalidateAfterExternalCommands();
 	void	ValidateDescriptors();
 private:
 

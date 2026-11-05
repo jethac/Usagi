@@ -222,6 +222,20 @@ void GFXContext::InvalidatePipelineOnly()
 	m_activeStateGroup.Invalidate();
 }
 
+void GFXContext::InvalidateAfterExternalCommands()
+{
+	m_pActiveBinding = NULL;
+	m_activeStateGroup.Invalidate();
+	m_uDirtyDescSetFlags = 0xFFFFFFFF;
+
+	for (uint32 uSlot = 0; uSlot < MAX_VERTEX_BUFFERS; uSlot++)
+	{
+		m_pActiveVBOs[uSlot] = NULL;
+	}
+
+	m_platform.InvalidateStates();
+}
+
 void GFXContext::InvalidateStates()
 {
 	m_pActiveBinding = NULL;
