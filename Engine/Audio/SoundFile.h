@@ -41,6 +41,7 @@ public:
 	AudioFalloff GetFalloff() const { return m_eFalloff;  }
 	AudioStacking GetStacking() const { return m_eStacking; }
 	uint32 GetPriority() const { return m_uPriority; }
+	uint32 GetMaxInstances() const { return m_uMaxInstances; }
 	uint32 GetCRC() const { return m_uCRC;  }
 
 	const AudioFilter* GetFilter() const { return m_pFilter; }
@@ -60,6 +61,7 @@ protected:
 	float			m_fPitch;
 	uint32			m_uCRC;
 	uint32			m_uPriority;
+	uint32			m_uMaxInstances = 0;
 	AudioType		m_eType;
 	AudioFalloff	m_eFalloff;
 	AudioStacking	m_eStacking;

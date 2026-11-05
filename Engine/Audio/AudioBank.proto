@@ -73,6 +73,9 @@ message SoundFileDef
 	required uint32 roomNameCRC = 19 [default = 0];
 	required float lowPassAttenFactor = 20 [default = 1.0];
 	required AudioStacking eStacking = 21 [default = AUDIO_STACK_MANY];
+	// Maximum simultaneous instances of this sound (0 = unlimited). Starting one
+	// more steals the lowest-priority instance, or is dropped if all outrank it.
+	optional uint32 maxInstances = 22 [default = 0];
 }
 
 message AudioFilterDef

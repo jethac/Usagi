@@ -103,8 +103,16 @@ public:
 
 	bool HasSound(uint32 uCRC);
 
+	// Voice budget across all playing sounds. When it is full, starting a sound
+	// steals the lowest-priority playing voice (distance-attenuated priority, so
+	// far-away sounds go first) or is dropped if every voice outranks it.
+	void SetMaxVoices(uint32 uMaxVoices) { m_uMaxVoices = uMaxVoices; }
+	uint32 GetMaxVoices() const { return m_uMaxVoices; }
+
 private:
 	bool ShouldPlay(Vector3f vPos, SoundFile* pSoundFile);
+	bool AcquireVoice(const SoundFile* pSoundFile);
+	SoundData* FindLowestPriorityVoice(const SoundFile* pOnlyFile);
 	SoundHandle Play3DSoundInt(SoundActorHandle& actorHandle, SoundFile* pSoundFile, const float fVolume, bool bPlay);
 	SoundHandle CreateSound(SoundActorHandle& actor);
 	void InitPanningData(float fAzimuthalAngle, PanningData& panning, float fDistance, float fSpeakerRadius);
@@ -138,6 +146,7 @@ private:
 	FastPool<ActorData>				m_actors;
 	FastPool<SoundData>				m_sounds;
 	float							m_fVolume[_AudioType_count];
+	uint32							m_uMaxVoices;
 	bool							m_bPaused[_AudioType_count];
 
 	struct SpeakerInfo

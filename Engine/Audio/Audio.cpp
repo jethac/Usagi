@@ -25,7 +25,8 @@ namespace usg
 Audio::Audio():
 m_listeners(5, false),
 m_actors(256, false),
-m_sounds(512, false)
+m_sounds(512, false),
+m_uMaxVoices(512)
 {
 	//m_speakerInfo.uSpeakerValues = 4;	// Only supporting stereo sound at the moment
 
@@ -586,6 +587,11 @@ SoundHandle Audio::Prepare2DSound(uint32 crc, const float fVolume, bool bPlay)
 			}
 		}
 
+		if (!AcquireVoice(pSoundFile))
+		{
+			return handle;
+		}
+
 		handle = CreateSound(emptyHndl);
 		if (handle.IsValid())
 		{
@@ -635,6 +641,64 @@ bool Audio::ShouldPlay(Vector3f vPos, SoundFile* pSoundFile)
 }
 
 
+Audio::SoundData* Audio::FindLowestPriorityVoice(const SoundFile* pOnlyFile)
+{
+	SoundData* pLowest = nullptr;
+	for (FastPool<SoundData>::Iterator it = m_sounds.Begin(); !it.IsEnd(); ++it)
+	{
+		SoundObject& object = (*it)->object;
+		if (!object.GetSoundFile() || object.IsStopping() || !object.IsPlaying())
+			continue;
+		if (pOnlyFile && object.GetSoundFile() != pOnlyFile)
+			continue;
+		if (!pLowest || object.GetPriority() < pLowest->object.GetPriority())
+		{
+			pLowest = *it;
+		}
+	}
+	return pLowest;
+}
+
+bool Audio::AcquireVoice(const SoundFile* pSoundFile)
+{
+	const uint32 uPriority = pSoundFile->GetPriority();
+	const float fStealFade = 0.05f;
+
+	uint32 uVoices = 0;
+	uint32 uInstances = 0;
+	for (FastPool<SoundData>::Iterator it = m_sounds.Begin(); !it.IsEnd(); ++it)
+	{
+		SoundObject& object = (*it)->object;
+		if (!object.GetSoundFile() || object.IsStopping() || !object.IsPlaying())
+			continue;
+		uVoices++;
+		if (object.GetSoundFile() == pSoundFile)
+			uInstances++;
+	}
+
+	// Per-sound cap first: the new instance replaces the least important one
+	const uint32 uMaxInstances = pSoundFile->GetMaxInstances();
+	if (uMaxInstances && uInstances >= uMaxInstances)
+	{
+		SoundData* pVictim = FindLowestPriorityVoice(pSoundFile);
+		if (!pVictim || pVictim->object.GetPriority() > uPriority)
+			return false;
+		pVictim->object.Stop(fStealFade);
+		uVoices--;
+	}
+
+	// Then the global budget (a newer sound wins a priority tie)
+	while (uVoices >= m_uMaxVoices)
+	{
+		SoundData* pVictim = FindLowestPriorityVoice(nullptr);
+		if (!pVictim || pVictim->object.GetPriority() > uPriority)
+			return false;
+		pVictim->object.Stop(fStealFade);
+		uVoices--;
+	}
+	return true;
+}
+
 AudioFilter* Audio::GetFilter(uint32 uCRC)
 {
 	return m_filterHashes[uCRC];
@@ -670,7 +734,7 @@ return SoundHandle();
 SoundHandle Audio::Play3DSoundInt(SoundActorHandle& actorHandle, SoundFile* pSoundFile, const float fVolume, bool bPlay)
 {
 	SoundHandle handle;
-	if (pSoundFile)
+	if (pSoundFile && AcquireVoice(pSoundFile))
 	{
 		handle = CreateSound(actorHandle);
 		if (handle.IsValid())
