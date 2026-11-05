@@ -1046,7 +1046,7 @@ void Display_ps::Resize(usg::GFXDevice* pDevice)
 	RECT dim;
 	GetClientRect(m_hwnd, &dim);
 
-	Resize(pDevice, dim.right - dim.left, m_uHeight = dim.bottom - dim.top);
+	Resize(pDevice, dim.right - dim.left, dim.bottom - dim.top);
 }
 
 void Display_ps::Minimized(usg::GFXDevice* pDevice)
