@@ -407,9 +407,14 @@ void ResourceMgr::ClearAllResources(GFXDevice* pDevice)
 }
 
 
-void ResourceMgr::AddResource(ResourceBase* pBase)
+BaseResHandle ResourceMgr::AddResource(ResourceBase* pBase)
 {
-	m_pImpl->resources.AddResource(pBase);
+	return m_pImpl->resources.AddResource(pBase);
+}
+
+BaseResHandle ResourceMgr::FindResource(const char* szName, ResourceType eType)
+{
+	return m_pImpl->resources.GetResourceHndl(szName, eType);
 }
 
 ModelResHndl ResourceMgr::_GetModel(GFXDevice* pDevice, const char* szModelName, bool bInstance, bool bFastMem)
