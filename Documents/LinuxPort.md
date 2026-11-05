@@ -90,8 +90,10 @@ The Vulkan loader is linked dynamically (`-lvulkan`) as on Windows.
 - Gamepads: `SDLGamepad` implements `IGamepad` over `SDL_Gamepad`,
   replacing `XInputPad` and `DirectInputJoystick`. It handles hot plug
   through `SDL_EVENT_GAMEPAD_ADDED/REMOVED`.
-- `VirtualGamepad` (keyboard-as-pad) is portable apart from VK constants
-  and is shared with Windows.
+- `VirtualGamepad` (keyboard-as-pad) has a `_linux` copy that uses the
+  engine's `KEYBOARD_KEY_*` codes. The Windows copy indexes the
+  keyboard with `VK_*` codes, but the DirectInput keyboard fills it with
+  engine codes, so its arrow and numpad bindings don't work.
 
 ## File I/O
 
@@ -239,5 +241,41 @@ from `_romfiles\win`.
 
 ## Status
 
-See the end of this file for progress, which is updated as milestones
-land.
+Milestones 1 to 4 are done. Milestone 5 builds and runs, but the 3D
+scene renders black (details below).
+
+- The engine libraries build on Linux with clang 23 (debug and
+  release). After the rebase they also build on Windows with MSBuild.
+- `Tools/Tests/LinuxClear` opens an SDL3/Wayland window on the GTX 1070,
+  creates the device and swap chain, and clears and presents at
+  1920×1080.
+- UsagiGP builds, links and runs with `_romfiles/win` cooked on Windows.
+  It loads every pak, model and entity file and runs game logic, and
+  the 2D debug overlay draws correctly. **The 3D scene is black.**
+  Vulkan validation (1.4.363) reports no errors. The cause is not post
+  effects (a forward-only run is also black), not a resize, and not the
+  swap chain format (B8G8R8A8_SRGB, sRGB non-linear, as on Windows).
+  Next step: capture a frame with RenderDoc and compare it with Windows.
+- Frame rate, fullscreen 1920×1080, mailbox present mode: about 465 fps
+  in release and 430 fps in debug. This is not meaningful until the
+  scene draws.
+- Audio is the `_dummy` backend (silent).
+
+### Building and running
+
+On Windows (pinned toolchain), in the engine checkout, then in the game:
+
+    rake platform=linux build=debug codegen
+
+Copy the tree, `_build/proto`, `_build/linux/<build>` and
+`_romfiles/win` to the Linux machine. Then, with `USAGI_DIR`,
+`VULKAN_SDK` (a prefix containing `include/vulkan`) and `PHYSX_DIR` set:
+
+    rake platform=linux build=debug         # engine: generate + build libs
+    Tools/Tests/LinuxClear/build.sh debug   # bring-up test
+    rake platform=linux build=debug         # in the game directory
+    cd _romfiles/win && ../../_rom/linux/debug/UsagiGP [--fullscreen]
+
+PhysX 4.1.2 for Linux: generate with the `linux` preset (snippets and
+samples off, static libraries), using CMake 3.x. Its CMake flags
+include `-Werror`, which current clang fails, so remove it.
