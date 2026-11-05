@@ -193,6 +193,92 @@ void InitTexInfo(const FontDefinition& fontDefIn, TexInfo& texInfoOut)
 
 #define LARGE_VALUE 1e240
 
+// msdfgen 1.5 takes the sign of a distance from the nearest edge, which
+// assumes every contour is wound the way it expects and that contours do
+// not overlap. Fonts instanced from variable fonts (Baloo 2, the HUD font)
+// keep overlapping contours, and some glyphs wind their outer contour the
+// other way: msdfgen then inverts the whole cell (D, 8 and p drew as filled
+// boxes) or leaves specks inside the glyph (B, @, d, e, g, q). msdfgen 1.7
+// fixed this with a scanline sign correction; this is the same idea. The
+// fill of each pixel comes from the non-zero winding rule on the flattened
+// outline, which ignores orientation and overlaps, and a pixel whose
+// distance has the wrong sign is mirrored across the edge value (0.5).
+struct FlatEdge
+{
+	double x0, y0, x1, y1;
+};
+
+static void FlattenShape(const Shape& shape, std::vector<FlatEdge>& out)
+{
+	const int STEPS = 24;
+	out.clear();
+	for (const Contour& contour : shape.contours)
+	{
+		for (const EdgeHolder& edge : contour.edges)
+		{
+			Point2 prev = edge->point(0.0);
+			for (int i = 1; i <= STEPS; i++)
+			{
+				Point2 cur = edge->point((double)i / STEPS);
+				FlatEdge e = { prev.x, prev.y, cur.x, cur.y };
+				out.push_back(e);
+				prev = cur;
+			}
+		}
+	}
+}
+
+// Non-zero winding number of (x, y): crossings of a ray towards +x.
+static bool InsideNonZero(const std::vector<FlatEdge>& edges, double x, double y)
+{
+	int winding = 0;
+	for (const FlatEdge& e : edges)
+	{
+		if ((e.y0 <= y) == (e.y1 <= y))
+			continue;
+		double t = (y - e.y0) / (e.y1 - e.y0);
+		double cx = e.x0 + t * (e.x1 - e.x0);
+		if (cx > x)
+			winding += e.y1 > e.y0 ? 1 : -1;
+	}
+	return winding != 0;
+}
+
+static float Median3(float a, float b, float c)
+{
+	return usg::Math::Max(usg::Math::Min(a, b), usg::Math::Min(usg::Math::Max(a, b), c));
+}
+
+// `translate` and `scale` as given to generateMSDF: pixel (x, y) samples
+// the shape at (x + 0.5, y + 0.5) / scale - translate.
+static void CorrectDistanceSigns(const Shape& shape, Bitmap<FloatRGB>& msdf, Bitmap<float>& sdf, double scale, const Vector2& translate)
+{
+	std::vector<FlatEdge> edges;
+	FlattenShape(shape, edges);
+	for (int y = 0; y < msdf.height(); ++y)
+	{
+		for (int x = 0; x < msdf.width(); ++x)
+		{
+			double sx = (x + 0.5) / scale - translate.x;
+			double sy = (y + 0.5) / scale - translate.y;
+			bool inside = InsideNonZero(edges, sx, sy);
+			// msdfgen stores sample y in this row (flipped for inverse-y shapes).
+			int row = shape.inverseYAxis ? msdf.height() - 1 - y : y;
+			// Distances are stored around 0.5 after generation: >0.5 is inside.
+			float& s = sdf(x, row);
+			if ((s > 0.5f) != inside)
+				s = 1.0f - s;
+			FloatRGB& m = msdf(x, row);
+			if ((Median3(m.r, m.g, m.b) > 0.5f) != inside)
+			{
+				m.r = 1.0f - m.r;
+				m.g = 1.0f - m.g;
+				m.b = 1.0f - m.b;
+			}
+		}
+	}
+}
+
 int ConvertUTF8ToUnicode(const char* utf8)
 {
 	wchar_t uni;
@@ -234,8 +320,13 @@ void AutoDetermineScale(const Vector2& vTrans, FontDefinition& fontDef, FontHand
 				shape.bounds(bounds.l, bounds.b, bounds.r, bounds.t);
 				float fWidthScale = maxRight / (float)bounds.r;
 				float fHeightScale  = bounds.t > 0.0f ? maxTop / (float)bounds.t : FLT_MAX;
+				// Descenders (g, j, p, q, y) hang below the baseline, which sits
+				// vTrans.y pixels up the cell: they must fit under it too, or the
+				// cell cuts them off.
+				float fDescentScale = bounds.b < 0.0f ? ((float)vTrans.y - 1.0f) / (float)-bounds.b : FLT_MAX;
 				fMinScale = usg::Math::Min(fWidthScale, fMinScale);
 				fMinScale = usg::Math::Min(fHeightScale, fMinScale);
+				fMinScale = usg::Math::Min(fDescentScale, fMinScale);
 		
 			}
 		}
@@ -362,6 +453,7 @@ int main(int argc, char *argv[])
 					// range, scale, translation
 					generateMSDF(msdf, shape, 4.0, fontDef.scale, trans/fontDef.scale, pxRange);
 					generateSDF(sdf, shape, 4.0, fontDef.scale, trans / fontDef.scale);
+					CorrectDistanceSigns(shape, msdf, sdf, fontDef.scale, trans / fontDef.scale);
 					EncodeUVs(texDef, bounds, chrInfo[uChrCount]);
 					EncodeCharacter(texDef, msdf, sdf, protoDef);
 
