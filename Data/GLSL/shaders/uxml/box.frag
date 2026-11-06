@@ -14,6 +14,8 @@ in BoxData
 	INT_LOC(4) vec2 go_vUV;
 	INT_LOC(5) vec4 go_vFill;
 	INT_LOC(6) vec4 go_vBorderCol;
+	INT_LOC(7) vec4 go_vSlice;
+	INT_LOC(8) vec4 go_vSliceUV;
 } boxData;
 
 SAMPLER_LOC(1, 0) uniform sampler2D sampler0;
@@ -33,6 +35,16 @@ float RoundedRectDistance(vec2 p, vec2 lo, vec2 hi, vec4 radii)
 	return min(max(d.x, d.y), 0.0) + length(max(d, vec2(0.0))) - r;
 }
 
+// One axis of a 9-slice: the ends keep their size (d0, d1 pixels showing
+// u0, u1 of the image), the middle stretches.
+float SliceAxis(float x, float size, float d0, float d1, float u0, float u1)
+{
+	if (x < d0) return d0 > 0.0 ? x / d0 * u0 : 0.0;
+	if (x > size - d1) return d1 > 0.0 ? 1.0 - u1 + (x - (size - d1)) / d1 * u1 : 1.0;
+	float mid = size - d0 - d1;
+	return mid > 0.0 ? u0 + (x - d0) / mid * (1.0 - u0 - u1) : u0;
+}
+
 void main(void)
 {
 	vec2 p = boxData.go_vLocal;
@@ -45,7 +57,17 @@ void main(void)
 	float outerCover = clamp(0.5 - outer / aa, 0.0, 1.0);
 	float innerCover = clamp(0.5 - inner / aa, 0.0, 1.0);
 
-	vec4 tex = texture(sampler0, boxData.go_vUV);
+	vec2 uv = boxData.go_vUV;
+	vec4 s = boxData.go_vSlice;
+	if (s.x > 0.0 || s.y > 0.0 || s.z > 0.0 || s.w > 0.0)
+	{
+		// 9-slice in one quad, so the pieces have no seams between them.
+		vec2 q = clamp(p, vec2(0.0), boxData.go_vSize);
+		vec4 su = boxData.go_vSliceUV;
+		uv = GetUV(vec2(SliceAxis(q.x, boxData.go_vSize.x, s.x, s.z, su.x, su.z),
+			SliceAxis(q.y, boxData.go_vSize.y, s.y, s.w, su.y, su.w)));
+	}
+	vec4 tex = texture(sampler0, uv);
 #ifdef SRGB_BLEND
 	// An sRGB texture samples as linear; the target is sRGB-space.
 	tex.rgb = fromLinear(tex.rgb);
