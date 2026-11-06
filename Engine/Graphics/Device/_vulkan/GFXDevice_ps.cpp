@@ -769,8 +769,8 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 
 	FATAL_RELEASE(supportedFeatures.features.samplerAnisotropy, "No anisotropy");
 
-	FATAL_RELEASE(supportedFeatures.features.geometryShader, "No geometry shader support");
-	FATAL_RELEASE(supportedFeatures.features.tessellationShader, "No tessellation shader support");
+	// Geometry and tessellation shaders are optional: Metal (MoltenVK) has
+	// no geometry shaders. Effects that need one check GPUCapabilities.
 	FATAL_RELEASE(supportedFeatures.features.multiDrawIndirect, "No multi draw indirect");
 	FATAL_RELEASE(supportedFeatures.features.textureCompressionBC, "No BC compression");
 	FATAL_RELEASE(supportedFeatures.features.independentBlend, "No independent blend");
@@ -783,7 +783,7 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 
 	// FIXME: Set up additional enabled features
 	m_enabledFeatures.samplerAnisotropy = VK_TRUE;
-	m_enabledFeatures.geometryShader = VK_TRUE;
+	m_enabledFeatures.geometryShader = supportedFeatures.features.geometryShader;
 	m_enabledFeatures.tessellationShader = VK_TRUE && supportedFeatures.features.tessellationShader;
 	m_enabledFeatures.multiDrawIndirect = VK_TRUE;
 	m_enabledFeatures.shaderStorageImageMultisample = VK_TRUE && supportedFeatures.features.shaderStorageImageMultisample;
@@ -861,6 +861,7 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	}
 
 	m_deviceCaps.bHasLineSmooth = m_bHasLineSmooth;
+	m_deviceCaps.bHasGeometryShaders = m_enabledFeatures.geometryShader == VK_TRUE;
 
 
 	GetHMDExtensionsForType(pHmd, IHeadMountedDisplay::ExtensionType::Device, extensions);

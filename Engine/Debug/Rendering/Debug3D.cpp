@@ -126,10 +126,15 @@ void Debug3D::InitContextData(GFXDevice* pDevice, ResourceMgr* pResMgr, ViewCont
 	pipelineState.uInputBindingCount = 1;
 	// Initialize cubes
 
-	pipelineState.pEffect = pResMgr->GetEffect(pDevice, "Debug.CubesOriented");
-	pipelineState.ePrimType = PT_POINTS;
-	
-	m_cubePipeline = pDevice->GetPipelineState(rp, pipelineState);
+	// Cubes are expanded from points in a geometry shader, so they aren't
+	// drawn where there are none (Metal)
+	if (pDevice->GetCaps().bHasGeometryShaders)
+	{
+		pipelineState.pEffect = pResMgr->GetEffect(pDevice, "Debug.CubesOriented");
+		pipelineState.ePrimType = PT_POINTS;
+
+		m_cubePipeline = pDevice->GetPipelineState(rp, pipelineState);
+	}
 
 	pipelineState.pEffect = pResMgr->GetEffect(pDevice, "Debug.SolidCol");
 	pipelineState.ePrimType = PT_TRIANGLES;

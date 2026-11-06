@@ -1,2 +1,2 @@
 Effects:
-  - { name: Box, vert: uxml/box, geom: uxml/box, frag: uxml/box }
+  - { name: Box, vert: uxml/box, frag: uxml/box }

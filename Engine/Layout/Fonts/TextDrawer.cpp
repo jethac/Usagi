@@ -33,7 +33,7 @@ namespace usg
 	const DescriptorDeclaration TextDrawer::ms_GlobalDescriptors3D[] =
 	{
 		DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_VERTEX),
-		DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL_1, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_GEOMETRY),
+		DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL_1, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_VERTEX),
 		DESCRIPTOR_END()
 	};
 
@@ -89,9 +89,11 @@ namespace usg
 
 
 		PipelineStateDecl pipelineState;
-		pipelineState.inputBindings[0].Init(g_textVertDecl);
+		// One instance per character, expanded to a four-vertex quad in the
+		// vertex shader
+		pipelineState.inputBindings[0].Init(g_textVertDecl, 0, VERTEX_INPUT_RATE_INSTANCE, 1);
 		pipelineState.uInputBindingCount = 1;
-		pipelineState.ePrimType = PT_POINTS;
+		pipelineState.ePrimType = PT_TRIANGLE_STRIP;
 		RasterizerStateDecl& rasDecl = pipelineState.rasterizerState;
 		rasDecl.eCullFace	= CULL_FACE_NONE;
 
@@ -175,7 +177,7 @@ namespace usg
 
 			pContext->SetDescriptorSet(&desc, 1);
 			pContext->SetVertexBuffer(&m_charVerts);
-			pContext->DrawImmediate((uint32)m_uCharCount);
+			pContext->DrawInstanced(4, (uint32)m_uCharCount);
 
 		}
 

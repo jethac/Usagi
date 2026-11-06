@@ -61,6 +61,11 @@ public:
 
 	void SetVertexBuffer(const VertexBuffer* pBuffer, uint32 uSlot = 0, uint32 uVertOffset = 0);
 	void DrawImmediate(uint32 uCount, uint32 uOffset = 0);
+	// Non-indexed instanced draw: uVertCount vertices for each of
+	// uInstanceCount instances, the first reading instance-rate streams at
+	// uFirstInstance. Used to expand sprites to quads without a geometry
+	// shader (four vertices per instance)
+	void DrawInstanced(uint32 uVertCount, uint32 uInstanceCount, uint32 uFirstInstance = 0);
 	void DrawIndexed(const IndexBuffer* pBuffer);	
 	void DrawIndexedEx(const IndexBuffer* pBuffer, uint32 uStartIndex, uint32 uIndexCount, uint32 uInstanceCount = 1);
 

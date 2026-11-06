@@ -2,7 +2,11 @@
 #include "../includes/global_2d.inc"
 #include "../includes/colorspace.inc"
 
-// Input attributes
+// One instance per character. Its four vertices are the corners of the
+// character's quad, drawn as a triangle strip in the order BR, BL, TR, TL.
+// (This was a geometry shader expanding a point; Metal has none.)
+
+// Input attributes (per instance)
 layout (location = 0) in vec4 ao_posRange;
 layout (location = 1) in float ao_fDepth;
 layout (location = 2) in vec4 ao_uvRange;
@@ -12,29 +16,32 @@ layout (location = 5) in vec4 ao_colBg;
 layout (location = 6) in vec4 ao_colFg;
 
 
-// Output attributes
-ATTRIB_LOC(0) out vec4 vo_posTL;
-ATTRIB_LOC(1) out vec4 vo_posTR;
-ATTRIB_LOC(2) out vec4 vo_posBL;
-ATTRIB_LOC(3) out vec4 vo_posBR;
-ATTRIB_LOC(4) out vec4 vo_vColorUpper;
-ATTRIB_LOC(5) out vec4 vo_vColorLower;
-ATTRIB_LOC(6) out vec4 vo_vBgColor;
-ATTRIB_LOC(7) out vec4 vo_vFgColor;
-ATTRIB_LOC(8) out vec4 vo_vUVRange;
+out GeometryData
+{
+	INT_LOC(0) vec2		go_vPos;
+	INT_LOC(1) vec4		go_vColor;
+	INT_LOC(2) vec4		go_vBgColor;
+	INT_LOC(3) vec2		go_vTexcoord;
+
+} geometryData;
 
 
 void main(void)
 {
- 	vo_posTL = vec4( ao_posRange.xy, ao_fDepth, 1.0 ) * proj;
- 	vo_posTR = vec4( ao_posRange.zy, ao_fDepth, 1.0 ) * proj;
- 	vo_posBL = vec4( ao_posRange.xw, ao_fDepth, 1.0 ) * proj;
- 	vo_posBR = vec4( ao_posRange.zw, ao_fDepth, 1.0 ) * proj;
- 	
-	vo_vColorUpper 		= toLinear(ao_colUpper);
-	vo_vColorLower 		= toLinear(ao_colLower);		
-	vo_vBgColor			= toLinear(ao_colBg);
-	vo_vFgColor			= toLinear(ao_colFg);
-	vo_vUVRange.xy  	= GetUV(ao_uvRange.xy);
-	vo_vUVRange.zw  	= GetUV(ao_uvRange.zw);
+	bool bRight = (gl_VertexIndex & 1) == 0;
+	bool bTop = gl_VertexIndex >= 2;
+
+	vec2 vLayoutPos = vec2(bRight ? ao_posRange.z : ao_posRange.x, bTop ? ao_posRange.y : ao_posRange.w);
+	vec4 vPos = vec4(vLayoutPos, ao_fDepth, 1.0) * proj;
+
+	vec2 vUVMin = GetUV(ao_uvRange.xy);
+	vec2 vUVMax = GetUV(ao_uvRange.zw);
+	vec4 vColor = toLinear(bTop ? ao_colUpper : ao_colLower);
+
+	geometryData.go_vColor = toLinear(ao_colFg) * vColor;
+	geometryData.go_vBgColor = toLinear(ao_colBg) * vColor;
+	geometryData.go_vTexcoord = vec2(bRight ? vUVMax.x : vUVMin.x, bTop ? vUVMax.y : vUVMin.y);
+	geometryData.go_vPos = vPos.xy;
+
+	gl_Position = vPos;
 }

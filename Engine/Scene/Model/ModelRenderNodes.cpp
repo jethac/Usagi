@@ -127,7 +127,9 @@ void Model::RenderMesh::Init(GFXDevice* pDevice, Scene* pScene, const ModelResou
 	// FIXME: Single verts for omni depth!
 
 	const PipelineStateDecl& omniDecl = GetPipelineState(ModelResource::Mesh::RS_OMNI_DEPTH);
-	if (omniDecl.pEffect)
+	// Omni shadows render all six cube faces at once through a geometry
+	// shader, which not every device has (Metal)
+	if (omniDecl.pEffect && pDevice->GetCaps().bHasGeometryShaders)
 	{
 		m_omniDepthPipelineState = pDevice->GetPipelineState(pScene->GetShadowRenderPass(), omniDecl);
 	}
