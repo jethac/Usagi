@@ -15,7 +15,7 @@
 #include "Engine/Audio/Audio.h"
 #include "Engine/Core/File/File.h"
 #include "Engine/Maths/MathUtil.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
 #include "Engine/Core/Timer/Timer.h"
 #include OS_HEADER(Engine/Core/Timer, TimeTracker.h)
 #include "Engine/Core/Modules/ModuleManager.h"

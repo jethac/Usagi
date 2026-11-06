@@ -11,10 +11,7 @@
 
 #ifndef FINAL_BUILD
 
-namespace physx
-{
-	class PxScene;
-}
+#include <box3d/id.h>
 
 namespace usg
 {
@@ -26,7 +23,7 @@ namespace usg
 		PhysicsDebugStats();
 		~PhysicsDebugStats();
 
-		void Init(physx::PxScene* pScene);
+		void Init(b3WorldId worldId);
 		void Cleanup(GFXDevice* pDevice);
 		void Update(float fElapsed) override;
 
@@ -50,7 +47,7 @@ namespace usg
 			PAGE_COUNT
 		};
 
-		physx::PxScene* m_pPhysicsScene;
+		b3WorldId m_worldId;
 
 	};
 

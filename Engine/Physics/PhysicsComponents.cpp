@@ -4,33 +4,19 @@
 #include "Engine/Common/Common.h"
 #include "Engine/Resource/ResourceMgr.h"
 #include "PhysicsComponents.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
 #include "Engine/Framework/FrameworkComponents.pb.h"
 #include "Engine/Framework/ComponentLoadHandles.h"
 #include "Engine/Resource/CollisionModelResource.h"
 #include "Engine/Resource/HeightFieldResource.h"
-#include "Engine/Physics/PhysXMeshCache.h"
-#include "Engine/Physics/VehicleCollider.h"
+#include "Engine/Physics/PhysicsMeshCache.h"
 #include "Engine/Physics/PhysicsSceneData.h"
 #include "Engine/Framework/TransformTool.h"
 #include <EASTL/string.h>
 
 namespace usg
 {
-	static_assert(sizeof(CollisionModelResource::IndexType)==sizeof(uint32),"PhysX and Usagi CollisionModelResource are using different index type.");
-
-	// Helper functions
-
-	namespace physics
-	{
-		namespace details
-		{
-			uint32 GetMaterialHash(const PhysicMaterial& m)
-			{
-				return utl::CRC32(&m, sizeof(PhysicMaterial));
-			}
-		}
-	}
+	static_assert(sizeof(CollisionModelResource::IndexType)==sizeof(uint32),"Box3D and Usagi CollisionModelResource are using different index type.");
 
 	template<typename ShapeType>
 	static void OnActivateShape(Component<ShapeType>& c)
@@ -38,8 +24,12 @@ namespace usg
 		auto& rtd = c.GetRuntimeData();
 		rtd.shapeAggregateEntity = nullptr;
 		rtd.entity = nullptr;
-		rtd.pShape = nullptr;
-		rtd.pMaterial = nullptr;
+		rtd.shapeId = b3_nullShapeId;
+		rtd.uMaterialFlags = 0;
+		rtd.uGroup = 0;
+		rtd.uFilter = 0;
+		rtd.uReportMask = 0;
+		rtd.uBitmask = 0;
 	}
 
 	template<typename ShapeType>
@@ -55,14 +45,37 @@ namespace usg
 
 		rtd.shapeAggregateEntity = nullptr;
 		rtd.entity = nullptr;
-		rtd.pShape = nullptr;
 	}
-	
-	void PhysXShapeRuntimeData::release()
+
+	void ShapeRuntimeData::release()
 	{
-		ASSERT(pMaterial != nullptr);
-		pMaterial->release();
-		pMaterial = nullptr;
+		// The shape is already gone if its body was destroyed first
+		if (B3_IS_NON_NULL(shapeId) && b3Shape_IsValid(shapeId))
+		{
+			b3Shape_SetUserData(shapeId, nullptr);
+			b3DestroyShape(shapeId, true);
+		}
+		shapeId = b3_nullShapeId;
+	}
+
+	namespace physics
+	{
+		namespace details
+		{
+			void SetGlobalPose(const RuntimeData<Components::RigidBody>& rbRtd, const Vector3f& vPosition, const Quaternionf& qRotation, bool bResetVelocity)
+			{
+				if (B3_IS_NULL(rbRtd.bodyId) || !b3Body_IsValid(rbRtd.bodyId))
+				{
+					return;
+				}
+				b3Body_SetTransform(rbRtd.bodyId, ToB3Vec3(vPosition), ToB3Quat(qRotation));
+				if (bResetVelocity && b3Body_GetType(rbRtd.bodyId) == b3_dynamicBody)
+				{
+					b3Body_SetLinearVelocity(rbRtd.bodyId, b3Vec3_zero);
+					b3Body_SetAngularVelocity(rbRtd.bodyId, b3Vec3_zero);
+				}
+			}
+		}
 	}
 
 	TransformComponent GetTransform(Entity e, ComponentLoadHandles& handles)
@@ -79,7 +92,7 @@ namespace usg
 	}
 
 	// Get an entity's transform relative to some not necessarily direct parent (pass nullptr as parent to get global pose)
-	static physx::PxTransform GetRelativeTransform(Entity parent, Entity child, ComponentLoadHandles& handles)
+	static b3Transform GetRelativeTransform(Entity parent, Entity child, ComponentLoadHandles& handles)
 	{
 		if (parent == nullptr)
 		{
@@ -92,12 +105,8 @@ namespace usg
 				handles.GetComponent(child, mtxFromSelfOrParents);
 				if (mtxFromSelfOrParents.Exists())
 				{
-					Quaternionf qRot = mtxFromSelfOrParents.Force()->matrix;
-					const Vector3f vPos = mtxFromSelfOrParents.Force()->matrix.vPos().v3();
-					physx::PxTransform t;
-					t.p = ToPhysXVec3(vPos);
-					t.q = ToPhysXQuaternion(qRot);
-					ASSERT(t.q.isUnit());
+					b3Transform t = ToB3Transform(*mtxFromSelfOrParents.Force());
+					ASSERT(b3IsNormalizedQuat(t.q));
 					return t;
 				}
 			}
@@ -106,29 +115,32 @@ namespace usg
 		const TransformComponent usgTrans = GetTransform(child, handles);
 		if (!usgTrans.bInheritFromParent)
 		{
-			return ToPhysXTransform(usgTrans);
+			return ToB3Transform(usgTrans);
 		}
-		physx::PxTransform trans = ToPhysXTransform(usgTrans);
+		b3Transform trans = ToB3Transform(usgTrans);
 		Entity e = child;
 		while (e->GetParentEntity() != parent)
 		{
-			physx::PxTransform parentTrans = ToPhysXTransform(GetTransform(e->GetParentEntity(), handles));
-			trans = parentTrans.transform(trans);
+			const b3Transform parentTrans = ToB3Transform(GetTransform(e->GetParentEntity(), handles));
+			trans = b3MulTransforms(parentTrans, trans);
 			e = e->GetParentEntity();
 		}
 		// Some propagated error
-		trans.q = trans.q.getNormalized();
+		trans.q = b3NormalizeQuat(trans.q);
 		return trans;
 	}
 
-	void ApplyMaterial(physx::PxMaterial* pMaterial, const PhysicMaterial& m)
+	static b3ShapeDef MakeShapeDef(const PhysicMaterial& m, bool bIsTrigger, float fDensity)
 	{
-		pMaterial->setDynamicFriction(m.fDynamicFriction);
-		pMaterial->setStaticFriction(m.fStaticFriction);
-		pMaterial->setRestitution(m.fBounciness);
-		pMaterial->setFrictionCombineMode((physx::PxCombineMode::Enum)m.eFrictionCombineMode);
-		pMaterial->setRestitutionCombineMode((physx::PxCombineMode::Enum)m.eRestitutionCombineMode);
-		pMaterial->userData = (void*)&m;
+		b3ShapeDef def = b3DefaultShapeDef();
+		def.baseMaterial = ToB3SurfaceMaterial(m);
+		def.density = fDensity;
+		def.isSensor = bIsTrigger;
+		// Triggers fire for any shape that overlaps them
+		def.enableSensorEvents = true;
+		// Mass is set once all of a body's shapes are attached (see UpdateMass)
+		def.updateBodyMass = false;
+		return def;
 	}
 
 	// The Scene
@@ -162,7 +174,7 @@ namespace usg
 	{
 		auto& rtd = c.GetRuntimeData();
 
-		if (rtd.pRigidActor != nullptr)
+		if (B3_IS_NON_NULL(rtd.bodyId))
 		{
 			return;
 		}
@@ -170,46 +182,43 @@ namespace usg
 		auto& sceneRuntimeData = *handles.pPhysicsScene;
 
 		ASSERT(!c->bDynamic || GameComponents<TransformComponent>::GetComponentData(c.GetEntity()) != nullptr && "Entities with dynamic rigid bodies must have TransformComponent");
-		const physx::PxTransform initialTransform = GetRelativeTransform(nullptr, c.GetEntity(), handles);
-		
+		const b3Transform initialTransform = GetRelativeTransform(nullptr, c.GetEntity(), handles);
+
+		b3BodyDef bodyDef = b3DefaultBodyDef();
+		bodyDef.position = initialTransform.p;
+		bodyDef.rotation = initialTransform.q;
+		bodyDef.userData = GameComponents<RigidBody>::GetComponent(c.GetEntity());
+
+		Optional<Identifier> id;
+		handles.GetComponent(c.GetEntity(), id);
+		if (id.Exists())
+		{
+			bodyDef.name = id.Force()->name;
+		}
+
 		if (c->bDynamic)
 		{
-			physx::PxRigidDynamic* pRigidBody = sceneRuntimeData.pPhysics->createRigidDynamic(initialTransform);
-			ASSERT(pRigidBody != nullptr);
-			pRigidBody->setMass(c->fMass);
-			pRigidBody->setMassSpaceInertiaTensor(ToPhysXVec3(c->vInertiaTensor));
-			pRigidBody->setAngularDamping(c->fAngularDamping);
-			pRigidBody->setLinearDamping(c->fLinearDamping);
-			pRigidBody->setSolverIterationCounts(c->uSolverMinPositionsIters, c->uSolverMinVelocityIters);
-			physx::PxRigidDynamicLockFlags lockFlags;
-			if (c->bLockRotationX) { lockFlags |= physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X; }
-			if (c->bLockRotationY) { lockFlags |= physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y; }
-			if (c->bLockRotationZ) { lockFlags |= physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z; }
-			pRigidBody->setRigidDynamicLockFlags(lockFlags);
-			rtd.pRigidActor = pRigidBody;
-			GameComponents<DynamicBodyTag>::Create(c.GetEntity());
-			if (c->bDisableSleep)
-			{
-				pRigidBody->setSleepThreshold(0);
-			}
-			else
-			{
-				pRigidBody->setSleepThreshold(c->fSleepThreshold);
-				pRigidBody->setActorFlag(physx::PxActorFlag::eSEND_SLEEP_NOTIFIES, true);
-			}
-			if (c->bKinematic)
-			{
-				pRigidBody->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);
-				GameComponents<KinematicBodyTag>::Create(c.GetEntity());
-			}
+			bodyDef.type = c->bKinematic ? b3_kinematicBody : b3_dynamicBody;
+			bodyDef.angularDamping = c->fAngularDamping;
+			bodyDef.linearDamping = c->fLinearDamping;
+			bodyDef.motionLocks.angularX = c->bLockRotationX;
+			bodyDef.motionLocks.angularY = c->bLockRotationY;
+			bodyDef.motionLocks.angularZ = c->bLockRotationZ;
+			bodyDef.enableSleep = !c->bDisableSleep;
+			// fSleepThreshold is a mass-normalised kinetic energy (PhysX); Box3D wants a speed
+			bodyDef.sleepThreshold = sqrtf(2.0f * Math::Max(c->fSleepThreshold, 0.0f));
+			bodyDef.gravityScale = c->bDisableGravity ? 0.0f : 1.0f;
 			if (c->bEnableCCD)
 			{
 				ASSERT_MSG(!c->bKinematic, "CCD not supported on kinematic bodies.");
-				pRigidBody->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, true);
+				// Box3D always sweeps dynamic bodies against static geometry; bullets are
+				// also swept against other dynamic bodies.
+				bodyDef.isBullet = true;
 			}
-			if (c->bDisableGravity)
+			GameComponents<DynamicBodyTag>::Create(c.GetEntity());
+			if (c->bKinematic)
 			{
-				pRigidBody->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
+				GameComponents<KinematicBodyTag>::Create(c.GetEntity());
 			}
 		}
 		else
@@ -217,34 +226,24 @@ namespace usg
 			ASSERT_MSG(!c->bKinematic, "Kinematic bodies must be dynamic.");
 			ASSERT_MSG(!c->bEnableCCD, "CCD is applied to dynamic bodies.");
 			ASSERT_MSG(!c->bDisableGravity, "Gravity is applied to dynamic bodies.");
-			rtd.pRigidActor = sceneRuntimeData.pPhysics->createRigidStatic(initialTransform);
+			bodyDef.type = b3_staticBody;
 		}
-		ASSERT(rtd.pRigidActor != nullptr);
-		rtd.pRigidActor->userData = GameComponents<RigidBody>::GetComponent(c.GetEntity());
-		rtd.pActor = rtd.pRigidActor;
 
-		Optional<Identifier> id;
-		handles.GetComponent(c.GetEntity(), id);
-		if (id.Exists())
-		{
-			rtd.pActor->setName(id.Force()->name);
-		}
+		rtd.bodyId = b3CreateBody(sceneRuntimeData.worldId, &bodyDef);
+		ASSERT(B3_IS_NON_NULL(rtd.bodyId));
+		rtd.uBitmask |= static_cast<uint32>(ActorRuntimeData::Bitmask::InScene);
 
 		Optional<PhysicsAggregate, FromSelfOrParents> aggregate;
 		handles.GetComponent(c.GetEntity(), aggregate);
 		if (aggregate.Exists() && !c->bDoNotAttachToParentAggregate)
 		{
 			auto& aggregateComponent = *GameComponents<PhysicsAggregate>::GetComponent(aggregate.Force().GetEntity());
-			if (aggregateComponent.GetRuntimeData().pAggregate == nullptr)
+			if (!aggregateComponent.GetRuntimeData().bLoaded)
 			{
 				OnLoaded(aggregateComponent, handles, false);
 			}
-			physx::PxAggregate* pAggregate = aggregateComponent.GetRuntimeData().pAggregate;
-			ASSERT(pAggregate != nullptr);
-			pAggregate->addActor(*rtd.pActor);
-			ASSERT(rtd.pActor->getAggregate() == pAggregate);
+			rtd.iAggregateGroup = aggregateComponent.GetRuntimeData().iGroup;
 		}
-
 
 		// Go through the parents and inform them physics needs the transform updated
 		// FIXME: This should be done in data by the hierarchy processor rather than at runtime
@@ -260,9 +259,6 @@ namespace usg
 				GameComponents<RigidBodyTransformUpdate>::Create(parent);
 			}
 		}
-		
-		sceneRuntimeData.addActorList.insert(&rtd);
-		sceneRuntimeData.dirtyActorList.insert(&rtd);
 	}
 
 	template <>
@@ -284,74 +280,93 @@ namespace usg
 		c.Modify().vInertiaTensor = Vector3f(1, 1, 1);
 
 		auto& rtd = c.GetRuntimeData();
-		rtd.pRigidActor = nullptr;
-		rtd.pActor = nullptr;
-		rtd.pActor = nullptr;
+		rtd.bodyId = b3_nullBodyId;
 		rtd.uBitmask = 0;
+		rtd.fMaxLinearSpeed = 0.0f;
+		rtd.fMaxAngularSpeed = 0.0f;
+		rtd.iAggregateGroup = 0;
 	}
 
 	template<>
 	void OnDeactivate<RigidBody>(Component<RigidBody>& c, ComponentLoadHandles& handles)
 	{
 		auto& rtd = c.GetRuntimeData();
-		if (rtd.pRigidActor != nullptr)
+		if (B3_IS_NON_NULL(rtd.bodyId))
 		{
-			ASSERT(rtd.pActor != nullptr);
-
-			if (handles.pPhysicsScene->addActorList.count(&rtd))
+			if (b3Body_IsValid(rtd.bodyId))
 			{
-				handles.pPhysicsScene->addActorList.erase(&rtd);
+				// Destroying the body destroys its shapes and joints too. Clear the user data
+				// so nothing reads the components while they are torn down.
+				b3ShapeId shapes[16];
+				const int iShapeCount = b3Body_GetShapes(rtd.bodyId, shapes, 16);
+				for (int i = 0; i < iShapeCount; i++)
+				{
+					b3Shape_SetUserData(shapes[i], nullptr);
+				}
+				b3Body_SetUserData(rtd.bodyId, nullptr);
+				b3DestroyBody(rtd.bodyId);
 			}
-			else
-			{
-				handles.pPhysicsScene->removeActorList.insert(rtd.pRigidActor);
-			}
-
-			handles.pPhysicsScene->dirtyActorList.erase(&rtd);
-
-			rtd.pRigidActor = nullptr;
-			rtd.pActor = nullptr;
+			rtd.bodyId = b3_nullBodyId;
 		}
 		rtd.uBitmask = 0;
 	}
 
 	// Generic Shape Functions
-	template<typename T>
-	static void AddShape(Required<RigidBody, T> rigidBody, physx::PxShape* pShape, ComponentLoadHandles& handles)
-	{
-		physx::PxRigidActor* pActor = rigidBody.GetRuntimeData().pRigidActor;
-		ASSERT(pActor != nullptr && "PhysX actor pointer uninitialized. Are you attempting to add a shape to a rigid body for which OnLoaded has not yet been called?");
-		pActor->attachShape(*pShape);
 
-		Optional<VehicleCollider> vehicle;
-		handles.GetComponent(rigidBody.GetEntity(), vehicle);
-		if (vehicle.Exists())
+	// Mass and inertia from the attached shapes. With fDensity set, the shapes' mass is used
+	// (and written back to fMass). Otherwise the body gets fMass, with the inertia of the same
+	// shapes at that mass (a uniform density of fMass / volume). vInertiaTensor scales the
+	// result per axis.
+	//
+	// The PhysX backend set fMass but left the inertia at its density 1 value, which for a
+	// 100 kg toy car was 600 times too small. Box3D's per-point friction then let two cars
+	// that touched side by side pin each other's yaw and lock together; the consistent
+	// inertia removes that (see lanes/physics/BOX3D_REPORT.md).
+	template<typename T>
+	static void UpdateMass(Required<RigidBody, T> rigidBody)
+	{
+		const b3BodyId bodyId = rigidBody.GetRuntimeData().bodyId;
+		if (!rigidBody->bDynamic || b3Body_GetType(bodyId) != b3_dynamicBody)
 		{
 			return;
 		}
-		
-		if (rigidBody->bDynamic && pActor->is<physx::PxRigidBody>())
+
+		b3Body_ApplyMassFromShapes(bodyId);
+		b3MassData massData = b3Body_GetMassData(bodyId);
+		if (rigidBody->fDensity > Math::EPSILON)
 		{
-			physx::PxRigidBody* pRigidBody = static_cast<physx::PxRigidBody*>(rigidBody.GetRuntimeData().pRigidActor);
-			if (rigidBody->fDensity > Math::EPSILON)
-			{
-				physx::PxRigidBodyExt::updateMassAndInertia(*pRigidBody, rigidBody->fDensity, 0, false);
-				rigidBody.Modify().fMass = pRigidBody->getMass();
-			}
-			else
-			{
-				physx::PxRigidBodyExt::updateMassAndInertia(*pRigidBody, 1.0f, 0, false);
-				pRigidBody->setMass(rigidBody->fMass);
-			}
-			const physx::PxVec3 vTensor = pRigidBody->getMassSpaceInertiaTensor().multiply(ToPhysXVec3(rigidBody->vInertiaTensor));
-			pRigidBody->setMassSpaceInertiaTensor(vTensor);
+			rigidBody.Modify().fMass = massData.mass;
 		}
+		else if (massData.mass > 0.0f)
+		{
+			const float fScale = rigidBody->fMass / massData.mass;
+			massData.inertia.cx = b3MulSV(fScale, massData.inertia.cx);
+			massData.inertia.cy = b3MulSV(fScale, massData.inertia.cy);
+			massData.inertia.cz = b3MulSV(fScale, massData.inertia.cz);
+			massData.mass = rigidBody->fMass;
+		}
+		else
+		{
+			massData.mass = rigidBody->fMass;
+		}
+
+		// D * I * D with D = sqrt(scale) keeps the tensor symmetric
+		const Vector3f& vScale = rigidBody->vInertiaTensor;
+		const float d[3] = { sqrtf(vScale.x), sqrtf(vScale.y), sqrtf(vScale.z) };
+		b3Vec3* cols[3] = { &massData.inertia.cx, &massData.inertia.cy, &massData.inertia.cz };
+		for (int c = 0; c < 3; c++)
+		{
+			cols[c]->x *= d[0] * d[c];
+			cols[c]->y *= d[1] * d[c];
+			cols[c]->z *= d[2] * d[c];
+		}
+		b3Body_SetMassData(bodyId, massData);
 	}
 
 	template<typename SearchMask>
 	static void EnsureRigidBodyLoaded(Optional<RigidBody, SearchMask> rigidBody, ComponentLoadHandles& handles)
 	{
-		if (rigidBody.Exists() && rigidBody.Force().GetRuntimeData().pRigidActor == nullptr)
+		if (rigidBody.Exists() && B3_IS_NULL(rigidBody.Force().GetRuntimeData().bodyId))
 		{
 			Required<RigidBody, FromSelf> rigidBodyFromSelf;
 			handles.GetComponent(rigidBody.Force().GetEntity(), rigidBodyFromSelf);
@@ -363,7 +378,7 @@ namespace usg
 	template<typename SearchMask>
 	static void EnsureRigidBodyLoaded(Required<RigidBody, SearchMask> rigidBody, ComponentLoadHandles& handles)
 	{
-		if (rigidBody.GetRuntimeData().pRigidActor == nullptr)
+		if (B3_IS_NULL(rigidBody.GetRuntimeData().bodyId))
 		{
 			Required<RigidBody, FromSelf> rigidBodyFromSelf;
 			handles.GetComponent(rigidBody.GetEntity(), rigidBodyFromSelf);
@@ -372,19 +387,13 @@ namespace usg
 		}
 	}
 
-	template<typename ShapeType>
-	static void OnShapeLoaded(Component<ShapeType>&c, const physx::PxGeometry& geometry, ComponentLoadHandles& handles)
+	// The geometry callback receives the body, the shape definition and the shape's pose
+	// relative to the body, and creates the Box3D shape.
+	template<typename ShapeType, typename CreateFn>
+	static void OnShapeLoaded(Component<ShapeType>&c, ComponentLoadHandles& handles, CreateFn createShape)
 	{
-		PhysXShapeRuntimeData& rtd = c.GetRuntimeData();
-
-		rtd.pMaterial = handles.pPhysicsScene->pPhysics->createMaterial(PhysicMaterial_fStaticFriction_default, PhysicMaterial_fDynamicFriction_default, PhysicMaterial_fBounciness_default);
-		rtd.pMaterial->userData = (void*)(uint64)0xdeadc0de;
+		ShapeRuntimeData& rtd = c.GetRuntimeData();
 		rtd.uMaterialFlags = c->material.uMaterialFlags;
-
-		ApplyMaterial(rtd.pMaterial, c->material);
-
-		physx::PxShape* pShape = handles.pPhysicsScene->pPhysics->createShape(geometry, *rtd.pMaterial, true);
-		rtd.pShape = pShape;
 
 		Entity shapeAggregateEntity = nullptr;
 		Entity actorEntity = nullptr;
@@ -415,18 +424,6 @@ namespace usg
 		rtd.entity = c.GetEntity();
 
 		EnsureRigidBodyLoaded(rigidBody, handles);
-		
-		physics::details::SetUserData(pShape, &c.GetRuntimeData());
-
-		if (c.GetEntity() != actorEntity)
-		{
-			const physx::PxTransform transformRelativeToActor = GetRelativeTransform(actorEntity,c.GetEntity(), handles);
-			pShape->setLocalPose(physx::PxTransform(ToPhysXVec3(c->vCenter)).transform(transformRelativeToActor));
-		}
-		else
-		{
-			pShape->setLocalPose(physx::PxTransform(ToPhysXVec3(c->vCenter)));
-		}
 
 		Required<RigidBody> rigidBodyFromSelf;
 		if (rigidBody.Exists())
@@ -444,21 +441,35 @@ namespace usg
 			handles.GetComponent(shapeAggregateEntity, rigidBodyFromSelf);
 			OnRigidBodyLoaded(rigidBodyFromSelf, handles);
 		}
-		if (c->bIsTrigger)
+
+		b3Transform localPose = b3Transform_identity;
+		localPose.p = ToB3Vec3(c->vCenter);
+		if (c.GetEntity() != actorEntity)
 		{
-			pShape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-			pShape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
+			const b3Transform transformRelativeToActor = GetRelativeTransform(actorEntity, c.GetEntity(), handles);
+			localPose = b3MulTransforms(localPose, transformRelativeToActor);
 		}
-		
+
+		const auto& rbRtd = rigidBodyFromSelf.GetRuntimeData();
+		b3ShapeDef shapeDef = MakeShapeDef(c->material, c->bIsTrigger, rigidBodyFromSelf->fDensity > Math::EPSILON ? rigidBodyFromSelf->fDensity : 1.0f);
+		shapeDef.userData = &rtd;
+		shapeDef.filter.groupIndex = rbRtd.iAggregateGroup;
+		// Collision masks, contact events and the impulse switch are set by UpdateSimulationFilter
+		// before the next step (dirtyShapeList); start with nothing colliding.
+		shapeDef.filter.categoryBits = 0;
+		shapeDef.filter.maskBits = 0;
 
 		Optional<Identifier> id;
 		handles.GetComponent(c.GetEntity(), id);
 		if (id.Exists())
 		{
-			pShape->setName(id.Force()->name);
+			shapeDef.name = id.Force()->name;
 		}
-		AddShape(rigidBodyFromSelf, pShape, handles);
-		handles.pPhysicsScene->dirtyActorList.insert(&rigidBodyFromSelf.GetRuntimeData());
+
+		rtd.shapeId = createShape(rbRtd.bodyId, shapeDef, localPose);
+		ASSERT(B3_IS_NON_NULL(rtd.shapeId) && "Box3D could not create the shape");
+
+		UpdateMass(rigidBodyFromSelf);
 		handles.pPhysicsScene->dirtyShapeList.insert(&rtd);
 	}
 
@@ -472,7 +483,14 @@ namespace usg
 			return;
 		}
 
-		OnShapeLoaded(c, physx::PxSphereGeometry(c->fRadius), handles);
+		const float fRadius = c->fRadius;
+		OnShapeLoaded(c, handles, [fRadius](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
+		{
+			b3Sphere sphere;
+			sphere.center = pose.p;
+			sphere.radius = fRadius;
+			return b3CreateSphereShape(bodyId, &def, &sphere);
+		});
 	}
 
 	template<>
@@ -497,7 +515,12 @@ namespace usg
 			return;
 		}
 
-		OnShapeLoaded(c, physx::PxBoxGeometry(ToPhysXVec3(c->vExtents)), handles);
+		const Vector3f vExtents = c->vExtents;
+		OnShapeLoaded(c, handles, [vExtents](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
+		{
+			const b3BoxHull box = b3MakeTransformedBoxHull(vExtents.x, vExtents.y, vExtents.z, pose);
+			return b3CreateHullShape(bodyId, &def, &box.base);
+		});
 	}
 
 	template<>
@@ -512,6 +535,18 @@ namespace usg
 		OnDeactivateShape(c, handles);
 	}
 
+	// Convex hull shapes. The hull is copied into the world (and shared between identical
+	// hulls), so the caller keeps ownership of pHull.
+	static b3ShapeId CreateHullShape(b3BodyId bodyId, const b3ShapeDef& def, const b3HullData* pHull, const b3Transform& pose, float fScale)
+	{
+		const bool bIdentity = pose.p.x == 0.0f && pose.p.y == 0.0f && pose.p.z == 0.0f && pose.q.s == 1.0f && fScale == 1.0f;
+		if (bIdentity)
+		{
+			return b3CreateHullShape(bodyId, &def, pHull);
+		}
+		return b3CreateTransformedHullShape(bodyId, &def, pHull, pose, b3Vec3{ fScale, fScale, fScale });
+	}
+
 	// Cone Collider
 
 	template <>
@@ -522,46 +557,36 @@ namespace usg
 			return;
 		}
 
-		auto pScene = handles.pPhysicsScene;
-
-		Vector3f vToCircle;
 		Vector3f vOtherVec = Vector3f::Z_AXIS;
 		if (DotProduct(c->vDirection, Vector3f::Z_AXIS) > 0.99f)
 		{
 			vOtherVec = Vector3f::X_AXIS;
 		}
-		vToCircle = CrossProduct(c->vDirection, vOtherVec).GetNormalised()*c->fRadius;
+		const Vector3f vToCircle = CrossProduct(c->vDirection, vOtherVec).GetNormalised()*c->fRadius;
 
-		vector<physx::PxVec3> vertices;
-		const size_t uCircleVertexCount = 1 + (size_t)(c->fRadius * 3);
-		vertices.reserve(1 + uCircleVertexCount);
-		physx::PxConvexMeshDesc convexDesc;
-		convexDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
-		convexDesc.points.stride = sizeof(physx::PxVec3);
-
-		vertices.push_back(ToPhysXVec3(c->vCenter));
-		for (size_t uVertexIndex = 0; uVertexIndex < uCircleVertexCount; uVertexIndex++)
+		// The cone's apex is at vCenter (which the shape pose also offsets by, as before)
+		Vector3f vertices[B3_MAX_HULL_VERTICES];
+		const uint32 uCircleVertexCount = Math::Clamp(1u + (uint32)(c->fRadius * 3), 3u, (uint32)B3_MAX_HULL_VERTICES - 1);
+		uint32 uCount = 0;
+		vertices[uCount++] = c->vCenter;
+		for (uint32 uVertexIndex = 0; uVertexIndex < uCircleVertexCount; uVertexIndex++)
 		{
 			const float fAngle = (float)uVertexIndex / (float)uCircleVertexCount*Math::two_pi;
 			const Vector3f vOffset = vToCircle*Quaternionf(c->vDirection, fAngle);
-			const Vector3f vVertex = c->vCenter + c->vDirection*c->fLength + vOffset;
-			vertices.push_back(ToPhysXVec3(vVertex));
+			vertices[uCount++] = c->vCenter + c->vDirection*c->fLength + vOffset;
 		}
 
-		convexDesc.points.count = static_cast<uint32>(vertices.size());
-		convexDesc.points.data = &vertices[0];
-
-		physx::PxDefaultMemoryOutputStream buf;
-		physx::PxConvexMeshCookingResult::Enum result;
-		if (!pScene->pCooking->cookConvexMesh(convexDesc, buf, &result))
+		b3HullData* pHull = PhysicsMeshCache::CreateHull(vertices, uCount);
+		if (pHull == nullptr)
 		{
 			ASSERT(false && "Failed to generate convex mesh from cone geometry.");
 			return;
 		}
-		physx::PxDefaultMemoryInputData input(buf.getData(), buf.getSize());
-		physx::PxConvexMesh* pConvexMesh = pScene->pPhysics->createConvexMesh(input);
-		OnShapeLoaded(c, physx::PxConvexMeshGeometry(pConvexMesh), handles);
-		pConvexMesh->release();
+		OnShapeLoaded(c, handles, [pHull](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
+		{
+			return CreateHullShape(bodyId, def, pHull, pose, 1.0f);
+		});
+		b3DestroyHull(pHull);
 	}
 
 	template<>
@@ -587,12 +612,15 @@ namespace usg
 		}
 
 		const memsize uCircleVertexCount = c->has_uCircleVertices ? c->uCircleVertices : Math::Min((memsize)16, 1 + (memsize)(c->fRadius * 5));
-		physx::PxConvexMesh* pConvexMesh = handles.pPhysicsScene->pMeshCache->GetCylinderMesh(c->vCenter, c->vDirection, c->fRadius, c->fHeight, (uint32)uCircleVertexCount);
-		ASSERT(pConvexMesh != nullptr);
-		if (pConvexMesh != nullptr)
+		b3HullData* pHull = PhysicsMeshCache::CreateCylinderHull(c->vCenter, c->vDirection, c->fRadius, c->fHeight, (uint32)uCircleVertexCount);
+		ASSERT(pHull != nullptr);
+		if (pHull != nullptr)
 		{
-			c.GetRuntimeData().pConvexMesh = pConvexMesh;
-			OnShapeLoaded(c, physx::PxConvexMeshGeometry(pConvexMesh), handles);
+			OnShapeLoaded(c, handles, [pHull](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
+			{
+				return CreateHullShape(bodyId, def, pHull, pose, 1.0f);
+			});
+			b3DestroyHull(pHull);
 		}
 	}
 
@@ -600,14 +628,12 @@ namespace usg
 	void OnActivate<CylinderCollider>(Component<CylinderCollider>& c)
 	{
 		OnActivateShape(c);
-		c.GetRuntimeData().pConvexMesh = nullptr;
 	}
 
 	template<>
 	void OnDeactivate<CylinderCollider>(Component<CylinderCollider>& c, ComponentLoadHandles& handles)
 	{
 		OnDeactivateShape(c, handles);
-		c.GetRuntimeData().pConvexMesh = nullptr;
 	}
 
 	// Heightfield Collider
@@ -631,19 +657,45 @@ namespace usg
 
 		HeightFieldResHndl heightField = handles.pResourceMgr->GetHeightfieldResource(c->szAsset);
 
-		physx::PxHeightFieldDesc hfDesc;
-		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
-		hfDesc.nbColumns = heightField->GetColumns();
-		hfDesc.nbRows = heightField->GetRows();
-		hfDesc.samples.data = heightField->GetSamples();
-		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+		// The resource stores rows along X and columns along Z (sample = row * columns + column);
+		// Box3D indexes heights as z * countX + x.
+		const uint32 uRows = heightField->GetRows();
+		const uint32 uColumns = heightField->GetColumns();
+		const HeightFieldSample* pSamples = heightField->GetSamples();
+		vector<float> heights(uRows * uColumns);
+		vector<uint8> materials((uRows - 1) * (uColumns - 1));
+		float fMin = FLT_MAX, fMax = -FLT_MAX;
+		for (uint32 x = 0; x < uRows; x++)
+		{
+			for (uint32 z = 0; z < uColumns; z++)
+			{
+				const HeightFieldSample& s = pSamples[x * uColumns + z];
+				heights[z * uRows + x] = (float)s.height;
+				fMin = Math::Min(fMin, (float)s.height);
+				fMax = Math::Max(fMax, (float)s.height);
+				if (x + 1 < uRows && z + 1 < uColumns)
+				{
+					materials[z * (uRows - 1) + x] = (s.materialIndex0 & 0x7f) == HeightFieldSample::HoleMaterial ? B3_HEIGHT_FIELD_HOLE : 0;
+				}
+			}
+		}
 
-		auto& sceneRuntimeData = *handles.pPhysicsScene;
+		b3HeightFieldDef hfDef = {};
+		hfDef.heights = &heights[0];
+		hfDef.materialIndices = &materials[0];
+		hfDef.scale = b3Vec3{ c->fRowScale, c->fHeightScale, c->fColumnScale };
+		hfDef.countX = (int)uRows;
+		hfDef.countZ = (int)uColumns;
+		hfDef.globalMinimumHeight = fMin;
+		hfDef.globalMaximumHeight = fMax;
+		rtd.pHeightfield = b3CreateHeightField(&hfDef);
 
-		rtd.pHeightfield = sceneRuntimeData.pCooking->createHeightField(hfDesc, sceneRuntimeData.pPhysics->getPhysicsInsertionCallback());
-
-		Required<RigidBody, FromSelf> rb;
-		OnShapeLoaded(c, physx::PxHeightFieldGeometry(rtd.pHeightfield, (physx::PxMeshGeometryFlags)0, c->fHeightScale, c->fColumnScale, c->fRowScale), handles);
+		ASSERT(c->vCenter.MagnitudeSquared() == 0.0f && "Box3D height fields cannot be offset from their body");
+		b3HeightFieldData* pHeightfield = rtd.pHeightfield;
+		OnShapeLoaded(c, handles, [pHeightfield](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
+		{
+			return b3CreateHeightFieldShape(bodyId, &def, pHeightfield);
+		});
 	}
 
 	template<>
@@ -661,30 +713,47 @@ namespace usg
 		OnDeactivateShape(c, handles);
 		if (rtd.pHeightfield)
 		{
-			rtd.pHeightfield->release();
+			// The shape held a reference to it, so it goes after the shape
+			b3DestroyHeightField(rtd.pHeightfield);
 			rtd.pHeightfield = nullptr;
 		}
 	}
 
 	// Joint Shared functions
 
-	template<typename JointType, typename PhysXJointType>
-	void OnJointLoaded(PhysXJointType* pJoint, Component<JointType>& c)
+	static b3BodyId GetJointParentBody(Optional<usg::RigidBody, FromParents>& parentRigidBody, ComponentLoadHandles& handles)
 	{
+		if (parentRigidBody.Exists())
+		{
+			return parentRigidBody.Force().GetRuntimeData().bodyId;
+		}
+		// Box3D joints always connect two bodies; joints to the world use a static ground body
+		auto& scene = *handles.pPhysicsScene;
+		if (B3_IS_NULL(scene.groundBodyId))
+		{
+			b3BodyDef def = b3DefaultBodyDef();
+			def.type = b3_staticBody;
+			def.name = "Ground";
+			scene.groundBodyId = b3CreateBody(scene.worldId, &def);
+		}
+		return scene.groundBodyId;
+	}
+
+	template<typename JointType>
+	static void SetupJointDef(b3JointDef& def, Component<JointType>& c, b3BodyId bodyA, b3BodyId bodyB, const b3Transform& frameA, const b3Transform& frameB)
+	{
+		def.bodyIdA = bodyA;
+		def.bodyIdB = bodyB;
+		def.localFrameA = frameA;
+		def.localFrameB = frameB;
+		def.userData = c.GetEntity();
 		if (c->bCanBreak)
 		{
-			const auto& joinBreakForce = c->breakForce;
-			pJoint->setBreakForce(joinBreakForce.fLinear, joinBreakForce.fAngular);
+			// Box3D reports joints over these thresholds and the physics systems break them
+			def.forceThreshold = c->breakForce.fLinear;
+			def.torqueThreshold = c->breakForce.fAngular;
 		}
-
-		if (c->bEnableProjection)
-		{
-			pJoint->setProjectionLinearTolerance(c->fProjectionLinearTolerance);
-			pJoint->setProjectionAngularTolerance(c->fProjectionAngularTolerance);
-			pJoint->setConstraintFlag(physx::PxConstraintFlag::ePROJECTION, true);
-			pJoint->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-		}
-		pJoint->userData = c.GetEntity();
+		// bEnableProjection has no Box3D equivalent; its soft step solver keeps joints together
 	}
 
 	// Revolute Joint
@@ -693,7 +762,7 @@ namespace usg
 	void OnActivate<RevoluteJoint>(Component<RevoluteJoint>& c)
 	{
 		auto& rtd = c.GetRuntimeData();
-		rtd.pJoint = nullptr;
+		rtd.jointId = b3_nullJointId;
 	}
 
 	template<>
@@ -718,34 +787,30 @@ namespace usg
 		handles.GetComponent(c.GetEntity(), myParentsRigidBody);
 		EnsureRigidBodyLoaded(myRigidBody, handles);
 		EnsureRigidBodyLoaded(myParentsRigidBody, handles);
-		
-		physx::PxRigidActor* pActor1 = myParentsRigidBody.GetRuntimeData().pRigidActor;
-		physx::PxRigidActor* pActor2 = myRigidBody.GetRuntimeData().pRigidActor;
-		ASSERT(pActor1 != nullptr && pActor2 != nullptr);
 
-		physx::PxTransform t1(physx::PxIdentity);
+		const b3BodyId body1 = myParentsRigidBody.GetRuntimeData().bodyId;
+		const b3BodyId body2 = myRigidBody.GetRuntimeData().bodyId;
+		ASSERT(B3_IS_NON_NULL(body1) && B3_IS_NON_NULL(body2));
 
 		usg::Matrix4x4 mMat;
-
 		mMat.SetRight(usg::Vector4f(c->vAxis, 0.0f));
 		mMat.SetUp( usg::Vector4f(c->vFace, 0.0f) );
-
 		usg::Vector4f vCross = usg::CrossProduct(mMat.vRight(), mMat.vUp());
-
 		mMat.SetFace(vCross);
 
-		Quaternionf q1;
-		//q1.MakeVectorRotation(Vector3f::X_AXIS, c->vAxis);
-		q1 = mMat;
-		q1.Normalise();
+		Quaternionf qAxis;
+		qAxis = mMat;
+		qAxis.Normalise();
 
-		TransformComponent trans;
-		trans = TransformTool::GetRelativeTransform(myParentsRigidBody.GetEntity(), myRigidBody.GetEntity(), handles);
+		// Usagi's hinge axis is the frame's X axis; Box3D's revolute joint turns about Z.
+		// A quarter turn about Y takes Z onto X.
+		const b3Quat qZtoX = { { 0.0f, 0.70710678f, 0.0f }, 0.70710678f };
+		const b3Quat qFrame = b3NormalizeQuat(b3MulQuat(ToB3Quat(qAxis), qZtoX));
 
-		t1.q = ToPhysXQuaternion(trans.rotation);
-		t1.p = ToPhysXVec3(trans.position);
-
-		t1.q = t1.q * ToPhysXQuaternion(q1);
+		const TransformComponent trans = TransformTool::GetRelativeTransform(myParentsRigidBody.GetEntity(), myRigidBody.GetEntity(), handles);
+		b3Transform t1;
+		t1.p = ToB3Vec3(trans.position);
+		t1.q = b3NormalizeQuat(b3MulQuat(ToB3Quat(trans.rotation), qFrame));
 
 		Required<TransformComponent> myTrans;
 		handles.GetComponent(c.GetEntity(), myTrans);
@@ -753,31 +818,20 @@ namespace usg
 		// FIXME: The code to handle inverting the transforms doesn't handle nested
 		// entities. Although there's no good reason to inherit
 		myTrans.Modify().bInheritFromParent = false;
-		physx::PxTransform t2(physx::PxIdentity);
-		Quaternionf q2;
-		//q2.MakeVectorRotation(Vector3f::X_AXIS, c->vAxis);
-		q2 = mMat;
-		
-		t2.q = ToPhysXQuaternion(q2);
+		b3Transform t2;
+		t2.p = b3Vec3_zero;
+		t2.q = qFrame;
 
-
-		t2.q.normalize();
-		t1.q.normalize();
-		
-		ASSERT(t2.isValid() && t1.isValid());
-
-		auto pJoint = physx::PxRevoluteJointCreate(*handles.pPhysicsScene->pPhysics, pActor1, t1, pActor2, t2);
-		c.GetRuntimeData().pJoint = pJoint;
-
-		pJoint->setRevoluteJointFlag(physx::PxRevoluteJointFlag::eDRIVE_ENABLED, c->bEnableMotor);
+		b3RevoluteJointDef def = b3DefaultRevoluteJointDef();
+		SetupJointDef(def.base, c, body1, body2, t1, t2);
+		def.enableMotor = c->bEnableMotor;
 		if (c->fMinAngleDegrees > -180.f || c->fMaxAngleDegrees < 180.f)
 		{
-			physx::PxJointAngularLimitPair limit(Math::DegToRad(c->fMinAngleDegrees), Math::DegToRad(c->fMaxAngleDegrees), 0.1f);
-			pJoint->setLimit(limit);
-			pJoint->setRevoluteJointFlag(physx::PxRevoluteJointFlag::eLIMIT_ENABLED, true);
+			def.enableLimit = true;
+			def.lowerAngle = Math::Max(Math::DegToRad(c->fMinAngleDegrees), -0.99f * Math::pi);
+			def.upperAngle = Math::Min(Math::DegToRad(c->fMaxAngleDegrees), 0.99f * Math::pi);
 		}
-
-		OnJointLoaded(pJoint, c);
+		c.GetRuntimeData().jointId = b3CreateRevoluteJoint(handles.pPhysicsScene->worldId, &def);
 	}
 
 	// Fixed Joint
@@ -786,7 +840,7 @@ namespace usg
 	void OnActivate<FixedJoint>(Component<FixedJoint>& c)
 	{
 		auto& rtd = c.GetRuntimeData();
-		rtd.pJoint = nullptr;
+		rtd.jointId = b3_nullJointId;
 	}
 
 	template<>
@@ -815,33 +869,16 @@ namespace usg
 			EnsureRigidBodyLoaded(myParentsRigidBody, handles);
 		}
 
-		physx::PxRigidActor* pActor1 = myParentsRigidBody.Exists() ? myParentsRigidBody.Force().GetRuntimeData().pRigidActor : nullptr;
-		physx::PxRigidActor* pActor2 = myRigidBody.GetRuntimeData().pRigidActor;
-		ASSERT(pActor2 != nullptr);
+		const b3BodyId body1 = GetJointParentBody(myParentsRigidBody, handles);
+		const b3BodyId body2 = myRigidBody.GetRuntimeData().bodyId;
+		ASSERT(B3_IS_NON_NULL(body2));
 
-		physx::PxTransform t1(physx::PxIdentity);
-		TransformComponent trans;
-		if (myParentsRigidBody.Exists())
-		{
-			trans = TransformTool::GetRelativeTransform(myParentsRigidBody.Force().GetEntity(), myRigidBody.GetEntity(), handles);
-		}
-		else
-		{
-			trans = TransformTool::GetRelativeTransform(nullptr, myRigidBody.GetEntity(), handles);
-		}
+		const TransformComponent trans = TransformTool::GetRelativeTransform(myParentsRigidBody.Exists() ? myParentsRigidBody.Force().GetEntity() : nullptr, myRigidBody.GetEntity(), handles);
+		const b3Transform t1 = MakeB3Transform(trans.position, trans.rotation);
 
-		t1.q = ToPhysXQuaternion(trans.rotation);
-		t1.p = ToPhysXVec3(trans.position);
-
-
-		Required<TransformComponent> myTrans;
-		handles.GetComponent(c.GetEntity(), myTrans);
-		physx::PxTransform t2(physx::PxIdentity);
-
-		auto pJoint = physx::PxFixedJointCreate(*handles.pPhysicsScene->pPhysics, pActor1, t1, pActor2, t2);
-		c.GetRuntimeData().pJoint = pJoint;
-
-		OnJointLoaded(pJoint, c);
+		b3WeldJointDef def = b3DefaultWeldJointDef();
+		SetupJointDef(def.base, c, body1, body2, t1, b3Transform_identity);
+		c.GetRuntimeData().jointId = b3CreateWeldJoint(handles.pPhysicsScene->worldId, &def);
 	}
 
 	// Prismatic Joint
@@ -850,7 +887,7 @@ namespace usg
 	void OnActivate<PrismaticJoint>(Component<PrismaticJoint>& c)
 	{
 		auto& rtd = c.GetRuntimeData();
-		rtd.pJoint = nullptr;
+		rtd.jointId = b3_nullJointId;
 	}
 
 	template<>
@@ -879,24 +916,24 @@ namespace usg
 			EnsureRigidBodyLoaded(myParentsRigidBody, handles);
 		}
 
-		physx::PxRigidActor* pActor1 = myParentsRigidBody.Exists() ? myParentsRigidBody.Force().GetRuntimeData().pRigidActor : nullptr;
-		physx::PxRigidActor* pActor2 = myRigidBody.GetRuntimeData().pRigidActor;
-		ASSERT(pActor2 != nullptr);
+		const b3BodyId body1 = GetJointParentBody(myParentsRigidBody, handles);
+		const b3BodyId body2 = myRigidBody.GetRuntimeData().bodyId;
+		ASSERT(B3_IS_NON_NULL(body2));
 
 		const TransformComponent myTransformRelativeToConnectedParent = TransformTool::GetRelativeTransform(myParentsRigidBody.Exists() ? myParentsRigidBody.Force().GetEntity() : nullptr, myRigidBody.GetEntity(), handles);
-		physx::PxTransform t1(physx::PxIdentity);
-		t1.p = ToPhysXVec3(myTransformRelativeToConnectedParent.position);
+		// Both PhysX and Box3D slide along the joint frame's X axis
 		Quaternionf q1;
 		q1.MakeVectorRotation(Vector3f::X_AXIS, c->vAxis);
-		t1.q = ToPhysXQuaternion(q1);
+		b3Transform t1;
+		t1.p = ToB3Vec3(myTransformRelativeToConnectedParent.position);
+		t1.q = ToB3Quat(q1);
+		b3Transform t2;
+		t2.p = b3Vec3_zero;
+		t2.q = ToB3Quat(q1);
 
-		physx::PxTransform t2(physx::PxIdentity);
-		t2.q = ToPhysXQuaternion(q1);
-
-		auto pJoint = physx::PxPrismaticJointCreate(*handles.pPhysicsScene->pPhysics, pActor1, t1, pActor2, t2);
-		c.GetRuntimeData().pJoint = pJoint;
-
-		OnJointLoaded(pJoint, c);
+		b3PrismaticJointDef def = b3DefaultPrismaticJointDef();
+		SetupJointDef(def.base, c, body1, body2, t1, t2);
+		c.GetRuntimeData().jointId = b3CreatePrismaticJoint(handles.pPhysicsScene->worldId, &def);
 	}
 
 	// Aggregate
@@ -905,35 +942,29 @@ namespace usg
 	void OnActivate<PhysicsAggregate>(Component<PhysicsAggregate>& c)
 	{
 		auto& rtd = c.GetRuntimeData();
-		rtd.pAggregate = nullptr;
+		rtd.iGroup = 0;
+		rtd.bLoaded = false;
 	}
 
 	template<>
 	void OnDeactivate<PhysicsAggregate>(Component<PhysicsAggregate>& c, ComponentLoadHandles& handles)
 	{
-		auto& scene = *handles.pPhysicsScene;
-		auto pAggregate = c.GetRuntimeData().pAggregate;
-		if (scene.addAggregateList.count(pAggregate))
-		{
-			scene.addAggregateList.erase(pAggregate);
-		}
-		else
-		{
-			scene.removeAggregateList.insert(pAggregate);
-		}
+		c.GetRuntimeData().iGroup = 0;
+		c.GetRuntimeData().bLoaded = false;
 	}
 
 	template <>
 	void OnLoaded<PhysicsAggregate>(Component<PhysicsAggregate>& c, ComponentLoadHandles& handles, bool bWasPreviouslyCalled)
 	{
-		if (bWasPreviouslyCalled)
+		auto& rtd = c.GetRuntimeData();
+		if (bWasPreviouslyCalled || rtd.bLoaded)
 		{
 			return;
 		}
-
-	
-		c.GetRuntimeData().pAggregate = handles.pPhysicsScene->pPhysics->createAggregate(c->uMaxNumBodies, c->bEnableSelfCollisions);
-		handles.pPhysicsScene->addAggregateList.insert(c.GetRuntimeData().pAggregate);
+		// Shapes sharing a negative group never collide with each other. Group 0 leaves
+		// self collision to the collision masks.
+		rtd.iGroup = c->bEnableSelfCollisions ? 0 : handles.pPhysicsScene->iNextAggregateGroup--;
+		rtd.bLoaded = true;
 	}
 
 	// Mesh Collider
@@ -945,21 +976,15 @@ namespace usg
 		{
 			return;
 		}
-		
-		auto& rtd = c.GetRuntimeData();
 
-		physx::PxCooking* pCooking = handles.pPhysicsScene->pCooking;
-		ASSERT(pCooking != nullptr);
-		physx::PxPhysics* pPhysics = handles.pPhysicsScene->pPhysics;
-		ASSERT(pPhysics != nullptr);
+		auto& rtd = c.GetRuntimeData();
 
 		Required<RigidBody, FromSelfOrParents> rigidBody;
 		handles.GetComponent(c.GetEntity(), rigidBody);
-		if (rigidBody->bDynamic && !c->bConvex && !rigidBody->bKinematic)
+		if (rigidBody->bDynamic && !c->bConvex)
 		{
-			// Triangle Mesh collider can only be attached to static actors (this is a limitation of PhysX). Split the mesh into convex submeshes if you REALLY need such a complex
-			// collision model in a dynamic entity.
-			// The one exception to this rule is kinematic actors
+			// Box3D only collides triangle meshes on static bodies. Split the mesh into convex
+			// submeshes if you REALLY need such a complex collision model in a dynamic entity.
 			ASSERT(false);
 			c.Modify().bConvex = true;
 		}
@@ -971,13 +996,16 @@ namespace usg
 			handles.pResourceMgr->LoadPackage(handles.pDevice, fullName.c_str());
 		}
 
-		PhysXMeshCache* pMeshCache = handles.pPhysicsScene->pMeshCache;
+		PhysicsMeshCache* pMeshCache = handles.pPhysicsScene->pMeshCache;
+		const float fMeshScale = c->fMeshScale;
 		if (c->bConvex)
 		{
-			physx::PxConvexMesh* pConvexMesh = pMeshCache->GetConvexMesh(handles, c->szCollisionModel, c->szMeshName);
+			const b3HullData* pConvexMesh = pMeshCache->GetConvexMesh(handles, c->szCollisionModel, c->szMeshName);
 			rtd.pConvexMesh = pConvexMesh;
-			OnShapeLoaded(c, physx::PxConvexMeshGeometry(pConvexMesh, physx::PxMeshScale(c->fMeshScale)), handles);
-			rtd.pShape->setName(c->szCollisionModel);
+			OnShapeLoaded(c, handles, [pConvexMesh, fMeshScale](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
+			{
+				return CreateHullShape(bodyId, def, pConvexMesh, pose, fMeshScale);
+			});
 		}
 		else
 		{
@@ -989,13 +1017,15 @@ namespace usg
 			}
 			else
 			{
-				ASSERT(rtd.pTriangleMesh != nullptr && "If you do not specify collision mesh filename, you must programmatically create the PxTriangleMesh between OnActivate and OnLoaded.");
+				ASSERT(rtd.pTriangleMesh != nullptr && "If you do not specify collision mesh filename, you must programmatically create the b3MeshData between OnActivate and OnLoaded.");
 			}
-			OnShapeLoaded(c, physx::PxTriangleMeshGeometry(rtd.pTriangleMesh, physx::PxMeshScale(c->fMeshScale)), handles);
-			if (c->szCollisionModel[0])
+			const b3MeshData* pTriangleMesh = rtd.pTriangleMesh;
+			OnShapeLoaded(c, handles, [pTriangleMesh, fMeshScale](b3BodyId bodyId, const b3ShapeDef& def, const b3Transform& pose)
 			{
-				rtd.pShape->setName(c->szCollisionModel);
-			}
+				// Box3D meshes take a scale but no local transform
+				ASSERT(pose.p.x == 0.0f && pose.p.y == 0.0f && pose.p.z == 0.0f && pose.q.s == 1.0f && "Triangle mesh colliders must sit at their rigid body's origin");
+				return b3CreateMeshShape(bodyId, &def, pTriangleMesh, b3Vec3{ fMeshScale, fMeshScale, fMeshScale });
+			});
 		}
 	}
 
@@ -1017,39 +1047,4 @@ namespace usg
 		rtd.pTriangleMesh = nullptr;
 	}
 
-	// Vehicle Collider
-
-	template <>
-	void OnLoaded<VehicleCollider>(Component<VehicleCollider>& c, ComponentLoadHandles& handles, bool bWasPreviouslyCalled)
-	{
-		if (bWasPreviouslyCalled)
-		{
-			return;
-		}
-		OnVehicleColliderLoaded(c, handles);
-		const memsize uWheelCount = c->uNumWheels;
-		for (memsize i = 0; i < uWheelCount; i++)
-		{
-			auto& wheel = c.GetRuntimeData().wheelsData.wheel[i];
-			handles.pPhysicsScene->dirtyShapeList.insert((PhysXShapeRuntimeData*)&wheel.rtd);
-		}
-	}
-
-	template<>
-	void OnActivate<VehicleCollider>(Component<VehicleCollider>& c)
-	{
-		auto& rtd = c.GetRuntimeData();
-		OnActivateShape(c);
-		OnVehicleColliderActivated(c);
-	}
-
-	template<>
-	void OnDeactivate<VehicleCollider>(Component<VehicleCollider>& c, ComponentLoadHandles& handles)
-	{
-		auto& rtd = c.GetRuntimeData();
-		OnDeactivateShape(c, handles);
-		OnVehicleColliderDeactivated(c, handles);
-	}
-
 }
-

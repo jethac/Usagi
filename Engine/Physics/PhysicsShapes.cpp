@@ -17,8 +17,8 @@ namespace usg
 			{
 				ASSERT(meshColliderRtd.pConvexMesh != nullptr || meshColliderRtd.pTriangleMesh != nullptr);
 				AABB r;
-				const auto physxAABB = meshColliderRtd.pConvexMesh ? meshColliderRtd.pConvexMesh->getLocalBounds() : meshColliderRtd.pTriangleMesh->getLocalBounds();
-				r.SetMinMax(ToUsgVec3(physxAABB.minimum), ToUsgVec3(physxAABB.maximum));
+				const b3AABB bounds = meshColliderRtd.pConvexMesh ? meshColliderRtd.pConvexMesh->aabb : meshColliderRtd.pTriangleMesh->bounds;
+				r.SetMinMax(ToUsgVec3(bounds.lowerBound), ToUsgVec3(bounds.upperBound));
 				return r;
 			}
 		}

@@ -12,8 +12,3 @@ message MarkShapeDirty
 {
 	required uint64 pShape = 1;
 }
-
-message MarkActorDirty
-{
-	required uint64 pActor = 1;
-}

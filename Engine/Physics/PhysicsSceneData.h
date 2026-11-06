@@ -1,4 +1,4 @@
-﻿/****************************************************************************
+/****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 
@@ -9,7 +9,8 @@
 #include "Engine/Core/stl/map.h"
 #include "Engine/Maths/MovingAverage.h"
 #include "Engine/Physics/PhysicsStructs.pb.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
+#include "Engine/Physics/Raycast.h"
 #include "Engine/Physics/RaycastHitBase.h"
 #include "Engine/Physics/Debug/PhysicsDebugStats.h"
 
@@ -20,11 +21,9 @@ namespace usg
 		typedef struct _PhysicsScene PhysicsScene;
 	}
 
-	class PhysXMeshCache;
-	class ContactReportCallback;
-	class VehicleSceneQueryData;
+	class PhysicsMeshCache;
 	struct ActorRuntimeData;
-	struct PhysXShapeRuntimeData;
+	struct ShapeRuntimeData;
 
 	namespace physics
 	{
@@ -32,20 +31,18 @@ namespace usg
 		{
 			uint32 uTick;
 
-			physx::PxFoundation* pPhysicsFoundation;
-			physx::PxPhysics* pPhysics;
-			physx::PxCooking* pCooking;
-			physx::PxScene* pScene;
-			PhysXMeshCache* pMeshCache;
+			b3WorldId worldId;
+			PhysicsMeshCache* pMeshCache;
+
+			// Static body that joints without a parent rigid body attach to (created on demand)
+			b3BodyId groundBodyId;
 
 			volatile bool bSimulationRunning;
 
-			set<ActorRuntimeData*> addActorList;
-			set<ActorRuntimeData*> dirtyActorList;
-			set<PhysXShapeRuntimeData*> dirtyShapeList;
-			set<physx::PxActor*> removeActorList;
-			set<physx::PxAggregate*> addAggregateList;
-			set<physx::PxAggregate*> removeAggregateList;
+			// Next negative Box3D filter group handed to a PhysicsAggregate
+			sint32 iNextAggregateGroup;
+
+			set<ShapeRuntimeData*> dirtyShapeList;
 
 #ifndef FINAL_BUILD
 			PhysicsDebugStats debugStats;
@@ -53,9 +50,8 @@ namespace usg
 
 			struct
 			{
-				physx::PxBatchQuery* pRaycastBatchQuery;
-				vector<pair<uint32, pair<uint32, Entity>>> pendingRequests;
-				vector<pair<uint32, pair<uint32, Entity>>> pendingSweepRequests;
+				vector<pair<AsyncRaycastRequest, pair<uint32, Entity>>> pendingRequests;
+				vector<pair<AsyncSweepRequest, pair<uint32, Entity>>> pendingSweepRequests;
 
 				struct
 				{
@@ -65,16 +61,16 @@ namespace usg
 				} workData;
 			} raycastData;
 
-			struct
+			// Contacts between shapes that someone listens to, from Box3D begin-touch
+			// until end-touch events. Collision signals are rebuilt from them every step.
+			struct TouchingContact
 			{
-				VehicleSceneQueryData* pVehicleSceneQueryData;
-				physx::PxBatchQuery* pVehicleBatchQuery;
-				physx::PxVehicleDrivableSurfaceToTireFrictionPairs* pFrictionPairs;
-				vector<physx::PxVehicleWheels*> vehicleList;
-
-				vector<physx::PxWheelQueryResult> wheelQueryResults;
-				vector<physx::PxVehicleWheelQueryResult> vehicleWheelQueryResults;
-			} vehicleData;
+				b3ContactId contactId;
+				b3ShapeId shapeIdA;
+				b3ShapeId shapeIdB;
+				bool bFirstPending;	// waiting for the first step with an impulse or overlap
+			};
+			vector<TouchingContact> touchingContacts;
 
 			struct CollisionData
 			{
@@ -108,13 +104,6 @@ namespace usg
 			};
 			vector<TriggerData> triggerSignals;
 
-			struct SharedMaterial
-			{
-				physx::PxMaterial* pPhysXMaterial = 0;
-				PhysicMaterial material;
-			};
-			map<uint32, SharedMaterial> sharedMaterials;
-
 #ifndef FINAL_BUILD
 			struct
 			{
@@ -126,11 +115,5 @@ namespace usg
 			} diagnostics;
 #endif
 		};
-
-		// Registers a shared material. Returns hash of the material.
-		uint32 RegisterSharedMaterial(Required<Components::PhysicsScene> scene, const PhysicMaterial& m);
-
-		// Get pointer to a shared material using its hash value.
-		PhysicsSceneData::SharedMaterial* GetSharedMaterial(Required<Components::PhysicsScene> scene, uint32 uMaterialHash);
 	}
 }

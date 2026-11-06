@@ -11,7 +11,7 @@
 #include "Engine/Framework/ComponentManager.h"
 #include "Engine/Layout/StringTable.h"
 #include "Engine/HID/Input.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
 #include "Engine/Game/InitThread.h"
 #include "Engine/Graphics/Device/GFXContext.h"
 #include "Engine/Network/UsagiInetCore.h"

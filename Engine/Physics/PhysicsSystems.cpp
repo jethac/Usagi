@@ -9,9 +9,8 @@
 #include "Engine/Debug/GlobalDebugStats.h"
 #include "Engine/Scene/Common/SceneComponents.pb.h"
 #include "Engine/Debug/DebugStats.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
 #include <limits>
-#include "Engine/Physics/PhysXVehicle/VehicleSceneQueryData.h"
 #include "Engine/Physics/PhysicsEvents.pb.h"
 #include "Engine/Scene/Common/SceneEvents.pb.h"
 #include "Engine/Physics/PhysicsEventsInternal.pb.h"
@@ -34,6 +33,11 @@ namespace usg
 		void DebugRender(const Camera& camera);
 	}
 #endif
+
+	namespace physics
+	{
+		void ProcessStepEvents(PhysicsSceneData& rtd, EventManager* pEventManager);
+	}
 
 	namespace Systems {
 
@@ -70,43 +74,43 @@ namespace usg
 				{
 					masks.uGroup = evt.uGroup;
 				}
-				usg::array<PhysXShapeRuntimeData*, 8> ptrs;
+				usg::array<ShapeRuntimeData*, 8> ptrs;
 				size_t uPtrCount = 0;
 				if (outputs.sphereCollider.Exists())
 				{
 					ASSERT(uPtrCount < ptrs.size());
-					ptrs[uPtrCount++] = static_cast<PhysXShapeRuntimeData*>(&outputs.sphereCollider.Force().GetRuntimeData());
+					ptrs[uPtrCount++] = static_cast<ShapeRuntimeData*>(&outputs.sphereCollider.Force().GetRuntimeData());
 				}
 				if (outputs.boxCollider.Exists())
 				{
 					ASSERT(uPtrCount < ptrs.size());
-					ptrs[uPtrCount++] = static_cast<PhysXShapeRuntimeData*>(&outputs.boxCollider.Force().GetRuntimeData());
+					ptrs[uPtrCount++] = static_cast<ShapeRuntimeData*>(&outputs.boxCollider.Force().GetRuntimeData());
 				}
 				if (outputs.meshCollider.Exists())
 				{
 					ASSERT(uPtrCount < ptrs.size());
-					ptrs[uPtrCount++] = static_cast<PhysXShapeRuntimeData*>(&outputs.meshCollider.Force().GetRuntimeData());
+					ptrs[uPtrCount++] = static_cast<ShapeRuntimeData*>(&outputs.meshCollider.Force().GetRuntimeData());
 				}
 				if (outputs.coneCollider.Exists())
 				{
 					ASSERT(uPtrCount < ptrs.size());
-					ptrs[uPtrCount++] = static_cast<PhysXShapeRuntimeData*>(&outputs.coneCollider.Force().GetRuntimeData());
+					ptrs[uPtrCount++] = static_cast<ShapeRuntimeData*>(&outputs.coneCollider.Force().GetRuntimeData());
 				}
 				if (outputs.cylinderCollider.Exists())
 				{
 					ASSERT(uPtrCount < ptrs.size());
-					ptrs[uPtrCount++] = static_cast<PhysXShapeRuntimeData*>(&outputs.cylinderCollider.Force().GetRuntimeData());
+					ptrs[uPtrCount++] = static_cast<ShapeRuntimeData*>(&outputs.cylinderCollider.Force().GetRuntimeData());
 				}
 				if (outputs.heightfieldCollider.Exists())
 				{
 					ASSERT(uPtrCount < ptrs.size());
-					ptrs[uPtrCount++] = static_cast<PhysXShapeRuntimeData*>(&outputs.heightfieldCollider.Force().GetRuntimeData());
+					ptrs[uPtrCount++] = static_cast<ShapeRuntimeData*>(&outputs.heightfieldCollider.Force().GetRuntimeData());
 				}
 				for (size_t i = 0; i < uPtrCount; i++)
 				{
 					physics::details::Events::MarkShapeDirty dirtyEvt;
 					physics::details::Events::MarkShapeDirty_init(&dirtyEvt);
-					static_assert(sizeof(decltype(dirtyEvt.pShape)) >= sizeof(PhysXShapeRuntimeData*), "Unable to store pointer into the integer type.");
+					static_assert(sizeof(decltype(dirtyEvt.pShape)) >= sizeof(ShapeRuntimeData*), "Unable to store pointer into the integer type.");
 					dirtyEvt.pShape = reinterpret_cast<uint64>(ptrs[i]);
 					inputs.eventManager->handle->RegisterEventWithEntity(inputs.scene.GetEntity(), dirtyEvt);
 				}
@@ -133,20 +137,6 @@ namespace usg
 
 			DECLARE_SYSTEM(SYSTEM_PHYSICS)
 
-			static void ProcessDirtyActors(const Inputs& inputs, Outputs& outputs)
-			{
-				const auto& rtd = inputs.scene.GetRuntimeData().GetData();
-				if (rtd.dirtyActorList.size())
-				{
-					for (auto pActorRtd : rtd.dirtyActorList)
-					{
-						rtd.pScene->resetFiltering(*pActorRtd->pActor);
-					}
-					auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-					mutableRtd.dirtyActorList.clear();
-				}
-			}
-
 			static void ProcessDirtyShapes(const Inputs& inputs, Outputs& outputs)
 			{
 				const auto& rtd = inputs.scene.GetRuntimeData().GetData();
@@ -165,43 +155,9 @@ namespace usg
 						const CollisionMasks* pMasks = &(*collisionMasks);
 						const RigidBody* pBody = rigidBody.Exists() ? &(*rigidBody.Force()) : nullptr;
 
-						UpdateSimulationFilter(dirtyShapeData->pShape, pMasks, pBody, dirtyShapeData->shapeAggregateEntity);
+						UpdateSimulationFilter(dirtyShapeData, pMasks, pBody, dirtyShapeData->shapeAggregateEntity);
 					}
 					mutableRtd.dirtyShapeList.clear();
-				}
-			}
-
-			static void ProcessNewActors(const Inputs& inputs, Outputs& outputs)
-			{
-				const auto& rtd = inputs.scene.GetRuntimeData().GetData();
-				if (rtd.addActorList.size())
-				{
-					// Add a list of actors in one batch
-					auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-					vector<physx::PxActor*> newActors;
-					newActors.reserve(mutableRtd.addActorList.size());
-					for (auto pActorRtd : mutableRtd.addActorList)
-					{
-						if (pActorRtd->pActor->getAggregate())
-						{
-							// Will be added as an aggregate shortly
-							continue;
-						}
-						newActors.push_back(pActorRtd->pActor);
-						mutableRtd.dirtyActorList.erase(pActorRtd);
-						pActorRtd->uBitmask |= static_cast<decltype(pActorRtd->uBitmask)>(ActorRuntimeData::Bitmask::InScene);
-					}
-					rtd.pScene->addActors(&newActors[0], (uint32)newActors.size());
-					mutableRtd.addActorList.clear();
-				}
-				if (rtd.addAggregateList.size())
-				{
-					auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-					for (auto pAggregate : mutableRtd.addAggregateList)
-					{
-						rtd.pScene->addAggregate(*pAggregate);
-					}
-					mutableRtd.addAggregateList.clear();
 				}
 			}
 
@@ -210,48 +166,18 @@ namespace usg
 				const uint32 uCurrentTick = inputs.scene.GetRuntimeData().GetData().uTick;
 
 				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-				vector< pair<Entity, Entity>> cleanList;
-				for (auto& cd : mutableRtd.collisions)
+				// Erase stale pairs in place; collecting them first would allocate every frame
+				for (auto it = mutableRtd.collisions.begin(); it != mutableRtd.collisions.end(); )
 				{
-					cd.second.contacts.clear();
-					if (uCurrentTick - cd.second.uTick > 5)
+					it->second.contacts.clear();
+					if (uCurrentTick - it->second.uTick > 5)
 					{
-						cleanList.push_back(cd.first);
+						it = mutableRtd.collisions.erase(it);
 					}
-				}
-				if (cleanList.size())
-				{
-					for (const auto& key : cleanList)
+					else
 					{
-						mutableRtd.collisions.erase(key);
+						++it;
 					}
-				}
-			}
-
-			static void CleanRemovedActors(const Inputs& inputs, Outputs& outputs)
-			{
-				// From PhysX documentation:
-				// "If you intend to delete both the PxAggregate and its actors, it is most efficient to release the actors first, then release the PxAggregate when it is empty."
-				const auto& rtd = inputs.scene.GetRuntimeData().GetData();
-				if (rtd.removeActorList.size())
-				{
-					auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-					for (auto pActor : rtd.removeActorList)
-					{
-						rtd.pScene->removeActor(*pActor);
-						pActor->release();
-					}
-					mutableRtd.removeActorList.clear();
-				}
-				if (rtd.removeAggregateList.size())
-				{
-					auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-					for (auto pAggregate : rtd.removeAggregateList)
-					{
-						rtd.pScene->removeAggregate(*pAggregate);
-						pAggregate->release();
-					}
-					mutableRtd.removeAggregateList.clear();
 				}
 			}
 
@@ -260,39 +186,8 @@ namespace usg
 				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
 				mutableRtd.bSimulationRunning = true;
 
-				CleanRemovedActors(inputs, outputs);
 				ProcessDirtyShapes(inputs, outputs);
-				ProcessNewActors(inputs, outputs);
-				ProcessDirtyActors(inputs, outputs);
 				ClearCollisions(inputs, outputs);
-				VehicleUpdate(inputs, outputs, fDelta);
-			}
-
-			static void VehicleUpdate(const Inputs& inputs, Outputs& outputs, float fDelta)
-			{
-				if (inputs.scene.GetRuntimeData().GetData().vehicleData.vehicleList.size() == 0)
-				{
-					return;
-				}
-				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-
-				physx::PxVehicleWheels** vehicles = &mutableRtd.vehicleData.vehicleList[0];
-				const uint32 uVehicleCount = (uint32)mutableRtd.vehicleData.vehicleList.size();
-
-				const physx::PxU32 raycastQueryResultsSize = mutableRtd.vehicleData.pVehicleSceneQueryData->GetRaycastQueryResultBufferSize();
-				physx::PxRaycastQueryResult* raycastQueryResults = mutableRtd.vehicleData.pVehicleSceneQueryData->GetRaycastQueryResultBuffer(0);
-				PxVehicleSuspensionRaycasts(mutableRtd.vehicleData.pVehicleBatchQuery, uVehicleCount, vehicles, raycastQueryResultsSize, raycastQueryResults);
-
-				if (mutableRtd.vehicleData.vehicleWheelQueryResults.size() != uVehicleCount)
-				{
-					mutableRtd.vehicleData.wheelQueryResults.resize(PX_MAX_NB_WHEELS*uVehicleCount);
-					mutableRtd.vehicleData.vehicleWheelQueryResults.resize(uVehicleCount);
-				}
-				for (uint32 i = 0; i < uVehicleCount; i++)
-				{
-					mutableRtd.vehicleData.vehicleWheelQueryResults[i] = { &mutableRtd.vehicleData.wheelQueryResults[0] + PX_MAX_NB_WHEELS*i, vehicles[i]->mWheelsSimData.getNbWheels() };
-				}
-				PxVehicleUpdates(fDelta, ToPhysXVec3(inputs.scene->vGravity), *mutableRtd.vehicleData.pFrictionPairs, uVehicleCount, vehicles, &mutableRtd.vehicleData.vehicleWheelQueryResults[0]);
 			}
 
 			static void Run(const Inputs& inputs, Outputs& outputs, float fDelta)
@@ -303,7 +198,11 @@ namespace usg
 				}
 				physics::profile::BeginStep();
 				PreSimulation(inputs, outputs, fDelta);
-				inputs.scene.GetRuntimeData().GetData().pScene->simulate(fDelta);// physics::GetTimeStep());
+				// Box3D steps synchronously; FetchPhysicsResultsSystem turns its events into signals
+				if (fDelta > 0.0f)
+				{
+					b3World_Step(inputs.scene.GetRuntimeData().GetData().worldId, fDelta, physics::SubStepCount);
+				}
 				physics::profile::EndStep();
 			}
 
@@ -311,7 +210,19 @@ namespace usg
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const ShiftWorldOrigin& evt)
 			{
 				PreSimulation(inputs, outputs, 0.0f);
-				outputs.scene.GetRuntimeData().pSceneData->pScene->shiftOrigin(ToPhysXVec3(evt.vShift));
+
+				// Box3D has no origin shift; move every body instead
+				const Vector3f vShift = evt.vShift;
+				for (auto it = GameComponents<RigidBody>::GetIterator(); !it.IsEnd(); ++it)
+				{
+					const auto& rbRtd = (*it)->GetRuntimeData();
+					if (B3_IS_NULL(rbRtd.bodyId) || !b3Body_IsValid(rbRtd.bodyId))
+					{
+						continue;
+					}
+					const b3Transform t = b3Body_GetTransform(rbRtd.bodyId);
+					b3Body_SetTransform(rbRtd.bodyId, b3Sub(t.p, ToB3Vec3(vShift)), t.q);
+				}
 
 				PhysicsSceneDirty dirtyEvt;
 				inputs.eventManager->handle->RegisterEvent(dirtyEvt);
@@ -320,46 +231,8 @@ namespace usg
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const physics::details::Events::MarkShapeDirty& evt)
 			{
 				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-				PhysXShapeRuntimeData* pShapeRtd = reinterpret_cast<PhysXShapeRuntimeData*>(evt.pShape);
+				ShapeRuntimeData* pShapeRtd = reinterpret_cast<ShapeRuntimeData*>(evt.pShape);
 				mutableRtd.dirtyShapeList.insert(pShapeRtd);
-				
-				physics::details::Events::MarkActorDirty actorEvt;
-				physics::details::Events::MarkActorDirty_init(&actorEvt);
-				actorEvt.pActor = 0;
-				inputs.eventManager->handle->RegisterEventWithEntity(pShapeRtd->shapeAggregateEntity, actorEvt);
-			}
-
-			static void OnEvent(const Inputs& inputs, Outputs& outputs, const physics::details::Events::MarkActorDirty& evt)
-			{
-				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
-				ActorRuntimeData* pActorRtd = reinterpret_cast<ActorRuntimeData*>(evt.pActor);
-				mutableRtd.dirtyActorList.insert(pActorRtd);
-			}
-		};
-
-		class SetPhysicsActorDirty : public System
-		{
-		public:
-			struct Inputs
-			{
-				Required<EventManagerHandle, FromSelfOrParents> eventManager;
-				Required<PhysicsScene, FromSelfOrParents> scene;
-			};
-
-			struct Outputs
-			{
-				Required<RigidBody> rigidBody;
-			};
-
-			DECLARE_SYSTEM(SYSTEM_POST_PHYSICS)
-
-			static void OnEvent(const Inputs& inputs, Outputs& outputs, const physics::details::Events::MarkActorDirty& evt)
-			{
-				ASSERT(evt.pActor == 0);
-				physics::details::Events::MarkActorDirty forwardedEvt;
-				physics::details::Events::MarkActorDirty_init(&forwardedEvt);
-				forwardedEvt.pActor = reinterpret_cast<uint64>((ActorRuntimeData*)&outputs.rigidBody.GetRuntimeData());
-				inputs.eventManager->handle->RegisterEventWithEntity(inputs.scene.GetEntity(), forwardedEvt);
 			}
 		};
 
@@ -385,6 +258,7 @@ namespace usg
 			static void PostSimulation(const Inputs& inputs, Outputs& outputs)
 			{
 				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
+				physics::ProcessStepEvents(mutableRtd, inputs.eventManager->handle);
 				mutableRtd.uTick++;
 				mutableRtd.bSimulationRunning = false;
 			}
@@ -398,17 +272,14 @@ namespace usg
 				ProfilingTimer timer;
 				timer.Start();
 				physics::profile::BeginStep();
-				inputs.scene.GetRuntimeData().GetData().pScene->fetchResults(true);
 				PostSimulation(inputs, outputs);
 				physics::profile::EndStep();
 				timer.Stop();
 				if (physics::profile::IsEnabled())
 				{
-					physx::PxScene* pScene = inputs.scene.GetRuntimeData().GetData().pScene;
-					physx::PxSimulationStatistics stats;
-					pScene->getSimulationStatistics(stats);
-					const uint32 uBodies = pScene->getNbActors(physx::PxActorTypeFlag::eRIGID_DYNAMIC | physx::PxActorTypeFlag::eRIGID_STATIC);
-					physics::profile::EndFrame(uBodies, stats.nbActiveDynamicBodies, stats.nbDiscreteContactPairsTotal);
+					const b3WorldId worldId = inputs.scene.GetRuntimeData().GetData().worldId;
+					const b3Counters counters = b3World_GetCounters(worldId);
+					physics::profile::EndFrame((uint32)counters.bodyCount, (uint32)b3World_GetAwakeBodyCount(worldId), (uint32)counters.contactCount);
 				}
 #ifndef FINAL_BUILD
 				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
@@ -446,24 +317,18 @@ namespace usg
 			// Convenience so reset code can be shared without knowing if kinematic
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const FullPhysicsSync& msg)
 			{
-				// We set the transform 
+				// We set the transform
 				outputs.transform.Modify().position = msg.vPosition;
 				outputs.transform.Modify().rotation = msg.qRotation;
 
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
 				ASSERT(inputs.rigidBody->bDynamic);
-
-				physx::PxTransform globalPose;
-				physx::PxTransform prevPos = pRigidDynamic->getGlobalPose();
-				globalPose.p = ToPhysXVec3(msg.vPosition);
-				globalPose.q = ToPhysXQuaternion(msg.qRotation);
+				Vector3f vPos = msg.vPosition;
 				if (msg.bGlobalSpace)
 				{
-					globalPose.p -= ToPhysXVec3(inputs.visualScene->vOriginOffset);
+					vPos -= inputs.visualScene->vOriginOffset;
 					outputs.transform.Modify().position -= inputs.visualScene->vOriginOffset;
 				}
-
-				pRigidDynamic->setGlobalPose(globalPose);
+				b3Body_SetTransform(inputs.rigidBody.GetRuntimeData().bodyId, ToB3Vec3(vPos), ToB3Quat(msg.qRotation));
 			}
 
 
@@ -471,14 +336,12 @@ namespace usg
 			{
 				const auto& rtd = inputs.rigidBody.GetRuntimeData();
 				ASSERT(inputs.rigidBody->bKinematic);
-				ASSERT(rtd.pActor->is<physx::PxRigidDynamic>() != nullptr);
-				if ((rtd.uBitmask & static_cast<decltype(rtd.uBitmask)>(RuntimeData<RigidBody>::Bitmask::InScene)) == 0)
+				if ((rtd.uBitmask & static_cast<decltype(rtd.uBitmask)>(RuntimeData<RigidBody>::Bitmask::InScene)) == 0 || fDelta <= 0.0f)
 				{
 					return;
 				}
-				physx::PxRigidDynamic* pRigidDynamic = (physx::PxRigidDynamic*)rtd.pActor;
-				const physx::PxTransform kinematicTargetTransform = ToPhysXTransform(*inputs.transform);
-				pRigidDynamic->setKinematicTarget(kinematicTargetTransform);
+				// Box3D drives the body to the target over the coming step
+				b3Body_SetTargetTransform(rtd.bodyId, ToB3Transform(*inputs.transform), fDelta, true);
 			}
 		};
 
@@ -497,7 +360,10 @@ namespace usg
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const ResizeSphere& evt)
 			{
 				outputs.sphereCollider.Modify().fRadius = evt.fNewRadius;
-				outputs.sphereCollider.GetRuntimeData().pShape->setGeometry(physx::PxSphereGeometry(evt.fNewRadius));
+				const b3ShapeId shapeId = outputs.sphereCollider.GetRuntimeData().shapeId;
+				b3Sphere sphere = b3Shape_GetSphere(shapeId);
+				sphere.radius = evt.fNewRadius;
+				b3Shape_SetSphere(shapeId, &sphere);
 			}
 		};
 
@@ -512,184 +378,192 @@ namespace usg
 				Required<SceneComponent, FromSelfOrParents> visualScene;
 			};
 
+			struct Outputs
+			{
+				Required<RigidBody> rigidBody;	// runtime speed caps
+			};
+
 			DECLARE_SYSTEM(SYSTEM_TRANSFORM_RIGIDBODIES)
 			EXCLUSION(usg::pair<KinematicBodyTag, FromSelf>)
 
+			static bool IsDynamic(const Inputs& inputs)
+			{
+				return inputs.rigidBody->bDynamic && !inputs.rigidBody->bKinematic;
+			}
+
+			static b3BodyId Body(const Inputs& inputs)
+			{
+				return inputs.rigidBody.GetRuntimeData().bodyId;
+			}
+
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const ApplyForce& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				if (pRigidDynamic != nullptr)
+				const b3BodyId bodyId = Body(inputs);
+				const b3Vec3 vForce = ToB3Vec3(evt.vForce);
+				switch (evt.eForceMode)
 				{
-					const physx::PxForceMode::Enum eForceMode = (physx::PxForceMode::Enum)(evt.eForceMode);
-					switch (eForceMode)
+				case ForceMode_VELOCITY_CHANGE:
+					b3Body_SetLinearVelocity(bodyId, b3Add(b3Body_GetLinearVelocity(bodyId), vForce));
+					break;
+				case ForceMode_ACCELERATION:
+					b3Body_ApplyForceToCenter(bodyId, b3MulSV(b3Body_GetMass(bodyId), vForce), true);
+					break;
+				case ForceMode_IMPULSE:
+					if (evt.has_vWorldPosition)
 					{
-					case physx::PxForceMode::Enum::eVELOCITY_CHANGE:
-					case physx::PxForceMode::Enum::eACCELERATION:
-						pRigidDynamic->addForce(ToPhysXVec3(evt.vForce), eForceMode);
-						break;
-					default:
-						if (!evt.has_vWorldPosition)
-						{
-							pRigidDynamic->addForce(ToPhysXVec3(evt.vForce), eForceMode);
-						}
-						else
-						{
-							physx::PxRigidBodyExt::addForceAtPos(*pRigidDynamic, ToPhysXVec3(evt.vForce), ToPhysXVec3(evt.vWorldPosition), eForceMode);
-						}
+						b3Body_ApplyLinearImpulse(bodyId, vForce, ToB3Vec3(evt.vWorldPosition), true);
 					}
+					else
+					{
+						b3Body_ApplyLinearImpulseToCenter(bodyId, vForce, true);
+					}
+					break;
+				default:
+					if (evt.has_vWorldPosition)
+					{
+						b3Body_ApplyForce(bodyId, vForce, ToB3Vec3(evt.vWorldPosition), true);
+					}
+					else
+					{
+						b3Body_ApplyForceToCenter(bodyId, vForce, true);
+					}
+					break;
 				}
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const FullPhysicsSync& msg)
 			{
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
 				ASSERT(inputs.rigidBody->bDynamic);
+				const b3BodyId bodyId = Body(inputs);
 
-				physx::PxTransform globalPose;
-				physx::PxTransform prevPos = pRigidDynamic->getGlobalPose();
-				globalPose.p = ToPhysXVec3(msg.vPosition);
-				globalPose.q = ToPhysXQuaternion(msg.qRotation);
+				Vector3f vPos = msg.vPosition;
 				if (msg.bGlobalSpace)
 				{
-					globalPose.p -= ToPhysXVec3(inputs.visualScene->vOriginOffset);
+					vPos -= inputs.visualScene->vOriginOffset;
 				}
 
-				pRigidDynamic->setGlobalPose(globalPose);
-				physx::PxTransform newPose = pRigidDynamic->getGlobalPose();
-				pRigidDynamic->clearForce();
-				pRigidDynamic->clearTorque();
-				pRigidDynamic->setLinearVelocity(ToPhysXVec3(msg.vVelocity));
-				pRigidDynamic->setAngularVelocity(ToPhysXVec3(msg.vTorque));
-
+				b3Body_SetTransform(bodyId, ToB3Vec3(vPos), ToB3Quat(msg.qRotation));
+				b3Body_SetLinearVelocity(bodyId, ToB3Vec3(msg.vVelocity));
+				b3Body_SetAngularVelocity(bodyId, ToB3Vec3(msg.vTorque));
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const ApplyTorque& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->addTorque(ToPhysXVec3(evt.vTorque), (physx::PxForceMode::Enum)evt.eForceMode);
+				const b3BodyId bodyId = Body(inputs);
+				const b3Vec3 vTorque = ToB3Vec3(evt.vTorque);
+				switch (evt.eForceMode)
+				{
+				case ForceMode_VELOCITY_CHANGE:
+					b3Body_SetAngularVelocity(bodyId, b3Add(b3Body_GetAngularVelocity(bodyId), vTorque));
+					break;
+				case ForceMode_ACCELERATION:
+					// An angular acceleration for the coming step, independent of inertia
+					b3Body_SetAngularVelocity(bodyId, b3Add(b3Body_GetAngularVelocity(bodyId), b3MulSV(physics::GetTimeStep(), vTorque)));
+					break;
+				case ForceMode_IMPULSE:
+					b3Body_ApplyAngularImpulse(bodyId, vTorque, true);
+					break;
+				default:
+					b3Body_ApplyTorque(bodyId, vTorque, true);
+					break;
+				}
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const SetLinearVelocity& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setLinearVelocity(ToPhysXVec3(evt.vVelocity));
+				b3Body_SetLinearVelocity(Body(inputs), ToB3Vec3(evt.vVelocity));
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const OverrideAngularDamping& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setAngularDamping(evt.fDamping);
+				b3Body_SetAngularDamping(Body(inputs), evt.fDamping);
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const RestoreAngularDamping& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setAngularDamping(inputs.rigidBody->fLinearDamping);
+				b3Body_SetAngularDamping(Body(inputs), inputs.rigidBody->fAngularDamping);
 			}
 
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const OverrideLinearDamping& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setLinearDamping(evt.fDamping);
+				b3Body_SetLinearDamping(Body(inputs), evt.fDamping);
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const RestoreLinearDamping& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setLinearDamping(inputs.rigidBody->fLinearDamping);
+				b3Body_SetLinearDamping(Body(inputs), inputs.rigidBody->fLinearDamping);
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const AddLinearVelocity& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setLinearVelocity(ToPhysXVec3(evt.vVelocity) + pRigidDynamic->getLinearVelocity());
+				const b3BodyId bodyId = Body(inputs);
+				b3Body_SetLinearVelocity(bodyId, b3Add(ToB3Vec3(evt.vVelocity), b3Body_GetLinearVelocity(bodyId)));
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const SetAngularVelocity& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setAngularVelocity(ToPhysXVec3(evt.vVelocity));
+				b3Body_SetAngularVelocity(Body(inputs), ToB3Vec3(evt.vVelocity));
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const SetMaxAngularVelocity& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setMaxAngularVelocity(evt.fMax);
-			} 
+				// Applied after each step (Box3D has no per-body speed cap)
+				outputs.rigidBody.GetRuntimeData().fMaxAngularSpeed = evt.fMax;
+			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const SetMaxLinearVelocity& evt)
 			{
-				if (!inputs.rigidBody->bDynamic || inputs.rigidBody->bKinematic)
+				if (!IsDynamic(inputs))
 				{
 					return;
 				}
-				ASSERT(inputs.rigidBody->bDynamic);
-				physx::PxRigidDynamic* pRigidDynamic = inputs.rigidBody.GetRuntimeData().pActor->is<physx::PxRigidDynamic>();
-				ASSERT(pRigidDynamic != nullptr);
-				pRigidDynamic->setMaxLinearVelocity(evt.fMax);
+				// Applied after each step (Box3D has no per-body speed cap)
+				outputs.rigidBody.GetRuntimeData().fMaxLinearSpeed = evt.fMax;
 			}
 
 		};
-		
+
 		class RigidBodyUpdateWorldMatrix : public System
 		{
 		public:
@@ -720,6 +594,24 @@ namespace usg
 			}
 		};
 
+		// Writes a body's pose into its TransformComponent, relative to the parent's matrix
+		// when the transform inherits from one.
+		static void WriteBodyTransform(const RuntimeData<RigidBody>& rtd, const TransformComponent& current, const MatrixComponent* pParentMatrix, TransformComponent& transOut)
+		{
+			const b3Transform globalTransform = b3Body_GetTransform(rtd.bodyId);
+			if (!current.bInheritFromParent || pParentMatrix == nullptr)
+			{
+				transOut.position = ToUsgVec3(globalTransform.p);
+				transOut.rotation = ToUsgQuaternionf(globalTransform.q);
+				return;
+			}
+
+			const b3Transform cumulativeParentTransform = ToB3Transform(*pParentMatrix);
+			const b3Transform localTransform = b3InvMulTransforms(cumulativeParentTransform, globalTransform);
+			transOut.position = ToUsgVec3(localTransform.p);
+			transOut.rotation = ToUsgQuaternionf(localTransform.q);
+		}
+
 		class HandlePhysicsDirty : public System
 		{
 		public:
@@ -740,21 +632,7 @@ namespace usg
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const PhysicsSceneDirty& evt)
 			{
-				const auto& rtd = inputs.rigidBody.GetRuntimeData();
-				if (!inputs.transform->bInheritFromParent || !inputs.parentMatrix.Exists())
-				{
-					TransformComponent& transOut = outputs.transform.Modify();
-					transOut.position = ToUsgVec3(rtd.pRigidActor->getGlobalPose().p);
-					transOut.rotation = ToUsgQuaternionf(rtd.pRigidActor->getGlobalPose().q);
-					return;
-				}
-
-				const physx::PxTransform& globalTransform = rtd.pRigidActor->getGlobalPose();
-				physx::PxTransform cumulativeParentTransform = ToPhysXTransform(*inputs.parentMatrix.Force());
-
-				const physx::PxTransform localTransform = cumulativeParentTransform.transformInv(globalTransform);
-				outputs.transform.Modify().position = ToUsgVec3(localTransform.p);
-				outputs.transform.Modify().rotation = ToUsgQuaternionf(localTransform.q);
+				WriteBodyTransform(inputs.rigidBody.GetRuntimeData(), *inputs.transform, inputs.parentMatrix.Exists() ? &(*inputs.parentMatrix.Force()) : nullptr, outputs.transform.Modify());
 			}
 		};
 
@@ -779,10 +657,10 @@ namespace usg
 			static void Run(const Inputs& inputs, Outputs& outputs, float fDelta)
 			{
 				ASSERT(inputs.rigidBody->bDynamic);
-				const auto& rtd = inputs.rigidBody.GetRuntimeData();
+				const b3Transform t = b3Body_GetTransform(inputs.rigidBody.GetRuntimeData().bodyId);
 				TransformComponent& transOut = outputs.transform.Modify();
-				transOut.position = ToUsgVec3(rtd.pRigidActor->getGlobalPose().p);
-				transOut.rotation = ToUsgQuaternionf(rtd.pRigidActor->getGlobalPose().q);
+				transOut.position = ToUsgVec3(t.p);
+				transOut.rotation = ToUsgQuaternionf(t.q);
 			}
 		};
 
@@ -811,21 +689,7 @@ namespace usg
 			{
 				// Note that the performance of this solution is very slow. You should generally avoid nested rigid bodies.
 				ASSERT(inputs.rigidBody->bDynamic);
-				const auto& rtd = inputs.rigidBody.GetRuntimeData();
-				if (!inputs.transform->bInheritFromParent)
-				{
-					TransformComponent& transOut = outputs.transform.Modify();
-					transOut.position = ToUsgVec3(rtd.pRigidActor->getGlobalPose().p);
-					transOut.rotation = ToUsgQuaternionf(rtd.pRigidActor->getGlobalPose().q);
-					return;
-				}
-
-				const physx::PxTransform& globalTransform = rtd.pRigidActor->getGlobalPose();
-				physx::PxTransform cumulativeParentTransform = ToPhysXTransform(*inputs.parentMatrix);
-				
-				const physx::PxTransform localTransform = cumulativeParentTransform.transformInv(globalTransform);
-				outputs.transform.Modify().position = ToUsgVec3(localTransform.p);
-				outputs.transform.Modify().rotation = ToUsgQuaternionf(localTransform.q);
+				WriteBodyTransform(inputs.rigidBody.GetRuntimeData(), *inputs.transform, &(*inputs.parentMatrix), outputs.transform.Modify());
 			}
 		};
 
@@ -834,11 +698,14 @@ namespace usg
 			template<typename JointType>
 			void DestroyJoint(Required<JointType> c)
 			{
-				auto pJoint = c.GetRuntimeData().pJoint;
-				if (pJoint != nullptr)
+				const b3JointId jointId = c.GetRuntimeData().jointId;
+				if (B3_IS_NON_NULL(jointId))
 				{
-					pJoint->release();
-					c.GetRuntimeData().pJoint = nullptr;
+					if (b3Joint_IsValid(jointId))
+					{
+						b3DestroyJoint(jointId, true);
+					}
+					c.GetRuntimeData().jointId = b3_nullJointId;
 				}
 			}
 		}
@@ -861,14 +728,19 @@ namespace usg
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const SetRevoluteJointAngleLimits& evt)
 			{
-				auto pJoint = inputs.joint.GetRuntimeData().pJoint;
+				const b3JointId jointId = inputs.joint.GetRuntimeData().jointId;
+				if (B3_IS_NULL(jointId) || !b3Joint_IsValid(jointId))
+				{
+					return;
+				}
 				const bool bLimitEnabled = evt.has_fMin || evt.has_fMax;
 				if (bLimitEnabled)
 				{
-					const physx::PxJointAngularLimitPair limits(evt.has_fMin ? evt.fMin : -physx::PxPi, evt.has_fMax ? evt.fMax : physx::PxPi);
-					pJoint->setLimit(limits);
+					// Box3D limits are within +-0.99 pi
+					const float fLimit = 0.99f * Math::pi;
+					b3RevoluteJoint_SetLimits(jointId, evt.has_fMin ? Math::Max(evt.fMin, -fLimit) : -fLimit, evt.has_fMax ? Math::Min(evt.fMax, fLimit) : fLimit);
 				}
-				pJoint->setRevoluteJointFlag(physx::PxRevoluteJointFlag::eLIMIT_ENABLED, bLimitEnabled);
+				b3RevoluteJoint_EnableLimit(jointId, bLimitEnabled);
 			}
 
 			static void OnEvent(const Inputs& inputs, Outputs& outputs, const DestroyJoint& evt)

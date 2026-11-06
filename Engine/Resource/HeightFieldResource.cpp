@@ -3,8 +3,6 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "HeightFieldResource.h"
-#include "Engine/Physics/PhysX.h"
-#include "Engine/Physics/PhysXMeshCache.h"
 
 
 using namespace usg;
@@ -21,7 +19,7 @@ bool HeightFieldResource::Init(GFXDevice* pDevice, const PakFileDecl::FileInfo* 
 	m_uRows = pHeightData->uRows;
 	m_uColumns = pHeightData->uColumns;
 
-	m_pHeightData = (physx::PxHeightFieldSample*)pData;
+	m_pHeightData = (HeightFieldSample*)pData;
 	m_bOwnsData = false;
 	SetupHash(pFileHeader->szName);
 	SetReady(true);
@@ -37,11 +35,10 @@ bool HeightFieldResource::Init(const char* szName, uint32 uWidth, uint32 uHeight
 	m_bOwnsData = true;
 
 	uint32 uCount = uWidth * uHeight;
-	uint32 uSize = uCount * sizeof(physx::PxHeightFieldSample);
-	m_pHeightData = (physx::PxHeightFieldSample*)mem::Alloc(MEMTYPE_STANDARD, ALLOC_COLLISION, uSize);
+	uint32 uSize = uCount * sizeof(HeightFieldSample);
+	m_pHeightData = (HeightFieldSample*)mem::Alloc(MEMTYPE_STANDARD, ALLOC_COLLISION, uSize);
 	for (uint32 i = 0; i < uCount; i++)
 	{
-		m_pHeightData[i].clearTessFlag();
 		m_pHeightData[i].height = pData[i];
 		m_pHeightData[i].materialIndex0 = 0;
 		m_pHeightData[i].materialIndex1 = 0;
