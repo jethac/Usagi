@@ -13,7 +13,8 @@ layout (location = 3) in vec4 ao_uv;		// u0, v0, u1, v1; 9-slice: the slices in 
 layout (location = 4) in vec4 ao_fill;		// background, opacity applied
 layout (location = 5) in vec4 ao_borderCol;
 layout (location = 6) in vec4 ao_slice;		// 9-slice: the slices on screen in pixels (l, t, r, b); 0 = not sliced
-layout (location = 7) in vec2 ao_axis;		// the box's x axis (cos, sin): it turns about its top-left corner
+layout (location = 7) in vec4 ao_axis;		// the box's x axis (cos, sin): it turns about its top-left corner;
+											// z: 9-slice tiled, screen pixels per image texel (0 = stretched)
 
 out BoxData
 {
@@ -26,6 +27,7 @@ out BoxData
 	INT_LOC(6) vec4 go_vBorderCol;
 	INT_LOC(7) vec4 go_vSlice;
 	INT_LOC(8) vec4 go_vSliceUV;
+	INT_LOC(9) float go_fTile;
 } boxData;
 
 void main(void)
@@ -44,6 +46,7 @@ void main(void)
 	boxData.go_vBorder = ao_border;
 	boxData.go_vUV = mix(uv.xy, uv.zw, t);
 	boxData.go_vSlice = ao_slice;
+	boxData.go_fTile = ao_axis.z;
 	boxData.go_vSliceUV = ao_uv;
 #ifdef SRGB_BLEND
 	// The target stores what we write: keep the authored sRGB colours.

@@ -16,6 +16,7 @@ in BoxData
 	INT_LOC(6) vec4 go_vBorderCol;
 	INT_LOC(7) vec4 go_vSlice;
 	INT_LOC(8) vec4 go_vSliceUV;
+	INT_LOC(9) float go_fTile;
 } boxData;
 
 SAMPLER_LOC(1, 0) uniform sampler2D sampler0;
@@ -37,12 +38,15 @@ float RoundedRectDistance(vec2 p, vec2 lo, vec2 hi, vec4 radii)
 
 // One axis of a 9-slice: the ends keep their size (d0, d1 pixels showing
 // u0, u1 of the image), the middle stretches.
-float SliceAxis(float x, float size, float d0, float d1, float u0, float u1)
+// `period` > 0 tiles the middle instead (-unity-slice-type: tiled): it
+// repeats every `period` pixels, the image's middle at the slice scale.
+float SliceAxis(float x, float size, float d0, float d1, float u0, float u1, float period)
 {
 	if (x < d0) return d0 > 0.0 ? x / d0 * u0 : 0.0;
 	if (x > size - d1) return d1 > 0.0 ? 1.0 - u1 + (x - (size - d1)) / d1 * u1 : 1.0;
 	float mid = size - d0 - d1;
-	return mid > 0.0 ? u0 + (x - d0) / mid * (1.0 - u0 - u1) : u0;
+	float t = period > 0.0 ? fract((x - d0) / period) : (mid > 0.0 ? (x - d0) / mid : 0.0);
+	return u0 + t * (1.0 - u0 - u1);
 }
 
 void main(void)
@@ -68,8 +72,14 @@ void main(void)
 		// 9-slice in one quad, so the pieces have no seams between them.
 		vec2 q = clamp(p, vec2(0.0), boxData.go_vSize);
 		vec4 su = boxData.go_vSliceUV;
-		uv = GetUV(vec2(SliceAxis(q.x, boxData.go_vSize.x, s.x, s.z, su.x, su.z),
-			SliceAxis(q.y, boxData.go_vSize.y, s.y, s.w, su.y, su.w)));
+		vec2 period = vec2(0.0);
+		if (boxData.go_fTile > 0.0)
+		{
+			vec2 texels = vec2(textureSize(sampler0, 0));
+			period = vec2(1.0 - su.x - su.z, 1.0 - su.y - su.w) * texels * boxData.go_fTile;
+		}
+		uv = GetUV(vec2(SliceAxis(q.x, boxData.go_vSize.x, s.x, s.z, su.x, su.z, period.x),
+			SliceAxis(q.y, boxData.go_vSize.y, s.y, s.w, su.y, su.w, period.y)));
 	}
 	vec4 tex = texture(sampler0, uv);
 #ifdef SRGB_BLEND
