@@ -839,7 +839,18 @@ uint32 ModelResource::GetModelDeclUVReusse(const exchange::Shape* pShape, const 
 		element.bIntegerReg = pInfo->attribute == exchange::VertexAttribute_BONE_INDEX;
 
 		// Copy all the references we need
-		if (pInfo->attribute == exchange::VertexAttribute_UV && uUVIndex != USG_INVALID_ID)
+		// A UV set named after one of the effect's attributes (e.g. a second
+		// "paint" set for a livery layer) binds to that attribute; the others
+		// feed uv0.. through the material's texture coordinators.
+		const uint32 uNamedUVAttrib = pInfo->attribute == exchange::VertexAttribute_UV ? customFXDecl->GetAttribBinding(pInfo->usageHint) : USG_INVALID_ID;
+		if (uNamedUVAttrib != USG_INVALID_ID)
+		{
+			element.uAttribId = uNamedUVAttrib;
+			memcpy(&elements[uCount], &element, sizeof(VertexElement));
+			uCount++;
+			texUV++;
+		}
+		else if (pInfo->attribute == exchange::VertexAttribute_UV && uUVIndex != USG_INVALID_ID)
 		{
 			for (size_t uTexDst = 0; uTexDst < pMaterial->textureCoordinators_count; ++uTexDst)
 			{
