@@ -3,6 +3,11 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
+    <!-- FBXSDK_DIR falls back to FBX_SDK (set by the game's usagi_env.bat). -->
+    <FBXSDK_DIR Condition="'$(FBXSDK_DIR)'=='' and '$(FBX_SDK)'!=''">$(FBX_SDK)</FBXSDK_DIR>
+    <!-- FBX SDK 2020.3+ installs lib\x64\{debug,release}; older SDKs use lib\vs2019\x64\{debug,release}. -->
+    <FbxSdkLibRoot Condition="Exists('$(FBXSDK_DIR)\lib\x64')">$(FBXSDK_DIR)\lib\x64</FbxSdkLibRoot>
+    <FbxSdkLibRoot Condition="'$(FbxSdkLibRoot)'==''">$(FBXSDK_DIR)\lib\vs2019\x64</FbxSdkLibRoot>
     <UsagiLibDir>$(USAGI_DIR)\_libs\$(Platform)\$(Configuration)</UsagiLibDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
