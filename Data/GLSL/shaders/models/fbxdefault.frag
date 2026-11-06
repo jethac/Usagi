@@ -32,6 +32,7 @@ ATTRIB_LOC(5) in vec3 vo_vBinormal;
 #ifndef OMNI_DEPTH
 ATTRIB_LOC(6) in vec3 vo_vWorldPos;
 ATTRIB_LOC(7) in vec3 vo_vViewDir;
+ATTRIB_LOC(8) in vec2 vo_vPaintUV;
 #endif
 #elif defined(PORTAL_TEST)
 ATTRIB_LOC(0) in vec3 vo_vWorldPos;
@@ -164,6 +165,29 @@ void main(void)
 		float fDetail = texture(sampler6, vo_vTexCoord01.xy * uMaterial.layerParams.y).g;
 		vDiffuse.rgb *= mix(1.0, 2.0 * fMacro, uMaterial.layerParams.z) * mix(1.0, 2.0 * fDetail, uMaterial.layerParams.w);
 		fLayer = (fMacro - 0.5) * uMaterial.layerParams.z + (fDetail - 0.5) * uMaterial.layerParams.w;
+	}
+
+	// Dev view of the "paint" UV set (iPaintUVDebug, see Model.yml); emissive so it reads unlit
+	if (uMaterial.iPaintUVDebug != 0)
+	{
+		vec2 vP = vo_vPaintUV;
+		vec3 vDbg = vec3(0.0, 0.0, 0.25);
+		if (all(greaterThanEqual(vP, vec2(0.0))) && all(lessThanEqual(vP, vec2(1.0))))
+		{
+			if (uMaterial.iPaintUVDebug == 1)
+			{
+				vec2 vCell = abs(fract(vP * 10.0 + 0.5) - 0.5) / fwidth(vP * 10.0);
+				float fLine = 1.0 - clamp(min(vCell.x, vCell.y) - 0.5, 0.0, 1.0);
+				vDbg = mix(vec3(vP, 0.0), vec3(1.0), fLine * 0.6);
+			}
+			else
+			{
+				vec2 vC = floor(vP * 8.0);
+				vDbg = mod(vC.x + vC.y, 2.0) < 0.5 ? vec3(0.9) : vec3(0.1);
+			}
+		}
+		vDiffuse.rgb = vec3(0.0);
+		vEmissive = vDbg;
 	}
 
 	vec3 rim = vec3(GetRimValue(1.0, 4.0, vNormal.z)) * vSpecular.rgb;

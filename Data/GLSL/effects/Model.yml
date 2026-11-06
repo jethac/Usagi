@@ -12,7 +12,9 @@ CustomEffects:
       - { index: 7, name: ao_uv1, hint: "uv1", type: vec2, default: [0.0, 0.0], defines: "!SHADOW_PASS" }
       - { index: 8, name: ao_uv2, hint: "uv2", type: vec2, default: [0.0, 0.0], defines: "!SHADOW_PASS" }
       - { index: 9, name: ao_uv3, hint: "uv3", type: vec2, default: [0.0, 0.0], defines: "!SHADOW_PASS" }
-      - { index: 11, name: ao_mModelMat, hint: "modelMat", type: mat3x4, defines: "INSTANCED"  }
+      - { index: 11, name: ao_mModelMat, hint: "modelMat", type: mat3x4, defines: "INSTANCED"  } # mat3x4: locations 11-13
+      # A UV set named "paint" in the FBX binds here (ModelResource); livery paint space, see UsagiGP export_game_car.py
+      - { index: 14, name: ao_uvPaint, hint: "paint", type: vec2, default: [-1.0, -1.0], defines: "!SHADOW_PASS" }
     Samplers:
       - { index: 0, hint: "DiffuseColor", default: "Textures/white_default" }
       - { index: 1, hint: "NormalMap", default: "Textures/normal_default", defines: "!SHADOW_PASS" } # HAS_BUMP breaks when multiple in scene atm
@@ -67,6 +69,9 @@ CustomEffects:
           - { type: bool,   name: bLayerMap,          default: false }
           - { type: vec4,   name: layerParams,        count: 1, default: [0.2, 9.0, 1.0, 1.0] }  # x = macro repeats per UV0 tile, y = detail repeats, z = macro strength, w = detail strength
           - { type: float,  name: layerRoughness,     count: 1, default: 0.0 }  # roughness *= 1 + layerRoughness * (macro + detail - 1)
+          # Dev view of ao_uvPaint: 0 off, 1 = (u, v) as red/green with a 0.1 grid, 2 = 8x8 checker.
+          # Outside 0..1 (unpainted) shows dark blue.
+          - { type: int,    name: iPaintUVDebug,      count: 1, default: 0 }
       - binding: Custom0
         shaderType: VS 
         defines: "!INSTANCED !HAS_SKELETON"        

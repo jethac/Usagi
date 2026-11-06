@@ -19,6 +19,7 @@ ATTRIB_LOC(5) out vec3 vo_vBinormal;
 #ifndef OMNI_DEPTH
 ATTRIB_LOC(6) out vec3 vo_vWorldPos;
 ATTRIB_LOC(7) out vec3 vo_vViewDir;
+ATTRIB_LOC(8) out vec2 vo_vPaintUV;
 #endif
 #elif defined(PORTAL_TEST)
 ATTRIB_LOC(0) out vec3 vo_vWorldPos;
@@ -95,6 +96,7 @@ void main(void)
 	vo_vViewDir			= -vViewPos.xyz;
 
 	vo_vWorldPos		= vWorldPos.xyz;
+	vo_vPaintUV			= ao_uvPaint;
 #endif
 
 #ifdef PORTAL_TEST
