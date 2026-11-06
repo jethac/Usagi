@@ -42,7 +42,7 @@ static const ShaderConstantDecl g_solidConstantDef[] =
 
 static const DescriptorDeclaration g_solidDescriptorDecl[] =
 {
-	DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_VS_GS),
+	DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_VERTEX),
 	DESCRIPTOR_END()
 };
 
@@ -145,7 +145,10 @@ void DebugRender::Init(GFXDevice* pDevice, ResourceMgr* pResMgr, const RenderPas
 	alphaDecl.bBlendEnable = false;
 	alphaDecl.srcBlend = BLEND_FUNC_SRC_ALPHA;
 	alphaDecl.dstBlend = BLEND_FUNC_ONE_MINUS_SRC_ALPHA;
-	pipelineState.inputBindings[0].Init(GetVertexDeclaration(VT_POSITION_UV_COL));
+	// One instance per character, expanded to a four-vertex quad in the
+	// vertex shader
+	pipelineState.ePrimType = PT_TRIANGLE_STRIP;
+	pipelineState.inputBindings[0].Init(GetVertexDeclaration(VT_POSITION_UV_COL), 0, VERTEX_INPUT_RATE_INSTANCE, 1);
 	pipelineState.pEffect = pResMgr->GetEffect(pDevice, "Debug.Text");
 	m_textMaterial.Init(pDevice, pDevice->GetPipelineState(renderPass, pipelineState), textDescriptors);
 	m_textConstants.Init(pDevice, g_textConstantDef);
@@ -389,7 +392,7 @@ void DebugRender::Draw(GFXContext* pContext)
 	{
 		m_textMaterial.Apply(pContext);
 		pContext->SetVertexBuffer(&m_charVerts);
-		pContext->DrawImmediate(m_uCharCount);
+		pContext->DrawInstanced(4, m_uCharCount);
 	}
 
 	pContext->EndGPUTag();
