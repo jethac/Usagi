@@ -180,6 +180,12 @@ message RigidBody
 	// The more iterations, the more accurate the results become.
 	required uint32 uSolverMinPositionsIters = 18 [default = 4];
 	required uint32 uSolverMinVelocityIters = 19 [default = 1];
+
+	// Lock rotation about world axes (PxRigidDynamicLockFlag::eLOCK_ANGULAR_*). Contacts can then never
+	// tip the body over on a locked axis; e.g. lock X and Z for a car that should only ever yaw.
+	required bool bLockRotationX = 20 [default = false];
+	required bool bLockRotationY = 21 [default = false];
+	required bool bLockRotationZ = 22 [default = false];
 }
 
 // FIXME: Should be automatically added any entity with a transform component which doesn't

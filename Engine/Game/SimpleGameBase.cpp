@@ -386,10 +386,17 @@ namespace usg
 		// the scene goes active so the countdown/first render has settled.
 		{
 			static int s_ssEnabled = -1;
+			static int s_ssFrame = 120;
 			if (s_ssEnabled < 0)
 			{
 				char szEnv[8] = {};
+				// USAGI_SCREENSHOT=1 shoots 120 frames in; a larger number picks that frame.
 				s_ssEnabled = OS::GetEnvVar("USAGI_SCREENSHOT", szEnv, sizeof(szEnv)) ? 1 : 0;
+				if (s_ssEnabled)
+				{
+					const int iFrame = atoi(szEnv);
+					s_ssFrame = iFrame > 1 ? iFrame : 120;
+				}
 			}
 			if (s_ssEnabled == 1)
 			{
@@ -397,7 +404,7 @@ namespace usg
 				if (m_eState == STATE_ACTIVE)
 				{
 					s_ssActive++;
-					if (s_ssActive == 120)
+					if (s_ssActive == s_ssFrame)
 					{
 						pDisplay->ScreenShot(pDevice, "usagi_frame.bmp");
 					}

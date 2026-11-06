@@ -181,6 +181,11 @@ namespace usg
 			pRigidBody->setAngularDamping(c->fAngularDamping);
 			pRigidBody->setLinearDamping(c->fLinearDamping);
 			pRigidBody->setSolverIterationCounts(c->uSolverMinPositionsIters, c->uSolverMinVelocityIters);
+			physx::PxRigidDynamicLockFlags lockFlags;
+			if (c->bLockRotationX) { lockFlags |= physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X; }
+			if (c->bLockRotationY) { lockFlags |= physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y; }
+			if (c->bLockRotationZ) { lockFlags |= physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z; }
+			pRigidBody->setRigidDynamicLockFlags(lockFlags);
 			rtd.pRigidActor = pRigidBody;
 			GameComponents<DynamicBodyTag>::Create(c.GetEntity());
 			if (c->bDisableSleep)
