@@ -51,6 +51,13 @@ public:
 	char16		GetInputChar(uint32 uIndex) const { return m_inputChars[uIndex]; }
 
 	void		RegisterHwnd(uint32 uDisplay, WindHndl hndl);
+
+	// Text input (SDL_StartTextInput / SDL_StopTextInput, which show and
+	// hide a phone's on-screen keyboard) and IME composition.
+	void		SetTextInput(bool bActive, const struct TextInputArea* pArea);
+	void		RegisterComposition(const char* szText, sint32 iCursor);
+	const char*	GetComposition() const { return m_composition; }
+	sint32		GetCompositionCursor() const { return m_iCompositionCursor; }
 private:
 	PRIVATIZE_COPY(Input_ps);
 
@@ -72,6 +79,10 @@ private:
 	long		m_mouseWheel;
 	char16		m_inputChars[Keyboard::MAX_INPUT_CHARS];
 	uint32		m_uInputChars;
+	WindHndl	m_window;
+	bool		m_bTextInput;
+	char		m_composition[Keyboard::MAX_COMPOSITION];
+	sint32		m_iCompositionCursor;
 	bool		m_mouseButtonsDown[MOUSE_BUTTON_NONE];
 	bool		m_mouseButtonsThisFrame[MOUSE_BUTTON_NONE];
 };

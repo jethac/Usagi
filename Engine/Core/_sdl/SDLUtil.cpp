@@ -340,7 +340,14 @@ namespace SDLUTIL
 				break;
 
 			case SDL_EVENT_TEXT_INPUT:
+				// Committed text ends any composition
+				usg::Input::GetPlatform().RegisterComposition("", 0);
 				RegisterText(event.text.text);
+				break;
+
+			case SDL_EVENT_TEXT_EDITING:
+				// An IME's composition so far (the whole string each time)
+				usg::Input::GetPlatform().RegisterComposition(event.edit.text, event.edit.start);
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:

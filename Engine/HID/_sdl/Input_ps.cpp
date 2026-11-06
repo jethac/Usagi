@@ -4,6 +4,8 @@
 #include "Engine/Common/Common.h"
 #include "Engine/Memory/MemUtil.h"
 #include "Input_ps.h"
+#include "Engine/HID/Input.h"
+#include "Engine/Core/String/String_Util.h"
 #include <SDL3/SDL.h>
 
 namespace usg{
@@ -16,6 +18,10 @@ Input_ps::Input_ps()
 	m_mouseWheel = 0;
 	m_uInputChars = 0;
 	m_uExternalPads = 0;
+	m_window = nullptr;
+	m_bTextInput = false;
+	m_composition[0] = '\0';
+	m_iCompositionCursor = 0;
 }
 
 Input_ps::~Input_ps()
@@ -161,6 +167,34 @@ void Input_ps::RegisterInputChar(char16 uChar)
 void Input_ps::RegisterHwnd(uint32 uDisplay, WindHndl hndl)
 {
 	m_mouse.SetWindow(hndl);
+	if (uDisplay == 0) m_window = hndl;
+}
+
+void Input_ps::SetTextInput(bool bActive, const TextInputArea* pArea)
+{
+	if (!m_window) return;
+	if (pArea)
+	{
+		SDL_Rect rect = { pArea->x, pArea->y, pArea->w, pArea->h };
+		SDL_SetTextInputArea(m_window, &rect, pArea->cursor);
+	}
+	if (bActive == m_bTextInput) return;
+	m_bTextInput = bActive;
+	// Desktops start text input with the window (SDLUtil) and keep it; where
+	// the keyboard is on screen it comes up only while text is asked for.
+	if (!SDL_HasScreenKeyboardSupport()) return;
+	if (bActive) SDL_StartTextInput(m_window);
+	else
+	{
+		SDL_StopTextInput(m_window);
+		RegisterComposition("", 0);
+	}
+}
+
+void Input_ps::RegisterComposition(const char* szText, sint32 iCursor)
+{
+	str::Copy(m_composition, szText ? szText : "", sizeof(m_composition));
+	m_iCompositionCursor = iCursor;
 }
 
 }

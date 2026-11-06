@@ -126,6 +126,11 @@ Input_ps& Input::GetPlatform()
 	return g_platform;
 }
 
+void Input::SetTextInput(bool bActive, const TextInputArea* pArea)
+{
+	g_platform.SetTextInput(bActive, pArea);
+}
+
 Gamepad* Input::GetAccerometer()
 {
 	return g_platform.GetAccerometer();

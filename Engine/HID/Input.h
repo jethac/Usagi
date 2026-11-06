@@ -18,6 +18,14 @@ class IGamepad;
 
 typedef int (*EvaluatePad) (const IGamepad* pDad);
 
+// Where text is being typed, in window pixels: an IME places its candidate
+// window by it, and a phone keeps it clear of its on-screen keyboard.
+struct TextInputArea
+{
+	sint32	x, y, w, h;
+	sint32	cursor;		// offset of the caret from x, pixels
+};
+
 class Input
 {
 public:	
@@ -38,6 +46,12 @@ public:
 	static Input_ps&	GetPlatform();
 
 	static void DeviceChange();
+
+	// Asks for typed text (a text field has focus): on a phone this brings
+	// up the on-screen keyboard, and false puts it away. Text arrives as the
+	// keyboard's input characters; an IME's unfinished composition as
+	// Keyboard::GetComposition. Desktop keyboards type regardless.
+	static void SetTextInput(bool bActive, const TextInputArea* pArea = nullptr);
 
 	static int DefaultEvaluate(const IGamepad* pPad) { return 1; }
 

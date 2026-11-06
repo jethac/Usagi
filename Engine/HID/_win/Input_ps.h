@@ -70,6 +70,9 @@ public:
 	char16		GetInputChar(uint32 uIndex) const { return m_inputChars[uIndex]; }
 
 	void		RegisterHwnd(uint32 uDisplay, HWND hwnd);
+	// Text arrives as WM_CHAR whenever a window has focus; there is no
+	// on-screen keyboard, and IME composition is not reported yet.
+	void		SetTextInput(bool bActive, const struct TextInputArea* pArea) { (void)bActive; (void)pArea; }
 private:
 	PRIVATIZE_COPY(Input_ps);
 	

@@ -4,6 +4,7 @@
 #include "Engine/Common/Common.h"
 #include "Input_ps.h"
 #include "Keyboard_ps.h"
+#include "Engine/Core/String/String_Util.h"
 #include <SDL3/SDL.h>
 
 namespace usg
@@ -174,5 +175,7 @@ namespace usg
 		{
 			m_inputChars[i] = m_pOwner->GetInputChar(i);
 		}
+		str::Copy(m_composition, m_pOwner->GetComposition(), sizeof(m_composition));
+		m_iCompositionCursor = m_pOwner->GetCompositionCursor();
 	}
 }
