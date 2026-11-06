@@ -167,6 +167,18 @@ void main(void)
 		fLayer = (fMacro - 0.5) * uMaterial.layerParams.z + (fDetail - 0.5) * uMaterial.layerParams.w;
 	}
 
+	// Livery (bLiveryMap, see Model.yml): a premultiplied RGBA image in the "paint" UV set,
+	// laid over the albedo. Faces outside paint space (glass, wheels, trim) are untouched.
+	if (uMaterial.bLiveryMap)
+	{
+		vec2 vP = vo_vPaintUV;
+		if (all(greaterThanEqual(vP, vec2(0.0))) && all(lessThanEqual(vP, vec2(1.0))))
+		{
+			vec4 vLivery = texture(sampler6, vP);
+			vDiffuse.rgb = vDiffuse.rgb * (1.0 - vLivery.a) + vLivery.rgb;
+		}
+	}
+
 	// Dev view of the "paint" UV set (iPaintUVDebug, see Model.yml); emissive so it reads unlit
 	if (uMaterial.iPaintUVDebug != 0)
 	{

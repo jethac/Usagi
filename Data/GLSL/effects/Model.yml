@@ -23,6 +23,8 @@ CustomEffects:
       - { index: 4, hint: "Reflection",  type: "samplerCube", default: "Textures/white_cube", defines: "!SHADOW_PASS"  }      
       - { index: 5, hint: "MetalRoughMap", default: "Textures/white_default", defines: "!SHADOW_PASS"  } # glTF layout: occlusion R, roughness G, metallic B
       - { index: 6, hint: "LayerMap", default: "Textures/white_default", defines: "!SHADOW_PASS"  } # Two-scale albedo layers: macro R, detail G (0.5 = no change)
+                                    # or, with bLiveryMap, a livery in the "paint" UV set (premultiplied RGBA over the albedo).
+                                    # One slot for both: the cooked material holds exactly 7 samplers (exchange::Material).
     ConstantDefs:      
       - name: uVSMaterial
         binding: Material   
@@ -72,6 +74,10 @@ CustomEffects:
           # Dev view of ao_uvPaint: 0 off, 1 = (u, v) as red/green with a 0.1 grid, 2 = 8x8 checker.
           # Outside 0..1 (unpainted) shows dark blue.
           - { type: int,    name: iPaintUVDebug,      count: 1, default: 0 }
+          # Livery: sampler6 holds a premultiplied RGBA image in ao_uvPaint space, laid over the
+          # albedo where 0 <= uvPaint <= 1 (a runtime target, see Model::OverrideTextureAtBinding).
+          # Exclusive with bLayerMap, which uses the same sampler.
+          - { type: bool,   name: bLiveryMap,         default: false }
       - binding: Custom0
         shaderType: VS 
         defines: "!INSTANCED !HAS_SKELETON"        
