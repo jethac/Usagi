@@ -1,0 +1,9 @@
+Effects:
+  # Brush strokes into a paint target: an RGBA image in a model's "paint" UV set
+  # (see Model.yml bLiveryMap). One instance per segment, expanded to a quad
+  # around its capsule (round caps) or square; alpha-blended into the target,
+  # clipped by the mask in sampler0 (R, 1 = paintable). Output is premultiplied
+  # when blended with SRC_ALPHA / ONE_MINUS_SRC_ALPHA and ONE / ONE_MINUS_SRC_ALPHA.
+  - name: Stroke
+    vert: paint/stroke
+    frag: paint/stroke
