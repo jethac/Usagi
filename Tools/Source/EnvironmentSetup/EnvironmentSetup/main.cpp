@@ -114,25 +114,6 @@ int main(int argc, const char* argv[])
 		printf("OculusSDK not found in ../../OculusSdk, need to manually set OCULUS_SDK_DIR\n");
 	}
 
-	if (std::filesystem::exists("Engine\\ThirdParty\\PhysX\\physx"))
-	{
-		std::string s1(currPath);
-		s1 += "\\Engine\\ThirdParty\\PhysX\\physx";
-
-		if (RegSetValueEx(keyHandle, "PHYSX_DIR", 0, REG_SZ, (LPBYTE)s1.c_str(), (DWORD)s1.length() + 1) != ERROR_SUCCESS)
-		{
-			printf("Failed to set PHYSX_DIR variable\n");
-		}
-		else
-		{
-			printf("PHYSX_DIR set\n");
-		}
-	}
-	else
-	{
-		printf("PhysX not found in ../../PhysX, need to manually set PHYSX_DIR\n");
-	}
-
 	if (RegSetValueEx(keyHandle, "USAGI_DIR", 0, REG_SZ, (LPBYTE)currPath, strlen(currPath) + 1) != ERROR_SUCCESS)
 	{
 		printf("Unable to set usagi directory");

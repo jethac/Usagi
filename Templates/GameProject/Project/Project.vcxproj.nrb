@@ -96,7 +96,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>vulkan-1.lib;xaudio2.lib;opengl32.lib;glu32.lib;xinput9_1_0.lib;dinput8.lib;dxguid.lib;Winmm.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysX_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXCooking_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXExtensions_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXVehicle_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXPvdSDK_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXCommon_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Debug\PhysXFoundation_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;xaudio2.lib;opengl32.lib;glu32.lib;xinput9_1_0.lib;dinput8.lib;dxguid.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TargetMachine>MachineX64</TargetMachine>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
@@ -132,7 +132,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>vulkan-1.lib;xaudio2.lib;opengl32.lib;glu32.lib;xinput9_1_0.lib;dinput8.lib;dxguid.lib;Winmm.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysX_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXCooking_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXExtensions_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXVehicle_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXPvdSDK_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXCommon_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXFoundation_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;xaudio2.lib;opengl32.lib;glu32.lib;xinput9_1_0.lib;dinput8.lib;dxguid.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -166,7 +166,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>vulkan-1.lib;xaudio2.lib;opengl32.lib;glu32.lib;xinput9_1_0.lib;dinput8.lib;dxguid.lib;Winmm.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysX_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXCooking_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXExtensions_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXVehicle_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXPvdSDK_static_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXCommon_64.lib;$(USAGI_DIR)\Engine\ThirdParty\PhysX\physx\bin\win.x86_64.vc142.mt\Release\PhysXFoundation_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;xaudio2.lib;opengl32.lib;glu32.lib;xinput9_1_0.lib;dinput8.lib;dxguid.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

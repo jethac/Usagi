@@ -65,8 +65,9 @@ iOS adds:
 
 `Tools/build/platform.macos.rb` (`PlatformMacOS`, derived from
 `PlatformLinux`) compiles and links with Apple clang from the ninja file:
-arm64, `MACOS_MIN_VERSION` (default 13.0), SDL3 through pkg-config,
-PhysX from `bin/mac.arm64/<config>`. ld64 needs no `--start-group`.
+arm64, `MACOS_MIN_VERSION` (default 13.0), SDL3 through pkg-config.
+Physics (Box3D) builds from source with the engine, using its NEON path.
+ld64 needs no `--start-group`.
 iOS follows as `PlatformIOS` (device and simulator SDKs), producing a
 signed `.app` for the simulator without Xcode and an Xcode project for
 device signing and debugging.
@@ -75,7 +76,7 @@ device signing and debugging.
 
 Xcode (command line tools for macOS, full Xcode for iOS), Homebrew
 (`ninja`, `pkg-config`, `sdl3`, `cmake`, Ruby with the `ninja-gen` gem),
-the LunarG Vulkan SDK for macOS, and PhysX 4.1.2 built for arm64.
+and the LunarG Vulkan SDK for macOS.
 
 ## Milestones
 

@@ -155,5 +155,5 @@ License
 ----------------------
 
 Usagi its self is available under the MIT licence (see [LICENSE](LICENSE) in this repository). We would appreciate you letting us know if you make use of any part of the code or the design; but there is no requirement to do so.  
-It requires PhysX to run, any project making use of this project will need to be aware of this.
-Third party software falls under the PhysX, MIT, Modified BSD and zLib licenses, the specifics of which are detailed in [Documents/License.md](Documents/License.md)
+Physics is provided by Box3D (MIT), built from source with the engine.
+Third party software falls under the MIT, Modified BSD and zLib licenses, the specifics of which are detailed in [Documents/License.md](Documents/License.md)

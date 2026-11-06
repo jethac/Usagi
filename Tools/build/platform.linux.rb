@@ -11,9 +11,6 @@ require_relative 'platform.rb'
 # Environment overrides:
 #   CC, CXX, AR    - compilers and archiver (default clang, clang++, ar)
 #   VULKAN_SDK     - prefix containing include/vulkan (default: system)
-#   PHYSX_DIR      - PhysX 'physx' directory (as on Windows)
-#   PHYSX_BIN_DIR  - directory containing the PhysX static libraries
-#                    (default: $PHYSX_DIR/bin/linux.clang/<config>)
 class PlatformLinux < Platform
 
   def initialize(config)
@@ -60,9 +57,7 @@ class PlatformLinux < Platform
             'EASTL_USER_DEFINED_ALLOCATOR',
             'PB_FIELD_32BIT',
             "'LUA_USER_H=<Engine/Framework/Script/LuaConf.h>'",
-            'LUA_USE_POSIX',
-            'PX_DEBUG=0',
-            'PX_CHECKED=0']
+            'LUA_USE_POSIX']
 
     if debug_build?
       list += ['_DEBUG', 'DEBUG']
@@ -73,18 +68,6 @@ class PlatformLinux < Platform
     list << 'FINAL_BUILD' if @config.build == 'final'
 
     list
-  end
-
-  def physx_dir
-    ENV['PHYSX_DIR'] || @config.build_path('Engine/ThirdParty/PhysX/physx')
-  end
-
-  def physx_config
-    debug_build? ? 'debug' : 'release'
-  end
-
-  def physx_bin_dir
-    ENV['PHYSX_BIN_DIR'] || "#{physx_dir}/bin/linux.clang/#{physx_config}"
   end
 
   def include_dirs
@@ -101,8 +84,7 @@ class PlatformLinux < Platform
              @config.build_path('Engine/ThirdParty/yaml-cpp/include'),
              @config.build_path('Engine/ThirdParty/gli'),
              @config.build_path('Engine/ThirdParty/gli/external'),
-             "#{physx_dir}/include",
-             "#{physx_dir}/../pxshared/include"]
+             @config.build_path('Engine/ThirdParty/box3d/include')]
 
     if @config.type == ConfigType::GAME
       dirs << "#{@config.includes_output_dir(false)}/#{@config.project}"
@@ -152,7 +134,8 @@ class PlatformLinux < Platform
   end
 
   def cflags
-    common_flags
+    # Box3D is C17
+    common_flags + ['-std=gnu17']
   end
 
   def cxxflags
@@ -180,19 +163,6 @@ class PlatformLinux < Platform
 
   def ld_response_file_arg
     '@$out.rsp'
-  end
-
-  def physx_libs
-    # Static PhysX libraries, ordered so that a single-pass linker resolves
-    # every dependency
-    ['PhysXExtensions_static_64',
-     'PhysXCharacterKinematic_static_64',
-     'PhysXVehicle_static_64',
-     'PhysXCooking_static_64',
-     'PhysX_static_64',
-     'PhysXPvdSDK_static_64',
-     'PhysXCommon_static_64',
-     'PhysXFoundation_static_64'].map { |l| "#{physx_bin_dir}/lib#{l}.a" }
   end
 
   def system_libs
