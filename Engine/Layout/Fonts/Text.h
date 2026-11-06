@@ -41,6 +41,11 @@ namespace usg
 		// Extra advance after every character, in the units the text is
 		// positioned in (added to the font's own spacing; may be negative).
 		bool SetCharSpacing(float spacing);
+		// Distance-field fonts: widens the glyph edges' anti-aliasing to
+		// about `pixels` on screen, a soft (blurred) look for drop shadows,
+		// in the same draw. 0 is the font's crisp edge.
+		bool SetSoftness(float pixels);
+		float GetSoftness() const { return m_softness; }
 		bool SetScale(Vector2f scale);
 		bool SetTabWidth(int tabWidth);
 
@@ -79,7 +84,8 @@ namespace usg
 			kDirtyTabWidth              = (1 << 10),
 			kDirtyText					= (1 << 11),	// We've changed the string
 			kDirtyFont					= (1 << 12),
-			kDirtyBgColor				= (1 << 13)
+			kDirtyBgColor				= (1 << 13),
+			kDirtySoftness				= (1 << 14)
 		};
 
 
@@ -104,6 +110,7 @@ namespace usg
 		float		m_widthLimit;
 		float		m_lineSpacing;
 		float		m_charSpacing;
+		float		m_softness;
 		Vector2f	m_scale;
 		int			m_tabWidth;
 		uint32		m_dirtyFlags;

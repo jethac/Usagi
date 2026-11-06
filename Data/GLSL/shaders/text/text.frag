@@ -6,6 +6,7 @@ in GeometryData
     INT_LOC(1) vec4 	go_vColor;
     INT_LOC(2) vec4 	go_vBgColor;	// Not currently used on standard font rendering
     INT_LOC(3) vec2 	go_vTexcoord;
+    INT_LOC(4) float	go_fSoftness;
 
 } geometryData;
 

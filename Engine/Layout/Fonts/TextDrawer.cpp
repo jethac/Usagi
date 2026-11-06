@@ -43,6 +43,7 @@ namespace usg
 		VERTEX_DATA_ELEMENT_NAME(0, TextDrawer::Vertex, vPosRange, VE_FLOAT, 4, false),
 		VERTEX_DATA_ELEMENT_NAME(2, TextDrawer::Vertex, vUVRange, VE_FLOAT, 4, false),
 		VERTEX_DATA_ELEMENT_NAME(1, TextDrawer::Vertex, fDepth, VE_FLOAT, 1, false),
+		VERTEX_DATA_ELEMENT_NAME(7, TextDrawer::Vertex, fSoftness, VE_FLOAT, 1, false),
 		VERTEX_DATA_ELEMENT_NAME(3, TextDrawer::Vertex, cColUpper, VE_UBYTE, 4, true),
 		VERTEX_DATA_ELEMENT_NAME(4, TextDrawer::Vertex, cColLower, VE_UBYTE, 4, true),
 		VERTEX_DATA_ELEMENT_NAME(5, TextDrawer::Vertex, cColBg, VE_UBYTE, 4, true),
@@ -428,6 +429,7 @@ namespace usg
 			colorBg.FillU8(pVert->cColBg[0], pVert->cColBg[1], pVert->cColBg[2], pVert->cColBg[3]);
 			color.FillU8(pVert->cColFg[0], pVert->cColFg[1], pVert->cColFg[2], pVert->cColFg[3]);
 			pVert->fDepth = fZPos;
+			pVert->fSoftness = m_pParent->GetSoftness();
 
 
 			uCharsThisLine++;

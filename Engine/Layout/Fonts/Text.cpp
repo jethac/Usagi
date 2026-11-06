@@ -29,6 +29,7 @@ namespace usg
 		m_widthLimit = 0.0f;
 		m_lineSpacing = 0.0f;
 		m_charSpacing = 0.0f;
+		m_softness = 0.0f;
 		m_scale.Assign(1.0f, 1.0f);
 		m_tabWidth = 4;
 		m_dirtyFlags = 0;
@@ -228,6 +229,14 @@ namespace usg
 		m_lineSpacing = spacing;
 		m_dirtyFlags |= kDirtyLineSpacing;
 
+		return true;
+	}
+
+	bool Text::SetSoftness(float pixels)
+	{
+		if (usg::Math::IsEqual(m_softness, pixels)) { return true; }
+		m_softness = pixels;
+		m_dirtyFlags |= kDirtySoftness;
 		return true;
 	}
 

@@ -14,6 +14,7 @@ layout (location = 3) in vec4 ao_colUpper;
 layout (location = 4) in vec4 ao_colLower;
 layout (location = 5) in vec4 ao_colBg;
 layout (location = 6) in vec4 ao_colFg;
+layout (location = 7) in float ao_fSoftness;	// screen pixels of edge softening
 
 
 out GeometryData
@@ -22,6 +23,7 @@ out GeometryData
 	INT_LOC(1) vec4		go_vColor;
 	INT_LOC(2) vec4		go_vBgColor;
 	INT_LOC(3) vec2		go_vTexcoord;
+	INT_LOC(4) float	go_fSoftness;
 
 } geometryData;
 
@@ -42,6 +44,7 @@ void main(void)
 	geometryData.go_vBgColor = toLinear(ao_colBg) * vColor;
 	geometryData.go_vTexcoord = vec2(bRight ? vUVMax.x : vUVMin.x, bTop ? vUVMax.y : vUVMin.y);
 	geometryData.go_vPos = vPos.xy;
+	geometryData.go_fSoftness = ao_fSoftness;
 
 	gl_Position = vPos;
 }

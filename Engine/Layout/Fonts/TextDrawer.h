@@ -48,6 +48,7 @@ namespace usg
 			Vector4f vPosRange;
 			Vector4f vUVRange;
 			float	 fDepth;
+			float	 fSoftness;		// screen pixels of edge softening (distance-field fonts)
 			uint8	 cColUpper[4];
 			uint8	 cColLower[4];
 			uint8	 cColBg[4];
