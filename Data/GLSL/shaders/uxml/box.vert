@@ -13,6 +13,7 @@ layout (location = 3) in vec4 ao_uv;		// u0, v0, u1, v1; 9-slice: the slices in 
 layout (location = 4) in vec4 ao_fill;		// background, opacity applied
 layout (location = 5) in vec4 ao_borderCol;
 layout (location = 6) in vec4 ao_slice;		// 9-slice: the slices on screen in pixels (l, t, r, b); 0 = not sliced
+layout (location = 7) in vec2 ao_axis;		// the box's x axis (cos, sin): it turns about its top-left corner
 
 out BoxData
 {
@@ -52,5 +53,6 @@ void main(void)
 	boxData.go_vFill = vec4(toLinear(ao_fill.rgb), ao_fill.a);
 	boxData.go_vBorderCol = vec4(toLinear(ao_borderCol.rgb), ao_borderCol.a);
 #endif
-	gl_Position = vec4(ao_rect.xy + vLocal, 0.0, 1.0) * proj;
+	vec2 vTurned = vec2(ao_axis.x * vLocal.x - ao_axis.y * vLocal.y, ao_axis.y * vLocal.x + ao_axis.x * vLocal.y);
+	gl_Position = vec4(ao_rect.xy + vTurned, 0.0, 1.0) * proj;
 }
