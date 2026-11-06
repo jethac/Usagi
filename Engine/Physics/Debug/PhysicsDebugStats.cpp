@@ -8,7 +8,7 @@
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Core/Timer/ProfilingTimer.h"
 #include "Engine/Scene/SceneContext.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
 #include "Engine/Scene/Scene.h"
 #include "PhysicsDebugStats.h"
 
@@ -18,7 +18,7 @@ namespace usg {
 
 	PhysicsDebugStats::PhysicsDebugStats() :
 		IDebugStatGroup(),
-		m_pPhysicsScene(nullptr)
+		m_worldId(b3_nullWorldId)
 	{
 
 	}
@@ -28,9 +28,9 @@ namespace usg {
 
 	}
 
-	void PhysicsDebugStats::Init(physx::PxScene* pScene)
+	void PhysicsDebugStats::Init(b3WorldId worldId)
 	{
-		m_pPhysicsScene = pScene;
+		m_worldId = worldId;
 	}
 
 	void PhysicsDebugStats::Cleanup(GFXDevice* pDevice)
@@ -68,80 +68,77 @@ namespace usg {
 
 	void PhysicsDebugStats::SetActive(bool bActive)
 	{
-		if (!bActive)
-		{
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 0.0f);
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.f);
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 0.0f);
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0f);
-
-		}
 		IDebugStatGroup::SetActive(bActive);
 	}
 
 
 	void PhysicsDebugStats::SetPage(uint32 uPage)
 	{
-		if (m_pPhysicsScene)
-		{
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, uPage == PAGE_COLLISION ? 1.0f : 0.0f);
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, uPage == PAGE_JOINTS ? 1.0f : 0.f);
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, uPage == PAGE_JOINTS ? 1.0f : 0.0f);
-			//pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0f);
-			m_pPhysicsScene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0f);
-		}
 		IDebugStatGroup::SetPage(uPage);
 	}
 
+	static Color ToColor(b3HexColor color, float fAlpha = 1.0f)
+	{
+		const uint32 c = (uint32)color;
+		return Color(((c >> 16) & 0xff) / 255.0f, ((c >> 8) & 0xff) / 255.0f, (c & 0xff) / 255.0f, fAlpha);
+	}
+
+	static void DrawSegment(b3Pos p1, b3Pos p2, b3HexColor color, void* context)
+	{
+		Debug3D::GetRenderer()->AddLine(ToUsgVec3(p1), ToUsgVec3(p2), ToColor(color), 0.01f);
+	}
+
+	static void DrawPoint(b3Pos p, float size, b3HexColor color, void* context)
+	{
+		Debug3D::GetRenderer()->AddSphere(ToUsgVec3(p), 0.02f, ToColor(color));
+	}
+
+	static void DrawSphere(b3Pos p, float radius, b3HexColor color, float alpha, void* context)
+	{
+		Debug3D::GetRenderer()->AddSphere(ToUsgVec3(p), radius, ToColor(color, alpha));
+	}
+
+	static void DrawBox(b3Vec3 extents, b3WorldTransform transform, b3HexColor color, void* context)
+	{
+		Matrix4x4 cube;
+		cube.LoadIdentity();
+		cube.MakeScale(ToUsgVec3(extents));
+		Matrix4x4 rot = ToUsgQuaternionf(transform.q);
+		cube = cube * rot;
+		cube.SetPos(ToUsgVec3(transform.p));
+		Debug3D::GetRenderer()->AddCube(cube, ToColor(color, 0.5f));
+	}
 
 	void PhysicsDebugStats::DrawPhysicsPage(DebugRender* pRender)
 	{
 		Color cStatCol(0.0f, 1.0f, 1.0f, 1.0f);
 
-		if (!m_pPhysicsScene)
+		if (B3_IS_NULL(m_worldId) || !b3World_IsValid(m_worldId))
 		{
 			pRender->AddString("Physics system not set", 0.0f, 2.0f, cStatCol);
 			return;
 		}
-		else
-		{
-			// TODO: Display debug type
-			pRender->AddString("Physics debug", 0.0f, 2.0f, cStatCol);
-		}
 
+		const b3Counters counters = b3World_GetCounters(m_worldId);
+		const b3Profile profile = b3World_GetProfile(m_worldId);
+		char szText[128];
+		snprintf(szText, sizeof(szText), "Box3D: %d bodies (%d awake), %d contacts, %d joints, step %.3f ms",
+			counters.bodyCount, b3World_GetAwakeBodyCount(m_worldId), counters.contactCount, counters.jointCount, profile.step);
+		pRender->AddString(szText, 0.0f, 2.0f, cStatCol);
 
-		const physx::PxRenderBuffer& rb = m_pPhysicsScene->getRenderBuffer();
-
-		const physx::PxDebugLine* pLines = rb.getLines();
-
-		for (physx::PxU32 i = 0; i < rb.getNbLines(); i++)
-		{
-			const physx::PxDebugLine& line = pLines[i];
-			// render the line
-			usg::Vector3f vStart(line.pos0.x, line.pos0.y, line.pos0.z);
-			usg::Vector3f vEnd(line.pos1.x, line.pos1.y, line.pos1.z);
-			usg::Color color; color.AssignRGBA32(line.color0);
-			Debug3D::GetRenderer()->AddLine(vStart, vEnd, color, 0.01f);
-		}
-
-		const physx::PxDebugTriangle* pTris = rb.getTriangles();
-
-		for (physx::PxU32 i = 0; i < rb.getNbTriangles(); i++)
-		{
-			const physx::PxDebugTriangle& tri = pTris[i];
-
-			usg::Vector3f pos0(tri.pos0.x, tri.pos0.y, tri.pos0.z);
-			usg::Vector3f pos1(tri.pos1.x, tri.pos1.y, tri.pos1.z);
-			usg::Vector3f pos2(tri.pos2.x, tri.pos2.y, tri.pos2.z);
-
-			usg::Color color0; color0.AssignRGBA32(tri.color0);
-			usg::Color color1; color1.AssignRGBA32(tri.color1);
-			usg::Color color2; color2.AssignRGBA32(tri.color2);
-
-			Debug3D::GetRenderer()->AddTriangle(pos0, color0, pos1, color1, pos2, color2);
-
-		}
-
+		// Shapes are drawn by PhysicsDebugRender; this page adds contacts or joints
+		b3DebugDraw draw = b3DefaultDebugDraw();
+		draw.DrawSegmentFcn = DrawSegment;
+		draw.DrawPointFcn = DrawPoint;
+		draw.DrawSphereFcn = DrawSphere;
+		draw.DrawBoxFcn = DrawBox;
+		draw.drawingBounds = b3World_GetBounds(m_worldId);
+		draw.drawShapes = false;
+		draw.drawContacts = m_uActivePage == PAGE_COLLISION;
+		draw.drawContactNormals = m_uActivePage == PAGE_COLLISION;
+		draw.drawJoints = m_uActivePage == PAGE_JOINTS;
+		draw.drawJointExtras = m_uActivePage == PAGE_JOINTS;
+		b3World_Draw(m_worldId, &draw, B3_DEFAULT_MASK_BITS);
 	}
 
 }

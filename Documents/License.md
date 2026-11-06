@@ -10,11 +10,11 @@ Third party licences
 Usagi makes use of a number of third party libraries. Those such as the FBX SDK which do not have licenses which allow re-distribution must be installed seperately.  
 Below is a list for reference of the third party software included either as part of the distribution or as a submodule. In those cases the corresponding license files are included. The Usagi MIT license does not superceed any of these liceneses. Submodules are forked from the original repositories, please see their history for details of modifications. We have tried to avoid omissions to this list but always check source files and their parent directories to confirm the license of code within this repository.      
 
-**PhysX**  (submodule)  
-Original Authors: NVIDIA Corporation
-Website: https://github.com/NVIDIAGameWorks/PhysX  
-Source Location: Engine/ThirdParty/PhysX   
-Licensed Under: [NVIDIA PhysX SDK 4.1 License](https://github.com/NVIDIAGameWorks/PhysX/blob/4.1/LICENSE.md) 
+**Box3D**  (source)  
+Original Authors: Erin Catto  
+Website: https://github.com/erincatto/box3d  
+Source Location: Engine/ThirdParty/box3d  
+Licensed Under: MIT License  
 
 **UNICODE**  (source)  
 Original Authors: Unicode Inc  

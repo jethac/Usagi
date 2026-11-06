@@ -4,7 +4,7 @@
 #include "Engine/Core/stl/map.h"
 #include "Engine/Resource/PakDecl.h"
 #include "compressonator.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Resource/HeightFieldSample.h"
 #include <gli/gli.hpp>
 #include <sstream>
 
@@ -129,9 +129,9 @@ protected:
 			memcpy(customHeaderMem.data(), &hdr, sizeof(hdr));
 
 			uint32 uSamples = hdr.uColumns * hdr.uRows;
-			pSamples = new physx::PxHeightFieldSample[uSamples];
+			pSamples = new usg::HeightFieldSample[uSamples];
 
-			uDataSize = uSamples * sizeof(physx::PxHeightFieldSample);
+			uDataSize = uSamples * sizeof(usg::HeightFieldSample);
 
 			for(uint32 i=0; i<uSamples; i++)
 			{
@@ -147,7 +147,7 @@ protected:
 
 	private:
 
-		physx::PxHeightFieldSample*	pSamples = nullptr;
+		usg::HeightFieldSample*	pSamples = nullptr;
 		uint32					uDataSize = 0;
 		std::vector<char> customHeaderMem;
 	};

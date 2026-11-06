@@ -233,8 +233,8 @@ generator under Python 3 against the system `protoc`. Second, build
   SDL3 and Vulkan loader development files, and Vulkan headers. Ruby
   gems install with `--user-install`. Vulkan headers come from the
   distro package, or from `VULKAN_SDK` as on Windows.
-- PhysX 4.1.2 is built from the submodule with its `linux` preset
-  (cmake). `PHYSX_DIR` points at it, as on Windows.
+- Physics (Box3D) is vendored source, built with the engine; nothing to
+  install.
 
 ## Shaders and data
 
@@ -293,7 +293,7 @@ On Windows (pinned toolchain), in the engine checkout, then in the game:
 
 Copy the tree, `_build/proto`, `_build/linux/<build>` and
 `_romfiles/win` to the Linux machine. Then, with `USAGI_DIR`,
-`VULKAN_SDK` (a prefix containing `include/vulkan`) and `PHYSX_DIR` set:
+`VULKAN_SDK` (a prefix containing `include/vulkan`) set:
 
     rake platform=linux build=debug         # engine: generate + build libs
     Tools/Tests/LinuxClear/build.sh debug   # bring-up test
@@ -308,6 +308,6 @@ need extra include paths or defines declare them in `usagi_module.yml`
 under `ninja:` (`include_dirs`, `defines`). That's the counterpart of
 `_msbuild/Module.props`.
 
-PhysX 4.1.2 for Linux: generate with the `linux` preset (snippets and
-samples off, static libraries), using CMake 3.x. Its CMake flags
-include `-Werror`, which current clang fails, so remove it.
+Physics is Box3D, compiled from `Engine/ThirdParty/box3d` with the
+ThirdParty library (C17; `wide8.c` gets AVX2 through a target pragma), so
+there are no prebuilt physics libraries to build or point at.

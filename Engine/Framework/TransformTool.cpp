@@ -1,6 +1,6 @@
 ﻿#include "Engine/Common/Common.h"
 #include "Engine/Framework/TransformTool.h"
-#include "Engine/Physics/PhysX.h"
+#include "Engine/Physics/Physics.h"
 
 namespace usg
 {
@@ -24,17 +24,17 @@ namespace usg
 		TransformComponent usgTrans = GetTransform(child, handles);
 		if (!usgTrans.bInheritFromParent)
 		{
-			physx::PxTransform p = ToPhysXTransform(usgTrans);
-			physx::PxTransform parentTrans = ToPhysXTransform(GetTransform(parent, handles));
+			const b3Transform p = ToB3Transform(usgTrans);
+			const b3Transform parentTrans = ToB3Transform(GetTransform(parent, handles));
 
-			return physics::ToUsgTransform(parentTrans.transformInv(p));
+			return physics::ToUsgTransform(b3InvMulTransforms(parentTrans, p));
 		}
-		physx::PxTransform trans = ToPhysXTransform(usgTrans);
+		b3Transform trans = ToB3Transform(usgTrans);
 		Entity e = child;
 		while (e->GetParentEntity() != parent)
 		{
-			physx::PxTransform parentTrans = ToPhysXTransform(GetTransform(e->GetParentEntity(), handles));
-			trans = parentTrans.transform(trans);
+			const b3Transform parentTrans = ToB3Transform(GetTransform(e->GetParentEntity(), handles));
+			trans = b3MulTransforms(parentTrans, trans);
 			e = e->GetParentEntity();
 		}
 		usgTrans.position = ToUsgVec3(trans.p);

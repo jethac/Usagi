@@ -4,11 +4,7 @@
 #pragma once
 
 #include "Engine/Resource/ResourceBase.h"
-
-namespace physx
-{
-struct PxHeightFieldSample;
-}
+#include "Engine/Resource/HeightFieldSample.h"
 
 namespace usg {
 
@@ -27,7 +23,7 @@ public:
 
 	virtual void Cleanup(GFXDevice* pDevice);
 
-	physx::PxHeightFieldSample* GetSamples() const { return m_pHeightData; }
+	const HeightFieldSample* GetSamples() const { return m_pHeightData; }
 	const static ResourceType StaticResType = ResourceType::HEIGHTFIELD;
 
 	uint32 GetColumns() const { return m_uColumns; }
@@ -36,7 +32,7 @@ public:
 
 private:
 	
-	physx::PxHeightFieldSample*	m_pHeightData = nullptr;
+	HeightFieldSample*		m_pHeightData = nullptr;
 	uint32					m_uColumns = 0;
 	uint32					m_uRows = 0;
 	bool					m_bOwnsData = false;

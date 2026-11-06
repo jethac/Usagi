@@ -9,8 +9,6 @@ require_relative 'platform.linux.rb'
 #   VULKAN_SDK         - the LunarG SDK's macOS directory (containing
 #                        include/vulkan and lib/libvulkan.dylib)
 #   MACOS_MIN_VERSION  - deployment target (default 13.0)
-#   PHYSX_BIN_DIR      - directory containing the PhysX static libraries
-#                        (default: $PHYSX_DIR/bin/mac.arm64/<config>)
 #
 # SDL3 is found with pkg-config (Homebrew's sdl3, or a local build with
 # PKG_CONFIG_PATH pointing at it).
@@ -41,10 +39,6 @@ class PlatformMacOS < PlatformLinux
   # engine libraries need no grouping (and it has no --start-group)
   def link_group(libs)
     libs
-  end
-
-  def physx_bin_dir
-    ENV['PHYSX_BIN_DIR'] || "#{physx_dir}/bin/mac.arm64/#{physx_config}"
   end
 
   def vulkan_libs
