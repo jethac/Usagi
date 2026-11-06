@@ -281,7 +281,7 @@ namespace usg
 				bool bFound = font->GetCharacterCoords(thisChar.GetAsUInt32(), fLeft, fRight, fTop, fBottom);
 				Vector2f vDimensions = Vector2f(font->GetCharacterAspect(fLeft, fRight, fTop, fBottom), 1.0f);
 				vDimensions = vDimensions * vScale;
-				float fCharWidth = vDimensions.x + font->GetCharacterSpacing() * vScale.x;
+				float fCharWidth = vDimensions.x + font->GetCharacterSpacing() * vScale.x + m_pParent->GetCharSpacing();
 				fTmpWidth += fCharWidth;
 				if (fTmpWidth > fWidthLimit && bSpaceThisLine)
 				{
@@ -431,7 +431,7 @@ namespace usg
 
 
 			uCharsThisLine++;
-			float fCharWidth = vDimensions.x + font->GetCharacterSpacing() * vScale.x;
+			float fCharWidth = vDimensions.x + font->GetCharacterSpacing() * vScale.x + m_pParent->GetCharSpacing();
 			fPosX += fCharWidth;
 			fLineWidth += fCharWidth;
 			// We can't manage anymore
