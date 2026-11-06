@@ -43,6 +43,11 @@ public:
 	void UpdateScaleBounds(float fScale);
 
 	bool OverrideTexture(const char* szTextureName, TextureHndl pSrcTex);	
+	// Replaces whatever the material binds at a sampler binding (its index in the
+	// effect's Samplers), e.g. with a render target's texture. Meshes whose material
+	// has nothing at that binding are left alone. An invalid sampler keeps the
+	// material's own. Call UpdateDescriptors afterwards.
+	bool OverrideTextureAtBinding(uint32 uBinding, TextureHndl pSrcTex, SamplerHndl sampler = SamplerHndl(), uint32 uMeshIdx = USG_INVALID_ID);
 
 	void OverrideVariable(const char* szVarName, void* pData, uint32 uSize, uint32 uIndex, uint32 uMeshIdx = USG_INVALID_ID);
 	template <class VariableType>

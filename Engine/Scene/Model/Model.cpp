@@ -733,6 +733,34 @@ bool Model::OverrideTexture(const char* szTextureName, TextureHndl pOverrideTex)
 	return bFound;
 }
 
+bool Model::OverrideTextureAtBinding(uint32 uBinding, TextureHndl pOverrideTex, SamplerHndl sampler, uint32 uMeshIdx)
+{
+	ASSERT(m_bDynamic);
+	ASSERT(pOverrideTex.get() != NULL);
+	if (uBinding >= ModelResource::Mesh::MAX_UV_STAGES)
+	{
+		return false;
+	}
+
+	bool bFound = false;
+	for (uint32 uMesh = 0; uMesh < m_pResource->GetMeshCount(); uMesh++)
+	{
+		if (uMeshIdx != USG_INVALID_ID && uMesh != uMeshIdx)
+		{
+			continue;
+		}
+		const ModelResource::Mesh* pSrcMesh = m_pResource->GetMesh(uMesh);
+		if (pSrcMesh->pTextures[uBinding].get() == NULL)
+		{
+			continue;
+		}
+		SamplerHndl samp = sampler.IsValid() ? sampler : pSrcMesh->samplers[uBinding];
+		GetRenderMesh(uMesh)->GetDescriptorSet().SetImageSamplerPairAtBinding(uBinding, pOverrideTex, samp);
+		bFound = true;
+	}
+	return bFound;
+}
+
 void Model::GPUUpdate(GFXDevice* pDevice, bool bVisible)
 {
 	// Should internally check for any relevant changes, drop out if nothing needs changing
