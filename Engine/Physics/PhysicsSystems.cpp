@@ -16,6 +16,7 @@
 #include "Engine/Scene/Common/SceneEvents.pb.h"
 #include "Engine/Physics/PhysicsEventsInternal.pb.h"
 #include "Engine/Physics/PhysicsSceneData.h"
+#include "Engine/Physics/PhysicsProfile.h"
 #include "Engine/Framework/ExclusionCheck.h"
 #include "Engine/Physics/CollisionData.pb.h"
 #ifndef FINAL_BUILD
@@ -300,8 +301,10 @@ namespace usg
 				{
 					return;
 				}
+				physics::profile::BeginStep();
 				PreSimulation(inputs, outputs, fDelta);
 				inputs.scene.GetRuntimeData().GetData().pScene->simulate(fDelta);// physics::GetTimeStep());
+				physics::profile::EndStep();
 			}
 
 
@@ -394,9 +397,19 @@ namespace usg
 				}
 				ProfilingTimer timer;
 				timer.Start();
+				physics::profile::BeginStep();
 				inputs.scene.GetRuntimeData().GetData().pScene->fetchResults(true);
 				PostSimulation(inputs, outputs);
+				physics::profile::EndStep();
 				timer.Stop();
+				if (physics::profile::IsEnabled())
+				{
+					physx::PxScene* pScene = inputs.scene.GetRuntimeData().GetData().pScene;
+					physx::PxSimulationStatistics stats;
+					pScene->getSimulationStatistics(stats);
+					const uint32 uBodies = pScene->getNbActors(physx::PxActorTypeFlag::eRIGID_DYNAMIC | physx::PxActorTypeFlag::eRIGID_STATIC);
+					physics::profile::EndFrame(uBodies, stats.nbActiveDynamicBodies, stats.nbDiscreteContactPairsTotal);
+				}
 #ifndef FINAL_BUILD
 				auto& mutableRtd = outputs.scene.GetRuntimeData().GetData();
 				mutableRtd.diagnostics.fFetchResultsTime.Add(timer.GetTotalMilliSeconds());
