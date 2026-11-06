@@ -1911,7 +1911,17 @@ void FbxLoad::AddMesh(Cmdl& cmdl, ::exchange::Shape* pShape, FbxNode* pNode, Fbx
 				int uUVCount = currMesh->GetUVLayerCount();
 				for (int k = 0; k < uUVCount; ++k)
 				{
-					GetUV(currMesh, iVertexIndex, currMesh->GetTextureUVIndex(uTriangle, uTriangleVert), k, UV);
+					// Each UV set has its own index array: GetTextureUVIndex only
+					// resolves the first (diffuse) one, so look later sets up directly
+					int iUVIndex = currMesh->GetTextureUVIndex(uTriangle, uTriangleVert);
+					FbxGeometryElementUV* pUVElement = k < currMesh->GetElementUVCount() ? currMesh->GetElementUV(k) : nullptr;
+					if (k > 0 && pUVElement && pUVElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+					{
+						const int iPolygonVertex = currMesh->GetPolygonVertexIndex(uTriangle) + (int)uTriangleVert;
+						iUVIndex = pUVElement->GetReferenceMode() == FbxGeometryElement::eDirect ? iPolygonVertex
+							: pUVElement->GetIndexArray().GetAt(iPolygonVertex);
+					}
+					GetUV(currMesh, iVertexIndex, iUVIndex, k, UV);
 					strcpy_s(UV.hint, uvNames[k]);
 					vertexOut.elements.push_back(UV);
 				}
