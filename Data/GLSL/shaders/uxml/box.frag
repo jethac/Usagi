@@ -51,7 +51,11 @@ void main(void)
 	vec4 b = boxData.go_vBorder;	// l t r b
 	float outer = RoundedRectDistance(p, vec2(0.0), boxData.go_vSize, boxData.go_vRadii);
 	vec4 innerRadii = max(boxData.go_vRadii - vec4(max(b.x, b.y), max(b.z, b.y), max(b.z, b.w), max(b.x, b.w)), vec4(0.0));
-	float inner = RoundedRectDistance(p, b.xy, boxData.go_vSize - b.zw, innerRadii);
+	// A side without a border pushes the inner edge out past the outer one,
+	// so its anti-aliasing does not leave a faint band of border colour
+	// (a two-sided border, as a chevron is drawn, stays clean).
+	vec4 inset = vec4(b.x > 0.0 ? b.x : -2.0, b.y > 0.0 ? b.y : -2.0, b.z > 0.0 ? b.z : -2.0, b.w > 0.0 ? b.w : -2.0);
+	float inner = RoundedRectDistance(p, inset.xy, boxData.go_vSize - inset.zw, innerRadii);
 
 	float aa = 0.75;
 	float outerCover = clamp(0.5 - outer / aa, 0.0, 1.0);
