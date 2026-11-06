@@ -418,7 +418,27 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	app_info.applicationVersion = 1;
 	app_info.pEngineName = "Usagi_Engine";
 	app_info.engineVersion = 1;
+	// The highest version we're written against. A Vulkan 1.0 loader (older
+	// Android) fails instance creation with VK_ERROR_INCOMPATIBLE_DRIVER for
+	// anything above 1.0, so never ask for more than the loader offers. A
+	// 1.1+ loader accepts any value; what each device can do is still capped
+	// by its own VkPhysicalDeviceProperties::apiVersion.
 	app_info.apiVersion = VK_API_VERSION_1_4;
+	{
+		// vkEnumerateInstanceVersion only exists from 1.1; a 1.0 loader
+		// doesn't export it, so look it up instead of linking to it
+		uint32 uInstanceVersion = VK_API_VERSION_1_0;
+		PFN_vkEnumerateInstanceVersion pfnEnumerateInstanceVersion =
+			(PFN_vkEnumerateInstanceVersion)vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion");
+		if (pfnEnumerateInstanceVersion && pfnEnumerateInstanceVersion(&uInstanceVersion) != VK_SUCCESS)
+		{
+			uInstanceVersion = VK_API_VERSION_1_0;
+		}
+		if (uInstanceVersion < VK_API_VERSION_1_1)
+		{
+			app_info.apiVersion = VK_API_VERSION_1_0;
+		}
+	}
 
 	vector<const char*> extensions;
 	const char* surfaceExtensions[VulkanWindow::MAX_SURFACE_EXTENSIONS];
@@ -763,9 +783,19 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	VkPhysicalDeviceLineRasterizationFeaturesEXT lineSupport = {};
 	lineSupport.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT;
 
-	supportedFeatures.pNext = &lineSupport;
-
-	vkGetPhysicalDeviceFeatures2(m_primaryPhysicalDevice, &supportedFeatures);
+	// vkGetPhysicalDeviceFeatures2 is core from 1.1, and only usable when both
+	// the instance and the device are 1.1+. A 1.0 device (older Android
+	// drivers) reports the core features only, without line rasterization.
+	const uint32 uDeviceVersion = Math::Min(app_info.apiVersion, m_deviceProperties[0].apiVersion);
+	if (uDeviceVersion >= VK_API_VERSION_1_1)
+	{
+		supportedFeatures.pNext = &lineSupport;
+		vkGetPhysicalDeviceFeatures2(m_primaryPhysicalDevice, &supportedFeatures);
+	}
+	else
+	{
+		vkGetPhysicalDeviceFeatures(m_primaryPhysicalDevice, &supportedFeatures.features);
+	}
 
 	FATAL_RELEASE(supportedFeatures.features.samplerAnisotropy, "No anisotropy");
 
