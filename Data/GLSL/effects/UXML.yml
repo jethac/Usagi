@@ -1,2 +1,10 @@
 Effects:
-  - { name: Box, vert: uxml/box, frag: uxml/box }
+  # SrgbBlend: drawn on the UNORM view of an sRGB display, so blending
+  # happens in sRGB space as UI is authored. Colours arrive sRGB-encoded
+  # and stay so; texture samples are encoded back to sRGB.
+  - name: Box
+    vert: uxml/box
+    frag: uxml/box
+    define_sets:
+      - name: SrgbBlend
+        defines: SRGB_BLEND=1

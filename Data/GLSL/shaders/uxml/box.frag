@@ -3,6 +3,7 @@
 // background (optionally textured) inside. Signed distances in pixels give
 // one pixel of anti-aliasing at any rotation.
 #include "../includes/platformdefines.inc"
+#include "../includes/colorspace.inc"
 
 in BoxData
 {
@@ -44,7 +45,12 @@ void main(void)
 	float outerCover = clamp(0.5 - outer / aa, 0.0, 1.0);
 	float innerCover = clamp(0.5 - inner / aa, 0.0, 1.0);
 
-	vec4 fill = boxData.go_vFill * texture(sampler0, boxData.go_vUV);
+	vec4 tex = texture(sampler0, boxData.go_vUV);
+#ifdef SRGB_BLEND
+	// An sRGB texture samples as linear; the target is sRGB-space.
+	tex.rgb = fromLinear(tex.rgb);
+#endif
+	vec4 fill = boxData.go_vFill * tex;
 	vec4 band = boxData.go_vBorderCol;
 	// Border band under the background, mixed pre-multiplied so a
 	// transparent border does not darken the edge.

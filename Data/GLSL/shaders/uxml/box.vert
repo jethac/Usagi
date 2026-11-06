@@ -39,7 +39,13 @@ void main(void)
 	boxData.go_vRadii = ao_radii;
 	boxData.go_vBorder = ao_border;
 	boxData.go_vUV = mix(uv.xy, uv.zw, t);
+#ifdef SRGB_BLEND
+	// The target stores what we write: keep the authored sRGB colours.
+	boxData.go_vFill = ao_fill;
+	boxData.go_vBorderCol = ao_borderCol;
+#else
 	boxData.go_vFill = vec4(toLinear(ao_fill.rgb), ao_fill.a);
 	boxData.go_vBorderCol = vec4(toLinear(ao_borderCol.rgb), ao_borderCol.a);
+#endif
 	gl_Position = vec4(ao_rect.xy + vLocal, 0.0, 1.0) * proj;
 }
