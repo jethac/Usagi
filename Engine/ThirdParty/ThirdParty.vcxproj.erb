@@ -49,6 +49,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile />
       <TreatWarningAsError>false</TreatWarningAsError>
+      <!-- Box3D is C17 -->
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
       <ExceptionHandling>Sync</ExceptionHandling>
       <CPPExceptions Condition="'$(Platform)'=='NX64'">true</CPPExceptions>
     </ClCompile>
@@ -129,7 +131,14 @@
 <% end %>
 
 <% for @src in sources %>
+<% if @src.tr('\\', '/').end_with?('box3d/src/wide8.c') %>
+    <!-- Box3D's 8-wide solver paths; picked at run time when the CPU has AVX2 -->
+    <ClCompile Include="..\..\..\..\<%= project_dir + @src %>">
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
+<% else %>
     <ClCompile Include="..\..\..\..\<%= project_dir + @src %>" />
+<% end %>
 <% end %>
   </ItemGroup>
   <ItemGroup>
