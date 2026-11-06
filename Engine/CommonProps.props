@@ -15,6 +15,13 @@
     <IntDir>$(USAGI_DIR)\_build\$(PlatformName)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup>
+    <!-- Add-on module projects (Engine/<Name>, see Tools/ruby/usagi_modules.rb) are
+         referenced by games but are not in the game's .sln. MSBuild would build such a
+         reference in its default configuration (Debug) and a Release game would then fail
+         to link with LNK2038. Pass the referencing project's configuration down instead. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+  </PropertyGroup>
+  <PropertyGroup>
     <!-- We need to set this to true to ensure that our custom build rules are run. -->
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <IncludePath>$(VULKAN_SDK)\Include;$(DXSDK_DIR)Include;$(GHS_ROOT)\ansi;$(GHS_ROOT)\scxx;$(USAGI_DIR);$(USAGI_DIR)\_build\win\$(Configuration);$(USAGI_DIR)\_includes;$(USAGI_DIR)\Engine\ThirdParty\nanopb;$(USAGI_DIR)\Engine\ThirdParty\gli;$(USAGI_DIR)\_includes;$(USAGI_DIR)\Engine\ThirdParty\khronos;$(USAGI_DIR)\Engine\ThirdParty\glew\include;$(GHS_ROOT)\include\ppc;$(USAGI_STL_INCLUDE);$(USAGI_EABASE_INCLUDE);$(USAGI_PHYSICS_INCLUDE);$(IncludePath)</IncludePath>
