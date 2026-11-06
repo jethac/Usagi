@@ -119,8 +119,13 @@ namespace SDLUTIL
 			return nullptr;
 		}
 
-		// Text input events are the equivalent of WM_CHAR
-		SDL_StartTextInput(hndl);
+		// Text input events are the equivalent of WM_CHAR. Where the keyboard
+		// is on screen (phones), starting text input would bring it up, so
+		// it's left to whatever asks for text
+		if (!SDL_HasScreenKeyboardSupport())
+		{
+			SDL_StartTextInput(hndl);
+		}
 
 		SetWindow(hndl);
 		return hndl;
@@ -210,16 +215,111 @@ namespace SDLUTIL
 		}
 	}
 
+	static void RegisterFinger(const SDL_TouchFingerEvent& finger)
+	{
+		usg::TouchGamepad& pad = usg::Input::GetPlatform().GetTouchGamepad();
+		if (finger.type == SDL_EVENT_FINGER_DOWN)
+		{
+			int iWidth = 0, iHeight = 0;
+			if (g_wndHndl && SDL_GetWindowSize(g_wndHndl, &iWidth, &iHeight) && iHeight > 0)
+			{
+				pad.SetAspectRatio((float)iWidth / (float)iHeight);
+			}
+			pad.RegisterFingerDown(finger.fingerID, finger.x, finger.y);
+		}
+		else if (finger.type == SDL_EVENT_FINGER_MOTION)
+		{
+			pad.RegisterFingerMotion(finger.fingerID, finger.x, finger.y);
+		}
+		else
+		{
+			pad.RegisterFingerUp(finger.fingerID);
+		}
+	}
+
+	// Mobile lifecycle. iOS and Android may suspend the process as soon as
+	// the application leaves the foreground, and submitting GPU work in the
+	// background gets it killed, so rendering stops (and the GPU drains)
+	// when it is about to go, from an event watch, which SDL calls
+	// synchronously from the OS notification
+	static bool g_bInBackground = false;
+
+	static bool SDLCALL LifecycleWatch(void* pUserData, SDL_Event* pEvent)
+	{
+		if (pEvent->type == SDL_EVENT_WILL_ENTER_BACKGROUND && !g_bInBackground)
+		{
+			g_bInBackground = true;
+			usg::GFX::SetFocus(false);
+			usg::Input::GetPlatform().GetTouchGamepad().ReleaseAll();
+			usg::GameMessage('WMIN', nullptr);
+		}
+		return true;
+	}
+
+	static void EnterForeground()
+	{
+		if (g_bInBackground)
+		{
+			g_bInBackground = false;
+			usg::GFX::SetFocus(true);
+			// The surface may have been lost or resized while away
+			usg::GameMessage('ONSZ', nullptr);
+			usg::GameMessage('WSZE', nullptr);
+		}
+	}
+
 	void PumpEvents()
 	{
-		SDL_Event event;
-		while (SDL_PollEvent(&event))
+		static bool s_bWatching = false;
+		if (!s_bWatching)
 		{
+			SDL_AddEventWatch(LifecycleWatch, nullptr);
+			s_bWatching = true;
+		}
+
+		SDL_Event event;
+		for (;;)
+		{
+			// While in the background the game is paused: wait for events
+			// rather than spinning the update loop
+			if (g_bInBackground)
+			{
+				if (!SDL_WaitEvent(&event))
+				{
+					return;
+				}
+			}
+			else if (!SDL_PollEvent(&event))
+			{
+				break;
+			}
+
 			switch (event.type)
 			{
 			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			case SDL_EVENT_TERMINATING:
 				usg::GameExit();
+				if (g_bInBackground)
+				{
+					return;
+				}
+				break;
+
+			case SDL_EVENT_WILL_ENTER_FOREGROUND:
+			case SDL_EVENT_DID_ENTER_FOREGROUND:
+				EnterForeground();
+				break;
+
+			case SDL_EVENT_LOW_MEMORY:
+				DEBUG_PRINT("SDL: the OS reports low memory\n");
+				break;
+
+			case SDL_EVENT_FINGER_DOWN:
+			case SDL_EVENT_FINGER_MOTION:
+			case SDL_EVENT_FINGER_UP:
+			case SDL_EVENT_FINGER_CANCELED:
+				RegisterFinger(event.tfinger);
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
