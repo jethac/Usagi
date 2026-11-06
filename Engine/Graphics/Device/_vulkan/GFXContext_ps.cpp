@@ -416,6 +416,11 @@ namespace usg {
 		vkCmdDraw(m_cmdBuff, uVertCount, 1, uOffset, 0);
 	}
 
+	void GFXContext_ps::DrawInstanced(uint32 uVertCount, uint32 uInstanceCount, uint32 uFirstInstance)
+	{
+		vkCmdDraw(m_cmdBuff, uVertCount, uInstanceCount, 0, uFirstInstance);
+	}
+
 	void GFXContext_ps::DrawIndexed(const IndexBuffer* pBuffer, uint32 uStartIndex, uint32 uIndexCount, uint32 uInstances)
 	{
 		const IndexBuffer_ps& ibPS = pBuffer->GetPlatform();

@@ -55,8 +55,8 @@ enum PrimitiveType
 	PT_LINES_ADJ,
 	PT_LINE_STRIP,
 	PT_PATCH_LIST,
+	PT_TRIANGLE_STRIP,
 	PT_COUNT
-	//PT_TRIANGLESTRIPS,
 };
 
 
@@ -338,6 +338,8 @@ struct GFXBounds
 struct GPUCapabilities
 {
 	bool	bHasLineSmooth;
+	// Metal (MoltenVK) has no geometry shaders, nor do some mobile GPUs
+	bool	bHasGeometryShaders;
 	uint32	maxPushConstantsSize;
 	uint32	maxTessellationGenerationLevel;
 	uint32	maxTessellationPatchSize;

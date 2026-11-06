@@ -380,6 +380,23 @@ void GFXContext::DrawImmediate(uint32 uCount, uint32 uOffset)
 	m_platform.DrawImmediate(uCount, uOffset);
 }
 
+void GFXContext::DrawInstanced(uint32 uVertCount, uint32 uInstanceCount, uint32 uFirstInstance)
+{
+	if (uInstanceCount == 0)
+	{
+		return;
+	}
+	if (m_uDirtyDescSetFlags)
+	{
+#if CONFIRM_PIPELINE_VALIDITY
+		ValidateDescriptors();
+#endif
+		m_platform.UpdateDescriptors(m_activeStateGroup, m_pActiveDescSets, m_uDirtyDescSetFlags);
+		m_uDirtyDescSetFlags = 0;
+	}
+	m_platform.DrawInstanced(uVertCount, uInstanceCount, uFirstInstance);
+}
+
 
 void GFXContext::Cleanup(GFXDevice* pDevice)
 {
