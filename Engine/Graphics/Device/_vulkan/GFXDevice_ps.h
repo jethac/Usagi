@@ -106,6 +106,9 @@ namespace usg {
 
 		const VkPhysicalDeviceFeatures& GetEnabledFeatures() const { return m_enabledFeatures; }
 		bool HasLineSmooth() const { return m_bHasLineSmooth; }
+		// VK_KHR_swapchain_mutable_format: the display can also be viewed as
+		// UNORM (sRGB-space blending for 2D UI).
+		bool HasSwapchainMutableFormat() const { return m_bSwapchainMutableFormat; }
 		bool IsMultiThreaded() const { return m_queue[QUEUE_TYPE_GRAPHICS] != m_queue[QUEUE_TYPE_TRANSFER]; }
 
 		const GPUCapabilities& GetCaps() const { return m_deviceCaps; }
@@ -216,6 +219,7 @@ namespace usg {
 
 		float								m_fGPUTime;
 		bool								m_bHasLineSmooth;
+		bool								m_bSwapchainMutableFormat;
 		memsize								m_uMemSize;
 
 		GPUCapabilities						m_deviceCaps;
