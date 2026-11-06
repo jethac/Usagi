@@ -14,6 +14,7 @@
 #include HID_HEADER(Engine/HID, Keyboard_ps.h)
 #include HID_HEADER(Engine/HID, Mouse_ps.h)
 #include HID_HEADER(Engine/HID, SDLGamepad.h)
+#include HID_HEADER(Engine/HID, TouchGamepad.h)
 
 namespace usg{
 
@@ -42,6 +43,7 @@ public:
 	void		RegisterInputChar(char16 uChar);
 	void		RegisterDeviceChange();
 	void		RegisterGamepad(IGamepad* pGamepad);
+	TouchGamepad& GetTouchGamepad() { return m_touchGamepad; }
 
 	bool		GetMouseButtonDown(uint32 uButton) const;
 	long		GetMouseWheel() const { return m_mouseWheel; }
@@ -63,6 +65,7 @@ private:
 	Keyboard_ps		m_keyboard;
 
 	SDLGamepad		m_sdlPads[MAX_SDL_PADS];
+	TouchGamepad	m_touchGamepad;
 	IGamepad*		m_pExternalPads[MAX_EXTERNAL_PADS];
 	uint32			m_uExternalPads;
 

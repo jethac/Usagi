@@ -42,6 +42,12 @@ void Input_ps::GetActiveGamepads(usg::vector<IGamepad*>& gamepads)
 		}
 	}
 
+	// After real controllers, which take over when one is connected
+	if (m_touchGamepad.IsConnected())
+	{
+		gamepads.push_back(&m_touchGamepad);
+	}
+
 	if (m_virtualGamepad.IsConnected())
 	{
 		gamepads.push_back(&m_virtualGamepad);
@@ -53,6 +59,16 @@ void Input_ps::Init()
 	m_mouse.Init(this);
 	m_keyboard.Init(this);
 	m_virtualGamepad.Init(&m_keyboard);
+
+	// Phones and tablets are played on their touch screens. Elsewhere a
+	// touch screen is usually something else (the Livingroom table is
+	// driven by phones), so the on-screen pad is opt-in: USAGI_TOUCH_PAD=1
+#if defined(PLATFORM_IOS) || defined(PLATFORM_ANDROID)
+	m_touchGamepad.SetEnabled(true);
+#else
+	const char* szTouch = SDL_getenv("USAGI_TOUCH_PAD");
+	m_touchGamepad.SetEnabled(szTouch && szTouch[0] == '1');
+#endif
 	RegisterDeviceChange();
 }
 
