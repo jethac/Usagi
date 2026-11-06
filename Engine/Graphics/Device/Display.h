@@ -59,6 +59,19 @@ public:
 	void SetVSyncMode(VSyncMode eVsync) { m_platform.SetVSyncMode(eVsync); }
 	bool HasHDRSupport() const { return m_platform.HasHDRSupport(); }
 
+	// sRGB-space blending for 2D UI: a UNORM view of the sRGB display. What
+	// a shader writes is stored as is, so colours authored in sRGB blend as
+	// CSS, Unity's editor and Godot's canvas blend them, with no extra target
+	// or composite pass. Drawing on the sRGB view blends in linear space,
+	// which lifts translucent dark panels over a bright scene.
+	// Available when the device has VK_KHR_swapchain_mutable_format and the
+	// swapchain is sRGB. While set, RenderToDisplay begins the UNORM pass
+	// (after a transfer to the display); pipelines must be created against
+	// GetSrgbBlendRenderPass().
+	bool HasSrgbBlendTarget() const { return m_platform.HasSrgbBlendTarget(); }
+	const RenderPassHndl& GetSrgbBlendRenderPass() { return m_platform.GetSrgbBlendRenderPass(); }
+	void SetSrgbBlendTarget(bool bEnable) { m_platform.SetSrgbBlendTarget(bEnable); }
+
 	Display_ps& GetPlatform() { return m_platform; }
 	WindHndl GetHandle() const { return m_window; }
 

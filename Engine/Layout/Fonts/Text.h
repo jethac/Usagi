@@ -38,6 +38,8 @@ namespace usg
 		bool SetAlign(unsigned int flags);
 		bool SetWidthLimit(float limit);
 		bool SetLineSpacing(float spacing);
+		// Extra advance after every character, in the units the text is
+		// positioned in (added to the font's own spacing; may be negative).
 		bool SetCharSpacing(float spacing);
 		bool SetScale(Vector2f scale);
 		bool SetTabWidth(int tabWidth);

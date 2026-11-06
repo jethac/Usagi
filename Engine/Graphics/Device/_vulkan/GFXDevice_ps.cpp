@@ -238,6 +238,7 @@ GFXDevice_ps::GFXDevice_ps()
 	m_uDisplayCount = 0;
 	m_fGPUTime = 0.0f;
 	m_bHasLineSmooth = false;
+	m_bSwapchainMutableFormat = false;
 	m_uMemSize = 0;
 
 }
@@ -853,6 +854,14 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	if (HasDeviceExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME))
 	{
 		extensions.push_back(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+	}
+	// Lets the display give 2D UI a UNORM view of the sRGB swapchain, so UI
+	// blends in sRGB space as it was authored, with no extra target (needs
+	// VK_KHR_image_format_list and maintenance2, core in Vulkan 1.2).
+	m_bSwapchainMutableFormat = HasDeviceExtension(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME);
+	if (m_bSwapchainMutableFormat)
+	{
+		extensions.push_back(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME);
 	}
 	// A portability implementation (MoltenVK) that advertises this must have
 	// it enabled; it reports what the device can't do in

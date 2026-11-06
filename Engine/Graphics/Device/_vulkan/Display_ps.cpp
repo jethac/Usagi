@@ -47,6 +47,12 @@ Display_ps::Display_ps()
 	m_uSwapChainImageCount = 0;
 	m_bWindowResized = false;
 	m_bRTShouldLoad = false;
+	m_pFramebuffersSrgbBlend = nullptr;
+	m_pSwapchainBlendViews = nullptr;
+	m_blendViewFormat = VK_FORMAT_UNDEFINED;
+	m_eBlendViewFormat = ColorFormat::RGBA_8888;
+	m_bSrgbBlendView = false;
+	m_bUseSrgbBlend = false;
 	m_eColorCorrect = ColorCorrection::None;
 	m_bHDR = false;
 	m_eVsync = VSYNC_MODE_MAILBOX;
@@ -63,12 +69,22 @@ void Display_ps::DestroySwapChain(GFXDevice* pDevice)
 			vkDestroyFramebuffer(pDevice->GetPlatform().GetVKDevice(), m_pFramebuffersNoCopy[i], nullptr);
 			m_pFramebuffers[i] = VK_NULL_HANDLE;
 			m_pFramebuffersNoCopy[i] = VK_NULL_HANDLE;
+			if (m_pFramebuffersSrgbBlend)
+			{
+				vkDestroyFramebuffer(pDevice->GetPlatform().GetVKDevice(), m_pFramebuffersSrgbBlend[i], nullptr);
+				m_pFramebuffersSrgbBlend[i] = VK_NULL_HANDLE;
+			}
 		}
 
 		for (uint32_t i = 0; i < m_uSwapChainImageCount; i++)
 		{
 			vkDestroyImageView(pDevice->GetPlatform().GetVKDevice(), m_pSwapchainImageViews[i], nullptr);
 			m_pSwapchainImageViews[i] = VK_NULL_HANDLE;
+			if (m_pSwapchainBlendViews)
+			{
+				vkDestroyImageView(pDevice->GetPlatform().GetVKDevice(), m_pSwapchainBlendViews[i], nullptr);
+				m_pSwapchainBlendViews[i] = VK_NULL_HANDLE;
+			}
 		}
 
 
@@ -76,6 +92,10 @@ void Display_ps::DestroySwapChain(GFXDevice* pDevice)
 		vdelete[] m_pSwapchainImageViews;
 		vdelete[] m_pFramebuffers;
 		vdelete[] m_pFramebuffersNoCopy;
+		vdelete[] m_pSwapchainBlendViews;
+		vdelete[] m_pFramebuffersSrgbBlend;
+		m_pSwapchainBlendViews = nullptr;
+		m_pFramebuffersSrgbBlend = nullptr;
 
 		vkDestroySwapchainKHR(pDevice->GetPlatform().GetVKDevice(), m_swapChain, nullptr);
 		m_swapChain = VK_NULL_HANDLE;
@@ -195,6 +215,12 @@ void Display_ps::Initialise(usg::GFXDevice* pDevice, WindHndl hndl)
 	attach.eLoadOp = usg::RenderPassDecl::LOAD_OP_LOAD_MEMORY;
 	attach.eInitialLayout = usg::RenderPassDecl::LAYOUT_PRESENT_SRC;
 	m_postCopyRenderPass = pDevice->GetRenderPass(rpDecl);
+
+	if (m_bSrgbBlendView)
+	{
+		attach.format.eColor = m_eBlendViewFormat;
+		m_srgbBlendRenderPass = pDevice->GetRenderPass(rpDecl);
+	}
 
 	InitFrameBuffers(pDevice);
 }
@@ -441,6 +467,27 @@ void Display_ps::CreateSwapChain(GFXDevice* pDevice)
 	swap_chain.queueFamilyIndexCount = 0;
 	swap_chain.pQueueFamilyIndices = NULL;
 
+	// The UNORM counterpart of an sRGB swapchain format, for the sRGB-blend
+	// view (VK_KHR_swapchain_mutable_format).
+	VkFormat viewFormats[2] = { eFormat, VK_FORMAT_UNDEFINED };
+	m_bSrgbBlendView = false;
+	if (devicePS.HasSwapchainMutableFormat() && !m_bHDR)
+	{
+		if (eFormat == VK_FORMAT_B8G8R8A8_SRGB) { viewFormats[1] = VK_FORMAT_B8G8R8A8_UNORM; m_eBlendViewFormat = ColorFormat::RGBA_8888; }
+		else if (eFormat == VK_FORMAT_R8G8B8A8_SRGB) { viewFormats[1] = VK_FORMAT_R8G8B8A8_UNORM; m_eBlendViewFormat = ColorFormat::RGBA_8888_SWP; }
+	}
+	VkImageFormatListCreateInfo formatList = {};
+	if (viewFormats[1] != VK_FORMAT_UNDEFINED)
+	{
+		formatList.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
+		formatList.viewFormatCount = 2;
+		formatList.pViewFormats = viewFormats;
+		swap_chain.pNext = &formatList;
+		swap_chain.flags = VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR;
+		m_blendViewFormat = viewFormats[1];
+		m_bSrgbBlendView = true;
+	}
+
 	res = vkCreateSwapchainKHR(devicePS.GetVKDevice(), &swap_chain, nullptr, &m_swapChain);
 	ASSERT(res == VK_SUCCESS);
 
@@ -518,6 +565,17 @@ void Display_ps::CreateSwapChainImageViews(GFXDevice* pDevice)
 
 		VkResult res = vkCreateImageView(pDevice->GetPlatform().GetVKDevice(), &color_image_view, nullptr, &m_pSwapchainImageViews[i]);
 		ASSERT(res == VK_SUCCESS);
+
+		if (m_bSrgbBlendView)
+		{
+			if (!m_pSwapchainBlendViews)
+			{
+				m_pSwapchainBlendViews = vnew(ALLOC_GFX_RENDER_TARGET) VkImageView[m_uSwapChainImageCount];
+			}
+			color_image_view.format = m_blendViewFormat;
+			res = vkCreateImageView(pDevice->GetPlatform().GetVKDevice(), &color_image_view, nullptr, &m_pSwapchainBlendViews[i]);
+			ASSERT(res == VK_SUCCESS);
+		}
 	}
 }
 
@@ -526,7 +584,13 @@ void Display_ps::SetAsTarget(VkCommandBuffer& cmd)
 	VkRenderPassBeginInfo rp_begin;
 	rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	rp_begin.pNext = NULL;
-	if (m_bRTShouldLoad)
+	if (m_bRTShouldLoad && m_bUseSrgbBlend && m_bSrgbBlendView)
+	{
+		// The UNORM view of the transferred image: sRGB-space blending.
+		rp_begin.renderPass = m_srgbBlendRenderPass.GetContents()->GetPass();
+		rp_begin.framebuffer = m_pFramebuffersSrgbBlend[m_uActiveImage];
+	}
+	else if (m_bRTShouldLoad)
 	{
 		rp_begin.renderPass = m_postCopyRenderPass.GetContents()->GetPass();
 		rp_begin.framebuffer = m_pFramebuffers[m_uActiveImage];
@@ -589,6 +653,17 @@ void Display_ps::InitFrameBuffers(GFXDevice* pDevice)
 		res = vkCreateFramebuffer(pDevice->GetPlatform().GetVKDevice(), &fb_info, NULL, &m_pFramebuffers[i]);
 		fb_info.renderPass = m_directRenderPass.GetContents()->GetPass();
 		res = vkCreateFramebuffer(pDevice->GetPlatform().GetVKDevice(), &fb_info, NULL, &m_pFramebuffersNoCopy[i]);
+		if (m_bSrgbBlendView)
+		{
+			if (!m_pFramebuffersSrgbBlend)
+			{
+				m_pFramebuffersSrgbBlend = vnew(ALLOC_GFX_RENDER_TARGET) VkFramebuffer[m_uSwapChainImageCount];
+			}
+			attachments[0] = m_pSwapchainBlendViews[i];
+			fb_info.renderPass = m_srgbBlendRenderPass.GetContents()->GetPass();
+			res = vkCreateFramebuffer(pDevice->GetPlatform().GetVKDevice(), &fb_info, NULL, &m_pFramebuffersSrgbBlend[i]);
+			ASSERT(res == VK_SUCCESS);
+		}
 
 		ASSERT(res == VK_SUCCESS);
 	}

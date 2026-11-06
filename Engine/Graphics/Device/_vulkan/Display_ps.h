@@ -40,6 +40,9 @@ public:
 	VkSemaphore& GetImageAcquired() { return m_imageAcquired; }
 	VkImage GetActiveImage() const { return m_pSwapchainImages[m_uActiveImage]; }
 	bool HasHDRSupport() const { return m_bHDR; }
+	bool HasSrgbBlendTarget() const { return m_bSrgbBlendView; }
+	const RenderPassHndl& GetSrgbBlendRenderPass() { return m_bSrgbBlendView ? m_srgbBlendRenderPass : m_directRenderPass; }
+	void SetSrgbBlendTarget(bool bEnable) { m_bUseSrgbBlend = bEnable; }
 	ColorCorrection GetRequiredColorCorrection() const { return m_eColorCorrect; }
 
 private:
@@ -59,6 +62,13 @@ private:
 
 	usg::RenderPassHndl	m_directRenderPass;
 	usg::RenderPassHndl	m_postCopyRenderPass;
+	usg::RenderPassHndl	m_srgbBlendRenderPass;		// UNORM view, loads the transferred image
+	VkFramebuffer*		m_pFramebuffersSrgbBlend;
+	VkImageView*		m_pSwapchainBlendViews;		// UNORM views of the sRGB images
+	VkFormat			m_blendViewFormat;
+	ColorFormat			m_eBlendViewFormat;
+	bool				m_bSrgbBlendView;
+	bool				m_bUseSrgbBlend;
 	VkFramebuffer*		m_pFramebuffers;
 	VkFramebuffer*		m_pFramebuffersNoCopy;
 	VSyncMode			m_eVsync;

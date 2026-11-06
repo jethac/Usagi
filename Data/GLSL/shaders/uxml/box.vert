@@ -9,9 +9,11 @@
 layout (location = 0) in vec4 ao_rect;		// x, y, width, height (panel pixels)
 layout (location = 1) in vec4 ao_radii;		// top-left, top-right, bottom-right, bottom-left
 layout (location = 2) in vec4 ao_border;	// left, top, right, bottom
-layout (location = 3) in vec4 ao_uv;		// u0, v0, u1, v1
+layout (location = 3) in vec4 ao_uv;		// u0, v0, u1, v1; 9-slice: the slices in UV (l, t, r, b)
 layout (location = 4) in vec4 ao_fill;		// background, opacity applied
 layout (location = 5) in vec4 ao_borderCol;
+layout (location = 6) in vec4 ao_slice;		// 9-slice: the slices on screen in pixels (l, t, r, b); 0 = not sliced
+layout (location = 7) in vec2 ao_axis;		// the box's x axis (cos, sin): it turns about its top-left corner
 
 out BoxData
 {
@@ -22,6 +24,8 @@ out BoxData
 	INT_LOC(4) vec2 go_vUV;
 	INT_LOC(5) vec4 go_vFill;
 	INT_LOC(6) vec4 go_vBorderCol;
+	INT_LOC(7) vec4 go_vSlice;
+	INT_LOC(8) vec4 go_vSliceUV;
 } boxData;
 
 void main(void)
@@ -39,7 +43,16 @@ void main(void)
 	boxData.go_vRadii = ao_radii;
 	boxData.go_vBorder = ao_border;
 	boxData.go_vUV = mix(uv.xy, uv.zw, t);
+	boxData.go_vSlice = ao_slice;
+	boxData.go_vSliceUV = ao_uv;
+#ifdef SRGB_BLEND
+	// The target stores what we write: keep the authored sRGB colours.
+	boxData.go_vFill = ao_fill;
+	boxData.go_vBorderCol = ao_borderCol;
+#else
 	boxData.go_vFill = vec4(toLinear(ao_fill.rgb), ao_fill.a);
 	boxData.go_vBorderCol = vec4(toLinear(ao_borderCol.rgb), ao_borderCol.a);
-	gl_Position = vec4(ao_rect.xy + vLocal, 0.0, 1.0) * proj;
+#endif
+	vec2 vTurned = vec2(ao_axis.x * vLocal.x - ao_axis.y * vLocal.y, ao_axis.y * vLocal.x + ao_axis.x * vLocal.y);
+	gl_Position = vec4(ao_rect.xy + vTurned, 0.0, 1.0) * proj;
 }
