@@ -133,6 +133,13 @@ namespace usg {
 			attach.eAttachType = RenderPassDecl::ATTACH_COLOR;
 			attach.eLoadOp = GetLoadOp(uFlag, flags.uLoadFlags, flags.uClearFlags);
 			attach.eInitialLayout = attach.eLoadOp == RenderPassDecl::LOAD_OP_LOAD_MEMORY ? RenderPassDecl::LAYOUT_COLOR_ATTACHMENT : RenderPassDecl::LAYOUT_UNDEFINED;
+			// A target that is loaded and also read by shaders between passes (one
+			// drawn into incrementally and sampled each frame) comes back in the
+			// layout this pass leaves it in. Its first pass must clear instead.
+			if (attach.eLoadOp == RenderPassDecl::LOAD_OP_LOAD_MEMORY && (flags.uShaderReadFlags & uFlag))
+			{
+				attach.eInitialLayout = RenderPassDecl::LAYOUT_SHADER_READ_ONLY;
+			}
 			attach.eStoreOp = flags.uStoreFlags & uFlag ? RenderPassDecl::STORE_OP_STORE : RenderPassDecl::STORE_OP_DONT_CARE;
 			attach.format.eColor = m_pColorBuffer[i]->GetFormat();
 			if (flags.uShaderReadFlags & uFlag)
