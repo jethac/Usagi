@@ -98,9 +98,11 @@ The build process has not been improved or significantly modified and currently 
    **OR**  
    [Create a new one](https://github.com/vitei/Usagi/wiki/Creating-a-New-Project)  
 
-1. **Optional** Install the **FBX SDK 2020.3.1 VS2019**.  
-   Not necessary to run, but required to build the model converter (Ayataka)
-   https://www.autodesk.com/products/fbx/overview
+1. **Optional** Build the model converter, **fbx-to-vmdf** (the `Tools/Source/fbx-to-vmdf`
+   submodule; no FBX SDK needed). From a VS developer prompt at the engine root:  
+   `cmake -S Tools\Source\fbx-to-vmdf -B _build\tools\win\fbx-to-vmdf -G "Visual Studio 17 2022" -A x64`  
+   `cmake --build _build\tools\win\fbx-to-vmdf --config Release --target fbx-to-vmdf`  
+   `copy _build\tools\win\fbx-to-vmdf\Release\fbx-to-vmdf.exe Tools\bin\`
 
 1. **Optional** Install and build the **Oculus SDK for Windows**.  
    Not necessary to run, but required if you want to make a VR app  

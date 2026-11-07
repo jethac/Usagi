@@ -5,8 +5,9 @@
 #
 # Builds the data-cooking tools natively on Linux (x86_64) with clang:
 #
-#   Ayataka       FBX -> .vmdf models, skeletons, custom effects, animations
-#   PakFileGen    textures (Compressonator), audio, layout and model .paks
+#   fbx-to-vmdf   FBX -> .vmdf models and skeleton XML, effect .yml -> .cfx
+#                 (the Tools/Source/fbx-to-vmdf submodule, built with its CMake)
+#   PakFileGen    textures (Compressonator), audio and layout .paks
 #   ShaderPackage effect .yml -> shader .pak (GLSL -> SPIR-V via libshaderc)
 #   FontCreator   font .yml -> MSDF font texture + .vpb
 #
@@ -14,23 +15,20 @@
 # writes <engine>/_build/tools/linux/build.ninja and runs ninja on it. Pass
 # tool names to build only those (default: all four).
 #
-# The tools link the engine's own libraries, so the engine must have been
-# generated and built for Linux first, in the configuration given by
-# ENGINE_BUILD (rake platform=linux build=release ninja && ninja ... libs).
+# The tools other than fbx-to-vmdf link the engine's own libraries, so the
+# engine must have been generated and built for Linux first, in the
+# configuration given by ENGINE_BUILD (rake platform=linux build=release
+# ninja && ninja ... libs). fbx-to-vmdf is self-contained.
 #
 # Environment:
 #   JOBS               ninja parallelism (default 4); run the script itself
 #                      under nice to keep it polite, the compilers inherit it
 #   ENGINE_BUILD       engine library configuration to link (default release)
 #   CC, CXX            compilers (default clang, clang++)
-#   FBXSDK_DIR         Autodesk FBX SDK for Linux (default ~/.local/opt/fbxsdk),
-#                      needed by Ayataka and by PakFileGen's model paks. Without
-#                      it Ayataka is skipped and PakFileGen is built without
-#                      FBX support (model paks then fail with a clear error).
 #   COMPRESSONATOR_DIR Compressonator source (default: the engine submodule if
 #                      checked out, else fetched once at the pinned commit into
 #                      <engine>/_build/tools/linux/src/compressonator)
-#   CMAKE              cmake for Compressonator (default: PATH, then
+#   CMAKE              cmake for Compressonator and fbx-to-vmdf (default: PATH, then
 #                      ~/.local/opt/usagi-buildtools/bin/cmake)
 #
 # Host packages (Arch names): clang, ninja, cmake, freetype2, shaderc, sdl3,
@@ -42,9 +40,8 @@ JOBS=${JOBS:-4}
 ENGINE_BUILD=${ENGINE_BUILD:-release}
 CC=${CC:-clang}
 CXX=${CXX:-clang++}
-FBXSDK_DIR=${FBXSDK_DIR:-$HOME/.local/opt/fbxsdk}
 OUT=$ENGINE/_build/tools/linux
-TOOLS=${*:-Ayataka PakFileGen ShaderPackage FontCreator}
+TOOLS=${*:-fbx-to-vmdf PakFileGen ShaderPackage FontCreator}
 
 # The engine submodule pin (Engine/ThirdParty/compressonator)
 CMP_COMMIT=f4b53d79ec5abbb50924f58aebb7bf2793200b94
@@ -52,25 +49,35 @@ CMP_URL=https://github.com/GPUOpen-Tools/compressonator.git
 
 die() { echo "build_linux_tools: $*" >&2; exit 1; }
 
+CMAKE=${CMAKE:-$(command -v cmake || echo "$HOME/.local/opt/usagi-buildtools/bin/cmake")}
+
+#####################################################################
+# fbx-to-vmdf (FBX -> .vmdf), the Tools/Source/fbx-to-vmdf submodule #
+# built with its own CMake; it needs nothing from the engine         #
+#####################################################################
+case " $TOOLS " in
+*" fbx-to-vmdf "*)
+  F2V=$ENGINE/Tools/Source/fbx-to-vmdf
+  [ -f "$F2V/CMakeLists.txt" ] || die "no fbx-to-vmdf source in $F2V: git submodule update --init Tools/Source/fbx-to-vmdf"
+  [ -x "$CMAKE" ] || die "cmake not found (set CMAKE)"
+  F2VB=$ENGINE/_build/tools/linux/fbx-to-vmdf
+  mkdir -p "$F2VB" "$ENGINE/_build/tools/linux/bin"
+  if [ ! -f "$F2VB/build.ninja" ]; then
+    (cd "$F2VB" && CC=$CC CXX=$CXX "$CMAKE" -G Ninja -DCMAKE_MAKE_PROGRAM="$(command -v ninja)" \
+      -DCMAKE_BUILD_TYPE=Release "$F2V" > cmake.log 2>&1) || die "fbx-to-vmdf cmake failed, see $F2VB/cmake.log"
+  fi
+  ninja -C "$F2VB" -j "$JOBS" fbx-to-vmdf > "$F2VB/build.log" 2>&1 || die "fbx-to-vmdf build failed, see $F2VB/build.log"
+  cp "$F2VB/fbx-to-vmdf" "$ENGINE/_build/tools/linux/bin/fbx-to-vmdf.new"
+  mv -f "$ENGINE/_build/tools/linux/bin/fbx-to-vmdf.new" "$ENGINE/_build/tools/linux/bin/fbx-to-vmdf"
+  echo "build_linux_tools: built fbx-to-vmdf in $ENGINE/_build/tools/linux/bin"
+  TOOLS=$(echo " $TOOLS " | sed 's/ fbx-to-vmdf / /g')
+  ;;
+esac
+[ -n "$(echo $TOOLS)" ] || exit 0
+
 LIBDIR=$ENGINE/_libs/linux/$ENGINE_BUILD
 [ -f "$LIBDIR/Core.a" ] || die "no engine libraries in $LIBDIR: build the engine (rake platform=linux build=$ENGINE_BUILD ninja; ninja -f _build/linux/$ENGINE_BUILD/build.ninja libs) first"
 [ -d "$ENGINE/_includes/Engine" ] || die "no generated headers in $ENGINE/_includes: run the engine codegen first"
-
-HAVE_FBX=
-if [ -f "$FBXSDK_DIR/include/fbxsdk.h" ]; then
-  HAVE_FBX=1
-  FBX_LIBDIR=$FBXSDK_DIR/lib/release
-  [ -d "$FBX_LIBDIR" ] || FBX_LIBDIR=$(ls -d "$FBXSDK_DIR"/lib/*/x64/release "$FBXSDK_DIR"/lib/*/release 2>/dev/null | head -1)
-  [ -f "$FBX_LIBDIR/libfbxsdk.so" ] || die "FBX SDK at $FBXSDK_DIR has no lib/.../release/libfbxsdk.so"
-  # libfbxsdk.so 2020.3.9 links libxml2.so.2 with versioned symbols (LIBXML2_2.x),
-  # which libxml2 2.14+ (soname .so.16) dropped. Arch etc. no longer ship .so.2, so
-  # build libxml2 2.13 into LIBXML2_LEGACY_DIR (no root) and link against that.
-  LIBXML2_LEGACY_DIR=${LIBXML2_LEGACY_DIR:-$HOME/.local/opt/libxml2-legacy}
-  XML2_LIBS="-lxml2"
-  if [ -f "$LIBXML2_LEGACY_DIR/lib/libxml2.so.2" ]; then
-    XML2_LIBS="-L$LIBXML2_LEGACY_DIR/lib -Wl,-rpath,$LIBXML2_LEGACY_DIR/lib -lxml2"
-  fi
-fi
 
 mkdir -p "$OUT/bin" "$OUT/obj"
 
@@ -96,7 +103,6 @@ if [ -n "$need_cmp" ]; then
       fi
     fi
   fi
-  CMAKE=${CMAKE:-$(command -v cmake || echo "$HOME/.local/opt/usagi-buildtools/bin/cmake")}
   [ -x "$CMAKE" ] || die "cmake not found (set CMAKE)"
   CMPB=$OUT/compressonator
   if [ ! -f "$CMPB/build.ninja" ]; then
@@ -194,50 +200,21 @@ for f in "$T"/msdfgen/core/*.cpp $T/msdfgen/ext/import-font.cpp; do
 done
 echo "build $OUT/obj/libmsdfgen.a: ar $MSDF_OBJS" >> "$NEW"
 
-# ResourceLib (material definitions, shared by ShaderPackage and Ayataka)
+# ResourceLib (material definitions, for ShaderPackage)
 RES_OBJS=$(obj $S/ResourceLib/MaterialDefinition/MaterialDefinitionExporter.cpp -I$S/ResourceLib)
-
-# AyatakaLib (FBX conversion, shared by Ayataka and PakFileGen)
-AYA_FLAGS="-iquote $S/Ayataka -I$S/ResourceLib -I$FBXSDK_DIR/include -DPUGIXML_NO_EXCEPTIONS -DFBXSDK_SHARED"
-AYA_OBJS=
-for f in Dependencies/DependencyTracker cmdl/Cmdl cmdl/CmdlBinaryStore common/CollisionStore \
-         common/ModelConverterBase common/debug common/performance common/printer \
-         exchange/Animation exchange/Material exchange/MaterialAnimation \
-         exchange/MaterialAnimationConverter exchange/MaterialOverrides exchange/Mesh \
-         exchange/Shape fbx/FbxConverter fbx/FbxLoad lib/pugixml-1.2/src/pugixml; do
-  AYA_OBJS="$AYA_OBJS $(obj $S/Ayataka/$f.cpp $AYA_FLAGS)"
-done
 
 built=
 for tool in $TOOLS; do
   case $tool in
-  Ayataka)
-    if [ -z "$HAVE_FBX" ]; then
-      echo "build_linux_tools: skipping Ayataka, no FBX SDK at $FBXSDK_DIR (see the header of this script)" >&2
-      continue
-    fi
-    objs="$(obj $S/Ayataka/Ayataka.cpp $AYA_FLAGS) $AYA_OBJS $RES_OBJS"
-    libs="-L$FBX_LIBDIR -Wl,-rpath,$FBX_LIBDIR -lfbxsdk $XML2_LIBS -lz $ENGINE_LIBS $SYSLIBS"
-    ;;
   PakFileGen)
     CMPS=$COMPRESSONATOR_DIR
     CMPL=$OUT/compressonator/lib
-    pak_flags="-I$S/ResourceLib -iquote $S/Ayataka -I$CMPS/cmp_compressonatorlib -I/usr/include/glslang/Public -D_LINUX"
-    if [ -n "$HAVE_FBX" ]; then
-      pak_flags="$pak_flags -I$FBXSDK_DIR/include -DFBXSDK_SHARED"
-      fbx_objs="$AYA_OBJS $RES_OBJS"
-      fbx_libs="-L$FBX_LIBDIR -Wl,-rpath,$FBX_LIBDIR -lfbxsdk $XML2_LIBS -lz"
-    else
-      pak_flags="$pak_flags -DUSG_TOOLS_NO_FBX"
-      fbx_objs="$(obj $S/Ayataka/Dependencies/DependencyTracker.cpp $AYA_FLAGS)"
-      fbx_libs=
-    fi
+    pak_flags="-I$S/ResourceLib -I$CMPS/cmp_compressonatorlib -I/usr/include/glslang/Public -D_LINUX"
     objs=
     for f in FileFactory FileFactoryWin main; do
       objs="$objs $(obj $S/PakFileGen/$f.cpp $pak_flags)"
     done
-    objs="$objs $fbx_objs"
-    libs="$CMPL/libCMP_Framework.a $CMPL/libCMP_Core.a $CMPL/libCMP_Core_SSE.a $CMPL/libCMP_Core_AVX.a $CMPL/libCMP_Core_AVX512.a $fbx_libs $ENGINE_LIBS $SYSLIBS"
+    libs="$CMPL/libCMP_Framework.a $CMPL/libCMP_Core.a $CMPL/libCMP_Core_SSE.a $CMPL/libCMP_Core_AVX.a $CMPL/libCMP_Core_AVX512.a $ENGINE_LIBS $SYSLIBS"
     ;;
   ShaderPackage)
     sp_flags="-I$S/ResourceLib -I/usr/include/shaderc"

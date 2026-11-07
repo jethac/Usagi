@@ -8,8 +8,7 @@
 #     $USAGI_TOOLCHAIN/protoc-2.5
 #   - a Python 3 venv in $USAGI_TOOLCHAIN/usagi-py with protobuf (for the
 #     nanopb plugins), the libclang bindings (for the systems scanner) and
-#     cmake (for Compressonator, unless the system has one)
-#   - checks for the Autodesk FBX SDK in $FBXSDK_DIR (Ayataka needs it)
+#     cmake (for Compressonator and fbx-to-vmdf, unless the system has one)
 #
 # Safe to rerun: each step is skipped when it's already done. Builds run
 # under nice with $JOBS jobs (default 4). Afterwards:
@@ -19,7 +18,7 @@
 #
 # System packages it expects (Arch names): base-devel (gcc, make), clang,
 # ruby, python, pkgconf, sdl3, vulkan-icd-loader, vulkan-headers (or
-# VULKAN_SDK), shaderc, freetype2, libxml2, zlib, git, curl. ninja can be
+# VULKAN_SDK), shaderc, freetype2, zlib, git, curl. ninja can be
 # the distro's or in ~/.local/bin.
 set -eu
 
@@ -36,7 +35,7 @@ done
 pkg-config --exists sdl3 2>/dev/null || missing="$missing sdl3(pkg-config)"
 if [ -n "$missing" ]; then
   echo "bootstrap: missing system tools:$missing" >&2
-  echo "bootstrap: on Arch: pacman -S base-devel clang ruby python pkgconf sdl3 vulkan-icd-loader vulkan-headers shaderc freetype2 libxml2 ninja git curl" >&2
+  echo "bootstrap: on Arch: pacman -S base-devel clang ruby python pkgconf sdl3 vulkan-icd-loader vulkan-headers shaderc freetype2 ninja git curl" >&2
   exit 1
 fi
 
@@ -94,13 +93,5 @@ if ! command -v cmake >/dev/null 2>&1 && [ ! -x "$PY_VENV/bin/cmake" ]; then
   "$USAGI_PYTHON" -m pip install -q cmake
 fi
 
-# --- FBX SDK ---------------------------------------------------------------
-if [ -f "$FBXSDK_DIR/include/fbxsdk.h" ]; then
-  echo "bootstrap: FBX SDK ok ($FBXSDK_DIR)"
-else
-  echo "bootstrap: no FBX SDK in $FBXSDK_DIR. Ayataka (FBX -> .vmdf) needs it; see" >&2
-  echo "           Documents/LinuxPort.md (Data tools) for where to get the Linux SDK and how to" >&2
-  echo "           install it without root." >&2
-fi
 
 echo "bootstrap: done. Next: . $HERE/usagi_env.sh; sh $HERE/../Source/build_linux_tools.sh"
