@@ -78,7 +78,11 @@ class BuildConfig
     @current_dir = Pathname.new(BuildConfig.normalize_path(argv[4]))
 
     @type = ConfigType::GAME
-    @is_engine_build = @usagi_dir.to_path.downcase == @current_dir.to_path.downcase
+    # USAGI_DIR may reach the engine through a link in the game directory
+    # (game/Usagi -> ../engine): game paths are then spelled 'Usagi/...', as
+    # on Windows, while the engine's own build still recognises itself.
+    @is_engine_build = @usagi_dir.to_path.downcase == @current_dir.to_path.downcase ||
+      BuildConfig.same_directory?(@usagi_dir, @current_dir)
 
     if @is_engine_build
       @type = ConfigType::ENGINE
@@ -104,12 +108,55 @@ class BuildConfig
     ['linux', 'macos'].include?(@target_platform)
   end
 
-  # Some code generators are Windows-only binaries: protoc 2.5 with the
-  # nanopb .bat plugins, and systems-scanner.exe. On other hosts their
-  # outputs (protocol buffer sources and per-system .yml files) must be
-  # generated on Windows ('rake platform=<p> codegen') and copied over.
-  def can_run_windows_codegen?
-    Gem.win_platform?
+  # A path argument for a tool: backslashes on Windows, as the tools there
+  # expect, unchanged elsewhere
+  def self.native_path(path)
+    Gem.win_platform? ? to_windows_path(path) : path
+  end
+
+  def self.same_directory?(a, b)
+    File.realpath(a.to_path) == File.realpath(b.to_path)
+  rescue SystemCallError
+    false
+  end
+
+  # True when the build runs on a Linux host
+  def self.linux_host?
+    RUBY_PLATFORM.include?('linux')
+  end
+
+  # Code generation needs protoc 2.5 with the nanopb plugins and the systems
+  # scanner. Windows runs the binaries checked in to Tools/bin. Linux runs a
+  # protoc 2.5 from $USAGI_PROTOC, the plugins under Python 3
+  # (Tools/python/nanopb_py3) and Tools/python/systems_scanner.py; see
+  # Documents/LinuxPort.md. On other hosts (macOS) these outputs (protocol
+  # buffer sources and per-system .yml files) must be generated on Windows
+  # ('rake platform=<p> codegen') and copied over.
+  def can_run_codegen?
+    Gem.win_platform? || BuildConfig.linux_host?
+  end
+
+  # Data is cooked by the tools in Tools/Source: the checked-in Windows
+  # binaries, or on Linux the same tools built natively into
+  # _build/tools/linux/bin by Tools/Source/build_linux_tools.sh.
+  def can_cook_data?
+    Gem.win_platform? || BuildConfig.linux_host?
+  end
+
+  # The data format a platform reads. The Linux runtime reads the data cooked
+  # for Windows, so a Linux build cooks 'win' data (into _romfiles/win).
+  def data_platform
+    @target_platform == 'linux' ? 'win' : @target_platform
+  end
+
+  # A data tool from Tools/Source: Tools/bin/<name>.exe on Windows, the
+  # natively built _build/tools/linux/bin/<name> elsewhere
+  def data_tool(name)
+    if Gem.win_platform?
+      BuildConfig::to_spawnable_path("#{tools_bin_dir}/#{name}.exe")
+    else
+      build_path("#{BUILD_DIR}/tools/linux/bin/#{name}")
+    end
   end
 
   #####################################################################
@@ -345,7 +392,11 @@ class BuildConfig
   end
 
   def boilerplate_tool
-    BuildConfig::to_spawnable_path("#{tools_bin_dir}/systems-scanner.exe")
+    if Gem.win_platform?
+      BuildConfig::to_spawnable_path("#{tools_bin_dir}/systems-scanner.exe")
+    else
+      "#{tools_python_dir}/systems_scanner.py"
+    end
   end
 
   def register_systems_template
@@ -364,8 +415,20 @@ class BuildConfig
     "#{nanopb_dir}/generator/proto"
   end
 
+  # What the nanopb plugins import to read nanopb.proto's options. On
+  # Windows that's protoc 2.5's Python 2 output, written into the nanopb
+  # tree. Under Python 3 (Tools/python/nanopb_py3) it's a descriptor set of
+  # nanopb.proto, which nanopb_py3/proto/nanopb_pb2.py loads.
   def nanopb_protocols
-    ['nanopb_pb2.py', 'plugin_pb2.py'].map{|p| "#{nanopb_proto_dir}/#{p}" }
+    if Gem.win_platform?
+      ['nanopb_pb2.py', 'plugin_pb2.py'].map{|p| "#{nanopb_proto_dir}/#{p}" }
+    else
+      [nanopb_descriptor_set]
+    end
+  end
+
+  def nanopb_descriptor_set
+    build_path("#{BUILD_DIR}/proto/nanopb.desc")
   end
 
   def usagi_protocols
@@ -381,15 +444,15 @@ class BuildConfig
   end
 
   def font_converter
-    BuildConfig::to_spawnable_path("#{tools_bin_dir}/FontCreator.exe")
+    data_tool('FontCreator')
   end
 
   def cmdl_converter
-    BuildConfig::to_spawnable_path("#{tools_bin_dir}/Ayataka.exe")
+    data_tool('Ayataka')
   end
 
-def shader_pack
-    BuildConfig::to_spawnable_path("#{tools_bin_dir}/ShaderPackage.exe")
+  def shader_pack
+    data_tool('ShaderPackage')
   end
 
   def cmdl_converter_dep_opts
@@ -397,7 +460,7 @@ def shader_pack
   end
 
   def resource_packer
-    BuildConfig::to_spawnable_path("#{tools_bin_dir}/PakFileGen.exe")
+    data_tool('PakFileGen')
   end
 
   def vitei_audio_tool
@@ -467,11 +530,25 @@ def shader_pack
     "\"#{ENV['MSBUILD_DIR']}\\MSBuild.exe\""
   end
 
+  # protoc 2.5. Its plugin protocol and output must match what the
+  # generated code was written against, so other hosts don't fall back to
+  # whatever protoc is on PATH: Linux takes it from $USAGI_PROTOC (built by
+  # Tools/linux/bootstrap.sh).
   def protoc
-    BuildConfig::to_spawnable_path("#{tools_bin_dir}/protoc")
+    return BuildConfig::to_spawnable_path("#{tools_bin_dir}/protoc") unless BuildConfig.linux_host?
+
+    protoc = ENV['USAGI_PROTOC']
+    if protoc.nil? || protoc.empty?
+      abort("USAGI_PROTOC isn't set: point it at a protoc 2.5.0 (Tools/linux/bootstrap.sh " \
+            "builds one) or source Tools/linux/usagi_env.sh")
+    end
+    protoc
   end
 
   def luac
+    # Elsewhere a Lua 5.3 luac comes from $USAGI_LUAC (no data uses it yet)
+    return ENV['USAGI_LUAC'] || 'luac5.3' unless Gem.win_platform?
+
     # Bytecode compiled with the 32-bit Lua compiler is not
     # compatible with 64-bit Lua VM. So we have to choose the Lua
     # compiler based on the platform.
@@ -486,10 +563,9 @@ def shader_pack
   # compiler, so they must be returned as Windows paths when building
   # on Windows
   def protoc_gen_c
-    command = build_path('Engine/ThirdParty/nanopb/generator/protoc-gen-nanopb.bat')
-    command = BuildConfig::to_windows_path(command) if Gem.win_platform?
+    return "#{tools_python_dir}/nanopb_py3/protoc-gen-nanopb" unless Gem.win_platform?
 
-    command
+    BuildConfig::to_windows_path(build_path('Engine/ThirdParty/nanopb/generator/protoc-gen-nanopb.bat'))
   end
 
   def protoc_gen_cs
@@ -500,10 +576,9 @@ def shader_pack
   end
 
   def protoc_gen_lua
-    command = "#{tools_python_dir}/protoc-gen-nanopblua.bat"
-    command = BuildConfig::to_windows_path(command) if Gem.win_platform?
+    return "#{tools_python_dir}/nanopb_py3/protoc-gen-nanopblua" unless Gem.win_platform?
 
-    command
+    BuildConfig::to_windows_path("#{tools_python_dir}/protoc-gen-nanopblua.bat")
   end
 
   def protoc_gen_ruby
@@ -517,7 +592,7 @@ def shader_pack
   # Game-specific paths                                               #
   #####################################################################
   def romfiles_dir
-    "#{ROMFILES_DIR}/#{@target_platform}"
+    "#{ROMFILES_DIR}/#{data_platform}"
   end
 
   def effects_out_dir

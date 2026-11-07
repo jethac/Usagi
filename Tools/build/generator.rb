@@ -130,14 +130,18 @@ def libs(config, platform, n, bp_objects, order_only_deps, codegen_outputs)
     pbs.concat pb_cpp
     pb_lua = GeneratorUtil.lua_protobuf(config, n, proto_files)
     pbs.concat pb_lua
-    codegen_outputs.concat GeneratorUtil.windows_protobuf_outputs(config, proto_files)
+    codegen_outputs.concat GeneratorUtil.codegen_protobuf_outputs(config, proto_files)
 
-    # The Ruby, Python and C# classes are only used by the data tools,
-    # which run on Windows against the 'win' build, so platforms that
-    # ninja compiles leave them out
-    if !config.compiles_with_ninja?
+    # The Ruby, Python and C# classes are only used by the data tools.
+    # The entity and data cookers need the Ruby classes wherever data is
+    # cooked (Windows, and Linux hosts building for Linux); the Python and
+    # C# ones only matter to the Windows tools, so platforms that ninja
+    # compiles leave them out
+    if !config.compiles_with_ninja? || config.can_cook_data?
       pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
       pbs.concat pb_rb
+    end
+    if !config.compiles_with_ninja?
       pb_py = GeneratorUtil.python_protobuf(config, n, proto_files)
       pbs.concat pb_py
       pb_csharp = GeneratorUtil.csharp_protobuf(config, n, proto_files, dllpath)
@@ -339,7 +343,7 @@ end
 
 def boilerplate(config, n, generated_code, win_bp_cpp, codegen_outputs)
   system_sources = grep(["namespace.Systems"], ['Engine'], ["*.h", "*.cpp"])
-  codegen_outputs.concat GeneratorUtil.windows_system_scan_outputs(config, system_sources)
+  codegen_outputs.concat GeneratorUtil.codegen_system_scan_outputs(config, system_sources)
 
   lib_ymls = []
 
@@ -435,13 +439,13 @@ bp_objects, bp_generated_headers = boilerplate($engine, n, generated_headers, wi
 
 libs($engine, $platform, n, bp_objects, generated_headers + bp_generated_headers, codegen_outputs)
 
-if $engine.can_run_windows_codegen?
+if $engine.can_run_codegen?
   GeneratorUtil.nanopb_protocols($engine, n)
   GeneratorUtil.usagi_protocols($engine, n)
 end
 
 if $engine.compiles_with_ninja?
-  GeneratorUtil.windows_codegen_targets($engine, n, codegen_outputs)
+  GeneratorUtil.codegen_targets($engine, n, codegen_outputs)
 end
 
 # TODO: If we ever want a command-line NX build, we'll have to check
