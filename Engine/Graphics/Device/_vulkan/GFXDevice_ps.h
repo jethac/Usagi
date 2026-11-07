@@ -5,6 +5,7 @@
 #define _USG_GRAPHICS_PC_GFXDEVICE_
 
 #include "Engine/Graphics/Device/Display.h"
+#include "Engine/Graphics/RenderConsts.h"
 #include "Engine/Scene/RenderNode.h"
 #include "Engine/Core/stl/list.h"
 #include "Engine/Core/stl/queue.h"
@@ -46,6 +47,12 @@ namespace usg {
 
 		void Begin();
 		void End(bool bIsLoading);
+		// Frames the CPU may record ahead of the GPU: 2 (GFX_NUM_DYN_BUFF, the
+		// default) overlaps recording frame N with the GPU executing N-1;
+		// USAGI_FRAMES_IN_FLIGHT=1 serialises them. The slot indexes the
+		// per-frame fence, command buffer and query range.
+		uint32 GetFrameSlot() const { return m_uFrameSlot; }
+		uint32 GetFramesInFlight() const { return m_uFramesInFlight; }
 		float GetGPUTime() const { return m_fGPUTime; }
 
 		GFXContext* CreateDeferredContext(uint32 uSizeMul) { ASSERT(false); return NULL; }
@@ -187,7 +194,9 @@ namespace usg {
 		VkFormat							m_depthFormats[(uint32)DepthFormat::COUNT];
 
 		GFXDevice* m_pParent;
-		VkFence								m_drawFence;
+		VkFence								m_drawFences[GFX_NUM_DYN_BUFF];
+		uint32								m_uFrameSlot;
+		uint32								m_uFramesInFlight;
 
 #ifdef USE_VK_DEBUG_EXTENSIONS
 		VkDebugReportCallbackEXT			m_callbacks[CALLBACK_COUNT];

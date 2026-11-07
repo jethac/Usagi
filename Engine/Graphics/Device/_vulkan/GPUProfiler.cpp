@@ -3,6 +3,7 @@
 ****************************************************************************/
 #include "Engine/Common/Common.h"
 #include "Engine/Core/String/String_Util.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include "GPUProfiler.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,17 +15,21 @@ GPUProfiler::GPUProfiler()
 	: m_device(VK_NULL_HANDLE)
 	, m_pool(VK_NULL_HANDLE)
 	, m_fPeriodNs(1.0f)
-	, m_uScopeCount(0)
-	, m_uQueryCount(0)
+	, m_uSlot(0)
 	, m_uStackDepth(0)
 	, m_bFrameOpen(false)
-	, m_bPending(false)
 	, m_uStatCount(0)
 	, m_uFrames(0)
 	, m_fTotalFrameMs(0.0)
 	, m_fMaxFrameMs(0.0)
 {
 	m_outFile[0] = '\0';
+	for (uint32 i = 0; i < GFX_NUM_DYN_BUFF; i++)
+	{
+		m_frames[i].uScopeCount = 0;
+		m_frames[i].uQueryCount = 0;
+		m_frames[i].bPending = false;
+	}
 }
 
 GPUProfiler::~GPUProfiler()
@@ -42,16 +47,22 @@ void GPUProfiler::Init(VkDevice device, float fTimestampPeriodNs)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-	if (!szEnv || szEnv[0] == '\0' || strcmp(szEnv, "0") == 0)
+	const bool bReport = szEnv && szEnv[0] != '\0' && strcmp(szEnv, "0") != 0;
+	// The frame budget meter (USAGI_BUDGET) shows the pass timings without
+	// writing the report
+	if (!bReport && !FrameBudget::IsEnabled())
 	{
 		return;
 	}
-	str::Copy(m_outFile, strcmp(szEnv, "1") == 0 ? "gpu_profile.txt" : szEnv, sizeof(m_outFile));
+	if (bReport)
+	{
+		str::Copy(m_outFile, strcmp(szEnv, "1") == 0 ? "gpu_profile.txt" : szEnv, sizeof(m_outFile));
+	}
 
 	VkQueryPoolCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
 	info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-	info.queryCount = MAX_QUERIES;
+	info.queryCount = MAX_QUERIES * GFX_NUM_DYN_BUFF;
 	if (vkCreateQueryPool(device, &info, nullptr, &m_pool) != VK_SUCCESS)
 	{
 		m_pool = VK_NULL_HANDLE;
@@ -70,23 +81,25 @@ void GPUProfiler::Cleanup(VkDevice device)
 	}
 }
 
-void GPUProfiler::BeginFrame(VkCommandBuffer cmd)
+void GPUProfiler::BeginFrame(VkCommandBuffer cmd, uint32 uSlot)
 {
 	if (!IsEnabled())
 		return;
 
-	// The device waits on the previous frame's fence before recording again,
-	// so its queries have landed.
-	if (m_bPending)
+	// The device has waited on this slot's fence before recording into it
+	// again, so the queries it last held have landed.
+	m_uSlot = uSlot % GFX_NUM_DYN_BUFF;
+	if (m_frames[m_uSlot].bPending)
 	{
-		ReadBack();
+		ReadBack(m_uSlot);
 	}
 
-	vkCmdResetQueryPool(cmd, m_pool, 0, MAX_QUERIES);
-	m_uScopeCount = 0;
-	m_uQueryCount = 0;
+	FrameQueries& frame = m_frames[m_uSlot];
+	vkCmdResetQueryPool(cmd, m_pool, QueryIndex(0), MAX_QUERIES);
+	frame.uScopeCount = 0;
+	frame.uQueryCount = 0;
 	m_uStackDepth = 0;
-	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_pool, m_uQueryCount++);
+	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_pool, QueryIndex(frame.uQueryCount++));
 	m_bFrameOpen = true;
 }
 
@@ -99,9 +112,10 @@ void GPUProfiler::EndFrame(VkCommandBuffer cmd)
 	{
 		Pop(cmd);
 	}
-	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_pool, m_uQueryCount++);
+	FrameQueries& frame = m_frames[m_uSlot];
+	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_pool, QueryIndex(frame.uQueryCount++));
 	m_bFrameOpen = false;
-	m_bPending = true;
+	frame.bPending = true;
 }
 
 void GPUProfiler::Push(VkCommandBuffer cmd, const char* szName)
@@ -109,7 +123,8 @@ void GPUProfiler::Push(VkCommandBuffer cmd, const char* szName)
 	if (!IsEnabled() || !m_bFrameOpen)
 		return;
 
-	if (m_uQueryCount + 3 > MAX_QUERIES || m_uScopeCount >= MAX_SCOPES || m_uStackDepth >= MAX_STACK)
+	FrameQueries& frame = m_frames[m_uSlot];
+	if (frame.uQueryCount + 3 > MAX_QUERIES || frame.uScopeCount >= MAX_SCOPES || m_uStackDepth >= MAX_STACK)
 	{
 		// Keep the stack balanced even when we run out of queries
 		if (m_uStackDepth < MAX_STACK)
@@ -119,13 +134,13 @@ void GPUProfiler::Push(VkCommandBuffer cmd, const char* szName)
 		return;
 	}
 
-	Scope& scope = m_scopes[m_uScopeCount];
+	Scope& scope = frame.scopes[frame.uScopeCount];
 	str::Copy(scope.name, szName ? szName : "?", sizeof(scope.name));
 	scope.uDepth = m_uStackDepth;
-	scope.uStartQuery = m_uQueryCount++;
+	scope.uStartQuery = frame.uQueryCount++;
 	scope.uEndQuery = USG_INVALID_ID;
-	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_pool, scope.uStartQuery);
-	m_stack[m_uStackDepth++] = m_uScopeCount++;
+	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_pool, QueryIndex(scope.uStartQuery));
+	m_stack[m_uStackDepth++] = frame.uScopeCount++;
 }
 
 void GPUProfiler::Pop(VkCommandBuffer cmd)
@@ -137,9 +152,10 @@ void GPUProfiler::Pop(VkCommandBuffer cmd)
 	if (uScope == USG_INVALID_ID)
 		return;
 
-	Scope& scope = m_scopes[uScope];
-	scope.uEndQuery = m_uQueryCount++;
-	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_pool, scope.uEndQuery);
+	FrameQueries& frame = m_frames[m_uSlot];
+	Scope& scope = frame.scopes[uScope];
+	scope.uEndQuery = frame.uQueryCount++;
+	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_pool, QueryIndex(scope.uEndQuery));
 }
 
 GPUProfiler::Stat* GPUProfiler::FindStat(const char* szName, uint32 uDepth)
@@ -166,12 +182,13 @@ GPUProfiler::Stat* GPUProfiler::FindStat(const char* szName, uint32 uDepth)
 	return &stat;
 }
 
-void GPUProfiler::ReadBack()
+void GPUProfiler::ReadBack(uint32 uSlot)
 {
-	m_bPending = false;
+	FrameQueries& frame = m_frames[uSlot];
+	frame.bPending = false;
 
 	uint64 results[MAX_QUERIES];
-	VkResult res = vkGetQueryPoolResults(m_device, m_pool, 0, m_uQueryCount, sizeof(uint64) * m_uQueryCount, results, sizeof(uint64),
+	VkResult res = vkGetQueryPoolResults(m_device, m_pool, uSlot * MAX_QUERIES, frame.uQueryCount, sizeof(uint64) * frame.uQueryCount, results, sizeof(uint64),
 		VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 	if (res != VK_SUCCESS)
 	{
@@ -185,9 +202,9 @@ void GPUProfiler::ReadBack()
 		m_stats[i].fFrameMs = 0.0;
 	}
 
-	for (uint32 i = 0; i < m_uScopeCount; i++)
+	for (uint32 i = 0; i < frame.uScopeCount; i++)
 	{
-		const Scope& scope = m_scopes[i];
+		const Scope& scope = frame.scopes[i];
 		if (scope.uEndQuery == USG_INVALID_ID)
 			continue;
 		Stat* pStat = FindStat(scope.name, scope.uDepth);
@@ -203,14 +220,32 @@ void GPUProfiler::ReadBack()
 		m_stats[i].fMaxMs = Math::Max(m_stats[i].fMaxMs, m_stats[i].fFrameMs);
 	}
 
-	const double fFrameMs = (double)(results[m_uQueryCount - 1] - results[0]) * fToMs;
+	const double fFrameMs = (double)(results[frame.uQueryCount - 1] - results[0]) * fToMs;
+
+	if (FrameBudget::IsEnabled())
+	{
+		// Passes and their sub-passes; per-model tags ("Instance (pencil)")
+		// are too fine for the meter
+		FrameBudget::SetGPUFrame((float)fFrameMs);
+		for (uint32 i = 0; i < m_uStatCount; i++)
+		{
+			const Stat& stat = m_stats[i];
+			if (stat.uDepth <= 1 && strchr(stat.name, '(') == nullptr)
+			{
+				FrameBudget::SetGPUScope(stat.name, stat.uDepth, (float)stat.fFrameMs);
+			}
+		}
+	}
 	m_fTotalFrameMs += fFrameMs;
 	m_fMaxFrameMs = Math::Max(m_fMaxFrameMs, fFrameMs);
 	m_uFrames++;
 
 	if (m_uFrames >= REPORT_FRAMES)
 	{
-		WriteReport();
+		if (m_outFile[0] != '\0')
+		{
+			WriteReport();
+		}
 		for (uint32 i = 0; i < m_uStatCount; i++)
 		{
 			m_stats[i].fTotalMs = 0.0;

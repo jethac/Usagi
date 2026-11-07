@@ -8,6 +8,7 @@
 #include "Engine/Graphics/Primitives/VertexBuffer.h"
 #include OS_HEADER(Engine/Graphics/Device, VulkanIncludes.h)
 #include "GPUProfiler.h"
+#include "Engine/Graphics/RenderConsts.h"
 
 namespace usg {
 
@@ -76,7 +77,9 @@ public:
 private:
 
 	GFXContext*			m_pParent;
-	VkCommandBuffer		m_cmdBuff;
+	GFXDevice*			m_pDevice;
+	VkCommandBuffer		m_cmdBuff;		// The frame slot's buffer, see GFXDevice_ps::GetFrameSlot
+	VkCommandBuffer		m_cmdBuffs[GFX_NUM_DYN_BUFF];
 	VkCommandPool		m_cmdPool;
 	VkPipelineLayout	m_pipelineLayout;
 
