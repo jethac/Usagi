@@ -15,6 +15,7 @@
 #include "Engine/Game/InitThread.h"
 #include "Engine/Graphics/Device/GFXContext.h"
 #include "Engine/Network/UsagiInetCore.h"
+#include "Engine/Debug/FrameBudgetOverlay.h"
 #include "SimpleGameBase.h"
 
 //#ifdef PLATFORM_SWITCH
@@ -238,6 +239,7 @@ namespace usg
 			bFinished = m_pActiveMode->Update(fElapsed);
 
 			m_debug.Draw();
+			DrawFrameBudgetOverlay(&m_debugRender);
 
 
 			if (bFinished)

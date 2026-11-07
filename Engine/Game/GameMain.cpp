@@ -17,6 +17,7 @@
 #include "Engine/Maths/MathUtil.h"
 #include "Engine/Physics/Physics.h"
 #include "Engine/Core/Timer/Timer.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include OS_HEADER(Engine/Core/Timer, TimeTracker.h)
 #include "Engine/Core/Modules/ModuleManager.h"
 #include "Engine/Resource/ResourceMgr.h"
@@ -220,6 +221,12 @@ void GameLoop()
 	if (bReport)
 	{
 		ReportFrameRate(g_timer.GetDeltaRealTime(), fUpdateMs, fDrawMs);
+	}
+	if (FrameBudget::IsEnabled())
+	{
+		FrameBudget::AddCPUTime(FrameBudget::CPU_UPDATE, fUpdateMs);
+		FrameBudget::SetDrawTime(fDrawMs);
+		FrameBudget::EndFrame(g_timer.GetDeltaRealTime() * 1000.0f);
 	}
 	GFX::PostUpdate();
 	OS::Update();
