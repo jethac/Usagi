@@ -167,6 +167,19 @@ void main(void)
 		fLayer = (fMacro - 0.5) * uMaterial.layerParams.z + (fDetail - 0.5) * uMaterial.layerParams.w;
 	}
 
+	// Mark map (bMarkMap, see Model.yml): deposits laid over the surface in world XZ
+	float fMarkCover = 0.0;
+	if (uMaterial.bMarkMap)
+	{
+		vec2 vMarkUV = (vo_vWorldPos.xz - uMaterial.markRect.xy) * uMaterial.markRect.zw;
+		if (all(greaterThanEqual(vMarkUV, vec2(0.0))) && all(lessThanEqual(vMarkUV, vec2(1.0))))
+		{
+			vec2 vMark = texture(sampler3, vMarkUV).rg;
+			vDiffuse.rgb *= 1.0 - vMark.r * uMaterial.markParams.x;
+			fMarkCover = vMark.g;
+		}
+	}
+
 	// Livery (bLiveryMap, see Model.yml): a premultiplied RGBA image in the "paint" UV set,
 	// laid over the albedo. Faces outside paint space (glass, wheels, trim) are untouched.
 	if (uMaterial.bLiveryMap)
@@ -226,8 +239,10 @@ void main(void)
 			fMetallic *= vORM.b;
 		}
 		fRoughness = clamp(fRoughness * (1.0 + uMaterial.layerRoughness * 2.0 * fLayer), 0.02, 1.0);
+		fRoughness = mix(fRoughness, uMaterial.markParams.y, fMarkCover);
+		float fClearcoat = uMaterial.clearcoat * (1.0 - fMarkCover * uMaterial.markParams.z);
 		OutputDeferredPBR(-vo_vViewDir.z, vNormal, vDiffuse.rgb, vEmissive, fRoughness, fMetallic, uMaterial.reflectance,
-			uMaterial.clearcoat, uMaterial.clearcoatRoughness, fOcclusion);
+			fClearcoat, uMaterial.clearcoatRoughness, fOcclusion);
 	}
 	else
 	{

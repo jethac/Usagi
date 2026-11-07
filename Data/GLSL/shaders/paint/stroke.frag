@@ -43,5 +43,9 @@ void main(void)
 	{
 		discard;
 	}
+#ifdef ACCUMULATE
+	colorOut = vec4(strokeData.go_vColor.rgb * fAlpha, fAlpha);
+#else
 	colorOut = vec4(toLinear(strokeData.go_vColor.rgb), fAlpha);
+#endif
 }

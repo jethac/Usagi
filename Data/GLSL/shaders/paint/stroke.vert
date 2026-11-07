@@ -5,7 +5,8 @@
 #include "../includes/platformdefines.inc"
 
 layout (location = 0) in vec4 ao_seg;		// u0, v0, u1, v1
-layout (location = 1) in vec4 ao_brush;		// x radius, y 1 = square stamp, z anti-aliasing width (paint units)
+layout (location = 1) in vec4 ao_brush;		// x radius, y 1 = square stamp, z anti-aliasing width (paint units),
+											// w paint v to target v (non-square targets; 0 = 1)
 layout (location = 2) in vec4 ao_color;		// sRGB colour, a = opacity
 
 out StrokeData
@@ -34,5 +35,6 @@ void main(void)
 	strokeData.go_vSeg = ao_seg;
 	strokeData.go_vBrush = ao_brush;
 	strokeData.go_vColor = ao_color;
-	gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+	float fVScale = ao_brush.w > 0.0 ? ao_brush.w : 1.0;
+	gl_Position = vec4(vec2(p.x, p.y * fVScale) * 2.0 - 1.0, 0.0, 1.0);
 }

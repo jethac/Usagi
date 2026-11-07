@@ -19,7 +19,7 @@ CustomEffects:
       - { index: 0, hint: "DiffuseColor", default: "Textures/white_default" }
       - { index: 1, hint: "NormalMap", default: "Textures/normal_default", defines: "!SHADOW_PASS" } # HAS_BUMP breaks when multiple in scene atm
       - { index: 2, hint: "EmissiveFactor", default: "Textures/black_default", defines: "!SHADOW_PASS"  }
-      - { index: 3, hint: "SpecularColor", default: "Textures/black_default", defines: "!SHADOW_PASS"  }
+      - { index: 3, hint: "SpecularColor", default: "Textures/black_default", defines: "!SHADOW_PASS"  } # or, with bMarkMap, a world-space mark map (PBR materials, see below)
       - { index: 4, hint: "Reflection",  type: "samplerCube", default: "Textures/white_cube", defines: "!SHADOW_PASS"  }      
       - { index: 5, hint: "MetalRoughMap", default: "Textures/white_default", defines: "!SHADOW_PASS"  } # glTF layout: occlusion R, roughness G, metallic B
       - { index: 6, hint: "LayerMap", default: "Textures/white_default", defines: "!SHADOW_PASS"  } # Two-scale albedo layers: macro R, detail G (0.5 = no change)
@@ -78,6 +78,14 @@ CustomEffects:
           # albedo where 0 <= uvPaint <= 1 (a runtime target, see Model::OverrideTextureAtBinding).
           # Exclusive with bLayerMap, which uses the same sampler.
           - { type: bool,   name: bLiveryMap,         default: false }
+          # Mark map: sampler3 holds a runtime target laid over the surface in world XZ, e.g.
+          # tyre marks building up on a bench (Model::OverrideTextureAtBinding). R darkens the
+          # albedo, G is how much of the surface the deposit covers: there the roughness goes to
+          # markParams.y and the clearcoat fades by markParams.z. PBR materials only (sampler3 is
+          # otherwise the specular map).
+          - { type: bool,   name: bMarkMap,           default: false }
+          - { type: vec4,   name: markRect,           count: 1, default: [0.0, 0.0, 1.0, 1.0] }  # x, z of the map's corner; 1 / width, 1 / depth (world units)
+          - { type: vec4,   name: markParams,         count: 1, default: [0.8, 0.55, 0.7, 0.0] }  # x = darkening, y = deposit roughness, z = clearcoat loss
       - binding: Custom0
         shaderType: VS 
         defines: "!INSTANCED !HAS_SKELETON"        
