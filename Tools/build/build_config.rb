@@ -447,8 +447,13 @@ class BuildConfig
     data_tool('FontCreator')
   end
 
+  # FBX -> .vmdf models (and effect .yml -> .cfx): fbx-to-vmdf, a drop-in
+  # replacement for Ayataka that needs no Autodesk FBX SDK
+  # (https://github.com/jethac/fbx-to-vmdf). Build it with its CMake and
+  # put it at Tools/bin/fbx-to-vmdf.exe (Windows) or
+  # _build/tools/linux/bin/fbx-to-vmdf, or point USAGI_FBX_TO_VMDF at it.
   def cmdl_converter
-    data_tool('Ayataka')
+    ENV['USAGI_FBX_TO_VMDF'] || data_tool('fbx-to-vmdf')
   end
 
   def shader_pack

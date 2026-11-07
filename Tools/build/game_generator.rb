@@ -406,12 +406,12 @@ def build_pc_models(config, n)
   FileUtils.mkdir_p(config.skeleton_out_dir)
   FileUtils.mkdir_p(config.effects_out_dir)
 
-  # The Linux Ayataka needs the Autodesk FBX SDK, which isn't redistributable
-  # (Documents/LinuxPort.md, "Data tools"). Without it the models aren't
-  # converted here, so that everything else still cooks; the .vmdf files and
-  # _build/skel skeletons then have to come from a cook that has it.
+  # Models are converted by fbx-to-vmdf (see BuildConfig#cmdl_converter).
+  # Without it the models aren't converted here, so that everything else
+  # still cooks; the .vmdf files and _build/skel skeletons then have to come
+  # from a cook that has it.
   if !Gem.win_platform? && !File.exist?(config.cmdl_converter)
-    puts "WARNING: #{config.cmdl_converter} isn't built (no FBX SDK): models are not converted"
+    puts "WARNING: #{config.cmdl_converter} isn't built (see https://github.com/jethac/fbx-to-vmdf): models are not converted"
     return []
   end
 
