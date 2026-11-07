@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include <cstdio>
 #include "Engine/Graphics/GFX.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
@@ -309,6 +310,8 @@ namespace usg {
 
 	void ViewContext::Update(GFXDevice* pDevice)
 	{
+		static const uint32 s_uPrep = FrameBudget::RegisterDetail("view-prep");
+		FrameBudget::Scope scope(s_uPrep);
 		const Camera* pCamera = GetCamera();
 		SetRenderMask(pCamera->GetRenderMask());
 		const Scene* pScene = GetScene();
@@ -551,6 +554,8 @@ namespace usg {
 
 	void ViewContext::DrawScene(GFXContext* pContext)
 	{
+		static const uint32 s_uRecord = FrameBudget::RegisterDetail("view-record");
+		FrameBudget::Scope scope(s_uRecord);
 		Scene* pScene = GetScene();
 		// We only suport one light for forward rendering, set it now
 		m_pImpl->lightingContext.SetPrimaryShadowDesc(pContext);

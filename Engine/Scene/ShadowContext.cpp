@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Scene/Camera/Camera.h"
 #include "Engine/Scene/Scene.h"
@@ -77,6 +78,8 @@ void ShadowContext::SetShadowExcludeFlags(uint32 uFlags)
 
 void ShadowContext::Update(GFXDevice* pDevice)
 {
+	static const uint32 s_uPrep = FrameBudget::RegisterDetail("shadow-prep");
+	FrameBudget::Scope scope(s_uPrep);
 	const Camera* pCamera = GetCamera();
 
 	GlobalShadowConstants* globalData = m_globalConstants.Lock<GlobalShadowConstants>();
@@ -116,6 +119,8 @@ void ShadowContext::Update(GFXDevice* pDevice)
 
 void ShadowContext::DrawScene(GFXContext* pContext)
 {
+	static const uint32 s_uRecord = FrameBudget::RegisterDetail("shadow-record");
+	FrameBudget::Scope scope(s_uRecord);
 	pContext->SetDescriptorSet( &m_descriptorSet, 0 );
 	RenderNode::RenderContext renderContext;
 	renderContext.eRenderPass = RenderNode::RENDER_PASS_DEPTH;

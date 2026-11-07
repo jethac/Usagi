@@ -47,6 +47,9 @@ namespace
 		uint32		uIntervalOver = 0;
 		GPUScope	gpu[FrameBudget::MAX_GPU_SCOPES];
 		uint32		uGPUScopes = 0;
+		const char*	detailNames[FrameBudget::MAX_DETAILS] = {};
+		double		detailInterval[FrameBudget::MAX_DETAILS] = {};
+		uint32		uDetails = 0;
 		bool		bFirst = true;
 	};
 
@@ -122,6 +125,49 @@ void FrameBudget::SetGPUScope(const char* szName, uint32 uDepth, float fMs)
 	}
 }
 
+uint32 FrameBudget::RegisterDetail(const char* szName)
+{
+	for (uint32 i = 0; i < g_budget.uDetails; i++)
+	{
+		if (strcmp(g_budget.detailNames[i], szName) == 0)
+		{
+			return i;
+		}
+	}
+	if (g_budget.uDetails >= MAX_DETAILS)
+	{
+		return USG_INVALID_ID;
+	}
+	g_budget.detailNames[g_budget.uDetails] = szName;
+	return g_budget.uDetails++;
+}
+
+void FrameBudget::AddDetail(uint32 uDetail, float fMs)
+{
+	if (uDetail < g_budget.uDetails)
+	{
+		g_budget.detailInterval[uDetail] += fMs;
+	}
+}
+
+FrameBudget::Scope::Scope(uint32 uDetail)
+	: m_uStart(0)
+	, m_uDetail(uDetail)
+{
+	if (IsEnabled())
+	{
+		m_uStart = TimeTracker::GetSystemTime();
+	}
+}
+
+FrameBudget::Scope::~Scope()
+{
+	if (m_uStart != 0)
+	{
+		AddDetail(m_uDetail, TicksToMs(m_uStart, TimeTracker::GetSystemTime()));
+	}
+}
+
 float FrameBudget::TicksToMs(uint64 uStart, uint64 uEnd)
 {
 	return (float)((double)(uEnd - uStart) * 1000.0 / (double)TimeTracker::GetTickFrequency());
@@ -181,12 +227,17 @@ void FrameBudget::EndFrame(float fFrameMs)
 		}
 	}
 
-	char szLine[1024];
+	char szLine[1536];
 	int iLen = snprintf(szLine, sizeof(szLine), "Budget: frame %.2f ms (%.0f%% of 16.67, worst %.2f, %u over) | CPU busy %.2f ms (%.0f%%):",
 		fFrame, 100.0f * fFrame / BUDGET_MS, b.fFrameIntervalMaxMs, b.uIntervalOver, fCPUBusy, 100.0f * fCPUBusy / BUDGET_MS);
 	for (uint32 i = 0; i < CPU_STAGE_COUNT && iLen > 0 && iLen < (int)sizeof(szLine); i++)
 	{
 		iLen += snprintf(szLine + iLen, sizeof(szLine) - iLen, " %s %.2f", g_szStageNames[i], (float)(b.cpuInterval[i] * fInv));
+	}
+	for (uint32 i = 0; i < b.uDetails && iLen > 0 && iLen < (int)sizeof(szLine); i++)
+	{
+		iLen += snprintf(szLine + iLen, sizeof(szLine) - iLen, " [%s %.2f]", b.detailNames[i], (float)(b.detailInterval[i] * fInv));
+		b.detailInterval[i] = 0.0;
 	}
 	if (iLen > 0 && iLen < (int)sizeof(szLine))
 	{

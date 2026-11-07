@@ -62,6 +62,25 @@ public:
 
 	// Milliseconds between two TimeTracker::GetSystemTime values
 	static float TicksToMs(uint64 uStart, uint64 uEnd);
+
+	// Named CPU details inside the stages (culling, signal traversal, ...),
+	// logged in brackets after the stages. Nested details may overlap.
+	enum { MAX_DETAILS = 16 };
+	static uint32 RegisterDetail(const char* szName);
+	static void AddDetail(uint32 uDetail, float fMs);
+
+	// Times its scope into a detail when the meter is on:
+	//   static const uint32 s_uCull = FrameBudget::RegisterDetail("cull");
+	//   FrameBudget::Scope scope(s_uCull);
+	class Scope
+	{
+	public:
+		explicit Scope(uint32 uDetail);
+		~Scope();
+	private:
+		uint64	m_uStart;
+		uint32	m_uDetail;
+	};
 };
 
 }
