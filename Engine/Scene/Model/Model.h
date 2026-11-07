@@ -139,6 +139,7 @@ private:
 
 	MaterialInfo*			m_pOverrideMaterials;
 	float					m_fMaxDrawDistance = 0.0f;
+	bool					m_bStaticBonesSet = false;	// m_staticBones holds the palette
 	bool					m_bDynamic;
 	uint32					m_uMeshCount;
 
