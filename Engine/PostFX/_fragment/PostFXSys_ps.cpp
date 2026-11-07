@@ -745,6 +745,13 @@ void PostFXSys_ps::EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags)
 
 	m_renderPasses.SetDeferredEnabled(m_pDeferredShading && (uEffectFlags & PostFXSys::EFFECT_DEFERRED_SHADING) != 0);
 
+	// Screen space reflections read last frame's scene from the bloom's downscale
+	if (m_pDeferredShading)
+	{
+		const bool bBloom = m_pBloom && (uEffectFlags & PostFXSys::EFFECT_BLOOM) != 0;
+		m_pDeferredShading->SetPrevSceneTexture(pDevice, bBloom ? m_pBloom->GetScaledSceneTexture() : TextureHndl());
+	}
+
 	EnableEffectsInt(pDevice, uEffectFlags);
 	
 

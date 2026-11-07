@@ -37,6 +37,16 @@ message LightingSettings
 	// Moves the shadow lookup along the surface normal (world units) to
 	// remove acne on surfaces at a grazing angle to the light
 	required float fShadowNormalOffset = 11 [default = 0.0];
+
+	// Screen space reflections in the image based lighting: a ray march through
+	// the depth buffer that reads last frame's lit scene (the bloom's quarter
+	// resolution copy, reprojected) where it hits. Replaces the environment in
+	// clearcoat and smooth specular reflections. uSSRSteps is the quality knob
+	// (0 disables); needs bloom.
+	required uint32 uSSRSteps = 12 [default = 0];
+	required float fSSRDistance = 13 [default = 12.0];		// Ray length, view units
+	required float fSSRThickness = 14 [default = 0.6];		// Depth a hit may be behind the surface, view units
+	required float fSSRMaxRoughness = 15 [default = 0.55];	// Rougher specular keeps the environment
 }
 
 message BloomSettings
