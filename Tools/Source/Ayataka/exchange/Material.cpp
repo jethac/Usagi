@@ -54,7 +54,7 @@ void Material::InitCustomMaterial(const char* szPakName, const char* szEffectNam
 			}
 
 			std::string pakName = szPakName;
-			size_t uLast = name.find_last_of("/") != std::string::npos ? pakName.find_last_of("/") : pakName.find_last_of("\\");
+			size_t uLast = pakName.find_last_of("/\\");	// either separator (the old test looked at the effect name, not the path)
 			pakName = pakName.substr(uLast + 1, pakName.size() - 4 - uLast - 1);
 				// FIXME: Pack name from input
 			sprintf_s(m_material.renderPasses[pass].effectName, "%s.%s", pakName.c_str(), name.c_str());
