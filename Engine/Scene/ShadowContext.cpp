@@ -120,9 +120,8 @@ void ShadowContext::DrawScene(GFXContext* pContext)
 	RenderNode::RenderContext renderContext;
 	renderContext.eRenderPass = RenderNode::RENDER_PASS_DEPTH;
 
-	for(list<RenderNode*>::iterator it = m_drawList.begin(); it != m_drawList.end(); ++it)
+	for(RenderNode* node : m_drawList)
 	{
-		RenderNode* node = (*it);
 		node->Draw(pContext, renderContext);
 	}
 	CacheDirtyInfo();

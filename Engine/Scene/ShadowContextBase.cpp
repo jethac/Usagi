@@ -91,46 +91,40 @@ namespace usg {
 
 	void ShadowContextBase::ReplaceInstancedNodes(usg::GFXDevice* pDevice)
 	{
-		// Now look for instances and build a new list
+		// Now look for instances and build a new list: nodes that don't instance
+		// stay, instanced ones go to their renderer (one batch per instance id)
 		InstancedRenderer* pCurrentInstanceRenderer = nullptr;
 		uint64 uCurrentInstance = USG_INVALID_ID64;
 
 		m_cmpList = m_drawList;
+		m_scratchList.clear();
 
-		for(auto itr = m_drawList.begin(); itr != m_drawList.end();)
+		for (RenderNode* pNode : m_drawList)
 		{
-			RenderNode* pNode = (*itr);
 			uint64 uInstanceId = pNode->GetInstanceId();
-			if (pCurrentInstanceRenderer && uInstanceId != uCurrentInstance)
+			if (uInstanceId == USG_INVALID_ID64)
 			{
-				pCurrentInstanceRenderer = nullptr;
-				uCurrentInstance = USG_INVALID_ID64;
+				m_scratchList.push_back(pNode);
+				continue;
 			}
 
-			if (uInstanceId != USG_INVALID_ID64)
+			if (uInstanceId != uCurrentInstance)
 			{
-				if (uInstanceId == uCurrentInstance)
+				auto itr = m_instanceRenders.find(uInstanceId);
+				if (itr == m_instanceRenders.end())
 				{
-					pCurrentInstanceRenderer->AddNode(pNode);
-					itr = m_drawList.erase(itr);
+					pCurrentInstanceRenderer = pNode->CreateInstanceRenderer(pDevice, GetScene());
+					m_instanceRenders[uInstanceId] = pCurrentInstanceRenderer;
 				}
 				else
 				{
-					if (m_instanceRenders.find(uInstanceId) == m_instanceRenders.end())
-					{
-						m_instanceRenders[uInstanceId] = pNode->CreateInstanceRenderer(pDevice, GetScene());
-					}
-					pCurrentInstanceRenderer = m_instanceRenders[uInstanceId];
-					uCurrentInstance = uInstanceId;
-					pCurrentInstanceRenderer->AddNode(pNode);
-					itr = m_drawList.erase(itr);
+					pCurrentInstanceRenderer = itr->second;
 				}
+				uCurrentInstance = uInstanceId;
 			}
-			else
-			{
-				itr++;
-			}
+			pCurrentInstanceRenderer->AddNode(pNode);
 		}
+		m_drawList.swap(m_scratchList);
 
 
 		for (auto itr : m_instanceRenders)
