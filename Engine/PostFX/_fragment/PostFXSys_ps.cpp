@@ -130,6 +130,13 @@ void PostFXSys_ps::PreViewUpdate(GFXDevice* pDevice)
 			break;
 		}
 	}
+
+	// The deferred lighting's per-frame constants (the reflections' last-frame
+	// camera). Nothing calls UpdateGPU each frame, so it's done here.
+	if (m_pDeferredShading && m_pDeferredShading->GetEnabled())
+	{
+		m_pDeferredShading->UpdateBuffer(pDevice);
+	}
 }
 
 void PostFXSys_ps::UpdateGPU(GFXDevice* pDevice)
