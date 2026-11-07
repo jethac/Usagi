@@ -1,25 +1,25 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-'''Generate lua serialiser code from nanopb-compatible protocol buffer files.'''
+'''Generate lua serialiser code from nanopb-compatible protocol buffer files.
+
+Python 3. The output is meant to stay byte-identical to what the original
+Python 2 version of this script generated (apart from the timestamp
+comment), so a few places below reproduce Python 2 behaviour on purpose:
+see py2_table_order() and py2_string_escape().
+'''
 lua_generator_version = "luagenerator-0.1"
 
+import codecs
 import sys
 import zlib
 import os.path
+from functools import reduce
 
-# Kinda nasty... hardcoding the path to nanopb's generator stuff.
-# This is because I couldn't figure out how to set the PYTHONPATH
-# variable externally in windows :-(
+# nanopb's generator package provides the 'proto' package (nanopb_pb2 and
+# plugin_pb2). nanopb_py3/run_plugin.py puts Python 3 versions of those
+# first on sys.path; otherwise fall back to the copies in the nanopb tree.
 scriptdir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.abspath(scriptdir + '\\..\\..\\Engine\\ThirdParty\\nanopb\\generator'))
-
-try:
-    # Add some dummy imports to keep packaging tools happy.
-    import google, distutils.util # bbfreeze seems to need these
-    import pkg_resources # pyinstaller / protobuf 2.5 seem to need these
-except:
-    # Don't care, we will error out later if it is actually important.
-    pass
+sys.path.append(os.path.join(scriptdir, '..', '..', 'Engine', 'ThirdParty', 'nanopb', 'generator'))
 
 try:
     import google.protobuf.text_format as text_format
@@ -78,6 +78,108 @@ intsizes = {
     nanopb_pb2.IS_64:    'int64_t',
 }
 
+# ---------------------------------------------------------------------------
+#                     Python 2 compatibility
+# ---------------------------------------------------------------------------
+# The Python 2 generator emitted some lists in dict/set iteration order.
+# To keep the generated code identical, py2_table_order() replays how a
+# CPython 2.7 dict or set lays out its hash table, using the hash functions
+# of the 64-bit Windows build (where a C long, and so a hash, is 32 bits)
+# that the code was originally generated with.
+
+_PY2_HASH_BITS = 32
+_PY2_HASH_MASK = (1 << _PY2_HASH_BITS) - 1
+_SIZE_T_MASK = (1 << 64) - 1
+
+def _py2_signed(x):
+    x &= _PY2_HASH_MASK
+    if x >= 1 << (_PY2_HASH_BITS - 1):
+        x -= 1 << _PY2_HASH_BITS
+    return -2 if x == -1 else x
+
+# hash(None) in CPython 2 is derived from None's address, which isn't
+# reproducible. None only ever sits in a table next to strings that are
+# then filtered out of the output; this value is the one that reproduces
+# the Windows output (it only matters if None collides with a string).
+_PY2_NONE_HASH = 0
+
+def py2_hash(value):
+    '''hash() of an int, str or None as CPython 2.7 (Win64) computed it.'''
+    if value is None:
+        return _PY2_NONE_HASH
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return _py2_signed(value)
+    # str and unicode hash identically for the ASCII identifiers seen here
+    if not value:
+        return 0
+    x = ord(value[0]) << 7
+    for c in value:
+        x = ((1000003 * x) ^ ord(c)) & _PY2_HASH_MASK
+    x ^= len(value)
+    return _py2_signed(x)
+
+def _py2_insert_clean(table, mask, key, h):
+    perturb = h & _SIZE_T_MASK
+    i = perturb & mask
+    while table[i & mask] is not None:
+        i = ((i << 2) + i + perturb + 1) & _SIZE_T_MASK
+        perturb >>= 5
+    table[i & mask] = (key,)
+
+def py2_table_order(keys):
+    '''Iteration order of a CPython 2.7 dict or set after inserting keys
+    (in this order, duplicates ignored, no deletions).'''
+    mask = 7
+    table = [None] * 8
+    used = 0
+    seen = set()
+    for key in keys:
+        if key in seen:
+            continue
+        seen.add(key)
+        _py2_insert_clean(table, mask, key, py2_hash(key))
+        used += 1
+        # dict/set growth rule from dictobject.c / setobject.c
+        if used * 3 >= (mask + 1) * 2:
+            minused = used * (2 if used > 50000 else 4)
+            newsize = 8
+            while newsize <= minused:
+                newsize <<= 1
+            old = table
+            mask = newsize - 1
+            table = [None] * newsize
+            for entry in old:
+                if entry is not None:
+                    _py2_insert_clean(table, mask, entry[0], py2_hash(entry[0]))
+    return [entry[0] for entry in table if entry is not None]
+
+def py2_string_escape(text):
+    '''text.encode('utf-8').encode('string_escape') from Python 2.'''
+    out = []
+    for c in text.encode('utf-8'):
+        if c == 0x5c:
+            out.append('\\\\')
+        elif c == 0x27:
+            out.append("\\'")
+        elif c == 0x09:
+            out.append('\\t')
+        elif c == 0x0a:
+            out.append('\\n')
+        elif c == 0x0d:
+            out.append('\\r')
+        elif c < 0x20 or c >= 0x7f:
+            out.append('\\x%02x' % c)
+        else:
+            out.append(chr(c))
+    return ''.join(out)
+
+def py2_max(*values):
+    '''max() with Python 2's ordering, where None sorts below any number.'''
+    present = [v for v in values if v is not None]
+    return max(present) if present else None
+
 class Names:
     '''Keeps a set of nested names and formats them to C identifier.'''
     def __init__(self, parts = (), namespaces = []):
@@ -87,12 +189,15 @@ class Names:
                 namespaces = parts.namespaces
         self.parts = tuple(parts)
         self.namespaces = namespaces
-    
+
     def __str__(self):
         return '_'.join(self.parts)
 
+    def __hash__(self):
+        return hash(self.parts)
+
     def __add__(self, other):
-        if isinstance(other, (str, unicode)):
+        if isinstance(other, str):
             return Names(self.parts + (other,), self.namespaces)
         elif isinstance(other, tuple):
             return Names(self.parts + other, self.namespaces)
@@ -144,7 +249,7 @@ class EncodedSize:
         self.symbols = symbols
     
     def __add__(self, other):
-        if isinstance(other, (int, long)):
+        if isinstance(other, int):
             return EncodedSize(self.value + other, self.symbols)
         elif isinstance(other, (str, Names)):
             return EncodedSize(self.value, self.symbols + [ns_prefix(other) + str(other)])
@@ -154,7 +259,7 @@ class EncodedSize:
             raise ValueError("Cannot add size: " + repr(other))
 
     def __mul__(self, other):
-        if isinstance(other, (int, long)):
+        if isinstance(other, int):
             return EncodedSize(self.value * other, [str(other) + '*' + s for s in self.symbols])
         else:
             raise ValueError("Cannot multiply size: " + repr(other))
@@ -310,11 +415,12 @@ class Enum:
             else:
                 value_map[item[1]] = [item[0]]
         output = []
-        for n, v in value_map.iteritems():
-            output.append((v, n))
+        for n in py2_table_order(item[1] for item in self.values):
+            output.append((value_map[n], n))
         return output
 
-    def tostring_case(self, (names, number)):
+    def tostring_case(self, names_number):
+        (names, number) = names_number
         firstname = ns_prefix(names[0]) + str(names[0])
         if not firstname.startswith('::'):
             firstname = '::' + firstname
@@ -341,7 +447,8 @@ class Enum:
 
         return (result, len(packages))
 
-    def addglobal(self, (name, number)):
+    def addglobal(self, name_number):
+        (name, number) = name_number
         fullname = ns_prefix(name) + str(name)
         if not fullname.startswith('::'):
             fullname = '::' + fullname
@@ -449,7 +556,7 @@ class Field:
             raise NotImplementedError(field_options.type)
         
         # Decide the C data type to use in the struct.
-        if datatypes.has_key(desc.type):
+        if desc.type in datatypes:
             self.ctype, self.pbtype, self.enc_size, isa = datatypes[desc.type]
 
             # Override the field size if user wants to use smaller integers
@@ -491,8 +598,9 @@ class Field:
         else:
             raise NotImplementedError(desc.type)
         
-    def __cmp__(self, other):
-        return cmp(self.tag, other.tag)
+    def __lt__(self, other):
+        # Python 2 used __cmp__ on the tag; list.sort() only needs <
+        return self.tag < other.tag
     
     def __str__(self):
         result = ''
@@ -574,12 +682,12 @@ class Field:
                 inner_init = '0'
         else:
             if self.pbtype == 'STRING':
-                inner_init = self.default.encode('utf-8').encode('string_escape')
+                inner_init = py2_string_escape(self.default)
                 inner_init = inner_init.replace('"', '\\"')
                 inner_init = '"' + inner_init + '"'
             elif self.pbtype == 'BYTES':
-                data = str(self.default).decode('string_escape')
-                data = ['0x%02x' % ord(c) for c in data]
+                data = codecs.escape_decode(str(self.default).encode('utf-8'))[0]
+                data = ['0x%02x' % c for c in data]
                 if len(data) == 0:
                     inner_init = '{0, {0}}'
                 else:
@@ -698,7 +806,7 @@ class Field:
             else:
                 return 'pb_membersize(%s, %s)' % (self.struct_name, self.name)
 
-        return max(self.tag, self.max_size, self.max_count)        
+        return py2_max(self.tag, self.max_size, self.max_count)
 
     def encoded_size(self, allmsgs):
         '''Return the maximum size that this field can take when encoded,
@@ -856,8 +964,9 @@ class OneOf(Field):
         # Sort by the lowest tag number inside union
         self.tag = min([f.tag for f in self.fields])
 
-    def __cmp__(self, other):
-        return cmp(self.tag, other.tag)
+    def __lt__(self, other):
+        # Python 2 used __cmp__ on the tag; list.sort() only needs <
+        return self.tag < other.tag
 
     def __str__(self):
         result = ''
@@ -1079,7 +1188,8 @@ class Message:
         result += self.addconstructor(fullname, metatablename)
         result += '\n'
         result += '\t\tlua_pop(L, %s);\n' % (num_packages + 1)
-        fields = filter(None, list(set([self.init_type(t) for t in (f.ctype for f in self.ordered_fields)])))
+        # The Python 2 version built a set() here, so the order is set order
+        fields = [x for x in py2_table_order([self.init_type(t) for t in (f.ctype for f in self.ordered_fields)]) if x]
         if fields:
             result += '\n\t\t'
             result += '\n\t\t'.join(fields)
@@ -1227,7 +1337,7 @@ class Message:
         result += '\t\t\tluaL_setmetatable(L, "%s");\n' % metatablename
         result += '\t\t\tProtocolBufferFields< %s >::Init(dataPtr);\n' % fullname
         result += '\t\t\tlua_setfield(L, -2, "%s");\n' % self.name
-        result += '\t\t}\n' % self.name
+        result += '\t\t}\n'
 
         return result
 
@@ -1716,7 +1826,7 @@ def process_file(filename, fdesc, options):
         if options.verbose:
             sys.stderr.write('Reading options from ' + optfilename + '\n')
 
-        Globals.separate_options = read_options_file(open(optfilename, "rU"))
+        Globals.separate_options = read_options_file(open(optfilename, "r"))
     else:
         # If we are given a full filename and it does not exist, give an error.
         # However, don't give error when we automatically look for .options file
@@ -1789,14 +1899,7 @@ def main_cli():
 def main_plugin():
     '''Main function when invoked as a protoc plugin.'''
 
-    import sys
-    if sys.platform == "win32":
-        import os, msvcrt
-        # Set stdin and stdout to binary mode
-        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    
-    data = sys.stdin.read()
+    data = sys.stdin.buffer.read()
     request = plugin_pb2.CodeGeneratorRequest.FromString(data)
     
     import shlex
@@ -1820,7 +1923,7 @@ def main_plugin():
                 f.name = results['sourcename']
                 f.content = results['sourcedata']
 
-    sys.stdout.write(response.SerializeToString())
+    sys.stdout.buffer.write(response.SerializeToString())
 
 if __name__ == '__main__':
     # Check if we are running as a plugin under protoc

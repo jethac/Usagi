@@ -69,8 +69,42 @@ begin
                        "-I\"C:/Program Files (x86)/Windows Kits/8.1/Include/shared\" " +
                        "-D_M_IA64 -DPLATFORM_PC -Dpid_t=int"
   else
-    boilerplate_tool = "Tools/bin/systems-scanner"
-    boilerplateflags = "-I. -ITank -IEngine/ThirdParty/nanopb -I_includes -Iusr/local/opt/llvm/include -D_M_IA64 -DPLATFORM_OSX"
+    # Tools/python/systems_scanner.py replaces systems-scanner.exe here. It
+    # needs libclang's Python bindings ('clang' module), so USAGI_PYTHON
+    # should name an interpreter that has them.
+    python = ENV['USAGI_PYTHON'] || 'python3'
+    scanner = "Tools/python/systems_scanner.py"
+    scanner = "#{$submodule_dir}/#{scanner}" if !$submodule_dir.nil?
+    boilerplate_tool = "#{python} #{scanner}"
+
+    # Search the same directories, in the same order, as the Windows tool
+    # does: sourceFile in the output is spelled the way the include was found.
+    sub = $submodule_dir.nil? ? "" : "#{$submodule_dir}/"
+    include_dirs = ["."]
+    include_dirs += ["_includes", $project_dir] if !$submodule_dir.nil?
+    include_dirs << $submodule_dir if !$submodule_dir.nil?
+    include_dirs += ["#{sub}Engine/ThirdParty/nanopb", "#{sub}_includes"]
+    # Then what the headers need to parse on this platform
+    include_dirs += ["Engine/ThirdParty/EASTL/include",
+                     "Engine/ThirdParty/EASTL/test/packages/EABase/include/Common",
+                     "Engine/ThirdParty/lua-5.3.2/src",
+                     "Engine/ThirdParty/yaml-cpp/include",
+                     "Engine/ThirdParty/gli",
+                     "Engine/ThirdParty/gli/external",
+                     "Engine/ThirdParty/box3d/include"].map { |d| "#{sub}#{d}" }
+    include_dirs << "#{ENV['VULKAN_SDK']}/include" if ENV['VULKAN_SDK']
+    include_dirs = include_dirs.compact.uniq
+
+    platform_define = RUBY_PLATFORM =~ /darwin/ ? "PLATFORM_OSX" : "PLATFORM_LINUX"
+    defines = [platform_define, "EASTL_CUSTOM_FLOAT_CONSTANTS_REQUIRED",
+               "EASTL_USER_DEFINED_ALLOCATOR", "PB_FIELD_32BIT",
+               "'LUA_USER_H=<Engine/Framework/Script/LuaConf.h>'", "LUA_USE_POSIX"]
+
+    # Every engine source starts with Common.h (the PCH); headers scanned on
+    # their own need it too, for uint32 and friends.
+    boilerplateflags = include_dirs.map { |d| "-I#{d} " }.join("") +
+                       defines.map { |d| "-D#{d} " }.join("") +
+                       "-include Engine/Common/Common.h"
   end
   includes.close
 
@@ -80,7 +114,7 @@ begin
   boilerplate_error = stderr.readlines[0]
 
   if boilerplate_error != nil
-    print "#{boilerplate_tool} #{boilerplateflags} -H -o #{$out} #{input_file}"
+    print "#{boilerplate_tool} #{boilerplateflags} -H -o #{$out} #{ALL_HEADERS.join(" ")}"
     raise "Error! Boilerplate error: #{boilerplate_error}"
   end
 ensure
