@@ -9,7 +9,7 @@
 #include <yaml-cpp/yaml.h>
 #include <sstream>
 #include <fstream>
-#include <ShaderLang.h>
+#include <filesystem>
 #include <pb.h>
 
 FileFactory* g_pFileFactory = nullptr;
@@ -36,37 +36,29 @@ bool ProcessFile(const std::string& fileName, YAML::Node node)
 // We shouldn't use this, creating pak file definitions for dependency sanity
 bool ProcessFiles(const std::string& inputDir)
 {
-	std::string pathName = inputDir + "/*";
-	WIN32_FIND_DATA findFileData;
-	HANDLE hFind;
-	hFind = FindFirstFile(pathName.c_str(), &findFileData);
-
-	YAML::Node fakeNode;
-
-	if (hFind == INVALID_HANDLE_VALUE)
+	std::error_code err;
+	std::filesystem::directory_iterator dir(inputDir, err);
+	if (err)
 	{
 		printf("Invalid directory\n");
 		return false;
 	}
 
-	do
+	YAML::Node fakeNode;
+
+	for (const std::filesystem::directory_entry& entry : dir)
 	{
-		if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		const std::string name = inputDir + "/" + entry.path().filename().string();
+		if (entry.is_directory())
 		{
-			if (strcmp(findFileData.cFileName, ".") != 0 
-				&& strcmp(findFileData.cFileName, "..") != 0 )
-			{
-				if( !ProcessFiles(inputDir + "/" + findFileData.cFileName) )
-					return false;
-			}
-		}
-		else
-		{
-			if (!ProcessFile(inputDir + "/" + findFileData.cFileName, fakeNode))
+			if (!ProcessFiles(name))
 				return false;
 		}
-
-	} while (FindNextFile(hFind, &findFileData) != 0);
+		else if (!ProcessFile(name, fakeNode))
+		{
+			return false;
+		}
+	}
 
 	return true;
 }

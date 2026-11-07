@@ -340,7 +340,7 @@ bool MaterialDefinitionExporter::LoadAttributes(YAML::Node& attributes)
 {
 	for (YAML::const_iterator it = attributes.begin(); it != attributes.end(); ++it)
 	{
-		usg::CustomEffectDecl::Attribute attrib;
+		usg::CustomEffectDecl::Attribute attrib = {};
 		strcpy_s(attrib.hint, sizeof(attrib.hint), (*it)["hint"].as<std::string>().c_str());
 		strcpy_s(attrib.name, sizeof(attrib.name), (*it)["name"].as<std::string>().c_str());
 		attrib.uIndex = (*it)["index"].as<uint32>();
@@ -438,7 +438,7 @@ bool MaterialDefinitionExporter::LoadSamplers(YAML::Node& samplers)
 {
 	for (YAML::const_iterator it = samplers.begin(); it != samplers.end(); ++it)
 	{
-		usg::CustomEffectDecl::Sampler sampler;
+		usg::CustomEffectDecl::Sampler sampler = {};
 		strcpy_s(sampler.hint, sizeof(sampler.hint), (*it)["hint"].as<std::string>().c_str());
 		sampler.uIndex = (*it)["index"].as<uint32>();
 		if ((*it)["default"])
@@ -505,7 +505,7 @@ bool MaterialDefinitionExporter::LoadConstantSets(YAML::Node& constantDefs)
 {
 	for (YAML::const_iterator setIt = constantDefs.begin(); setIt != constantDefs.end(); ++setIt)
 	{
-		ConstantSetData setData;
+		ConstantSetData setData = {};
 		if ((*setIt)["defines"])
 		{
 			if (!IsValidWithDefineSet((*setIt)["defines"].as<std::string>()))
@@ -537,7 +537,7 @@ bool MaterialDefinitionExporter::LoadConstantSets(YAML::Node& constantDefs)
 		// First collect the information about the variables
 		for (YAML::const_iterator variableIt = variableDefs.begin(); variableIt != variableDefs.end(); ++variableIt)
 		{
-			usg::CustomEffectDecl::Constant constant;
+			usg::CustomEffectDecl::Constant constant = {};
 			constant.eConstantType = GetConstantType((*variableIt)["type"].as<std::string>().c_str());
 			strcpy_s(constant.szName, sizeof(constant.szName), (*variableIt)["name"].as<std::string>().c_str());
 			constant.uNameHash = utl::CRC32(constant.szName);

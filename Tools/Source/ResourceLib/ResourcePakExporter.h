@@ -3,6 +3,7 @@
 #include "Engine/Core/Utility.h"
 #include "Engine/Resource/PakDecl.h"
 #include <algorithm>
+#include <string>
 #include <vector>
 
 struct DependencyEntry
@@ -81,18 +82,82 @@ private:
 	uint32 uFileCRCNoExt;
 };
 
-inline bool ComparePointers(const ResourceEntry * const & a, const ResourceEntry * const & b)
-{
-	return *a < *b;
-}
-
 namespace ResourcePakExporter
 {
+	// Orders the entries so that each comes after the entries in this pak it
+	// depends on: entries with no dependencies first, then the rest, each
+	// group otherwise in the order the entries were added.
+	// (This used to be std::sort with ResourceEntry::operator<, which isn't a strict
+	// weak ordering, so the result depended on the standard library: MSVC and
+	// libstdc++ produced different paks from the same input.)
+	inline void SortByDependencies(std::vector<ResourceEntry*>& entries)
+	{
+		const size_t uCount = entries.size();
+		std::vector<std::vector<size_t>> dependents(uCount);
+		std::vector<size_t> waitingOn(uCount, 0);
+		for (size_t i = 0; i < uCount; i++)
+		{
+			for (const DependencyEntry& dep : entries[i]->GetDeps())
+			{
+				for (size_t j = 0; j < uCount; j++)
+				{
+					if (j != i && entries[j]->GetNameCRC() == dep.fileNameCRC)
+					{
+						dependents[j].push_back(i);
+						waitingOn[i]++;
+					}
+				}
+			}
+		}
+
+		std::vector<ResourceEntry*> sorted;
+		sorted.reserve(uCount);
+		std::vector<bool> placed(uCount, false);
+		auto place = [&](size_t i)
+		{
+			sorted.push_back(entries[i]);
+			placed[i] = true;
+			for (size_t d : dependents[i])
+				waitingOn[d]--;
+		};
+
+		for (size_t i = 0; i < uCount; i++)
+		{
+			if (entries[i]->GetDeps().empty())
+				place(i);
+		}
+
+		// The lowest-indexed entry whose dependencies are all placed, each time
+		bool bProgress = true;
+		while (sorted.size() < uCount && bProgress)
+		{
+			bProgress = false;
+			for (size_t i = 0; i < uCount; i++)
+			{
+				if (!placed[i] && waitingOn[i] == 0)
+				{
+					place(i);
+					bProgress = true;
+					break;
+				}
+			}
+		}
+
+		// Circular dependencies: keep the remaining order
+		for (size_t i = 0; i < uCount; i++)
+		{
+			if (!placed[i])
+				sorted.push_back(entries[i]);
+		}
+
+		entries.swap(sorted);
+	}
+
 	// Note entries may be re-ordered by this function
 	inline bool Export(const char* szFileName, std::vector<ResourceEntry*>& entries)
 	{
 		// Sort these entries so that dependencies come before other files
-		std::sort(entries.begin(), entries.end(), ComparePointers);
+		SortByDependencies(entries);
 
 		uint32 uTmpOffset = sizeof(usg::PakFileDecl::ResourcePakHdr);
 		for (uint32 i = 0; i < entries.size(); i++)

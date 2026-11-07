@@ -6,8 +6,12 @@
 #include "Engine/Particles/Scripted/EffectGroup.pb.h"
 #include "Engine/Audio/AudioBank.pb.h"
 #include "Engine/Layout/UI.pb.h"
+// USG_TOOLS_NO_FBX: built without the FBX SDK (Linux hosts without it), so
+// model paks are unavailable and say so
+#ifndef USG_TOOLS_NO_FBX
 #include "../Ayataka/common/ModelConverterBase.h"
 #include "../Ayataka/fbx/FbxConverter.h"
+#endif
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
@@ -370,6 +374,10 @@ void FileFactory::AddDependency(const char* szFileName)
 
 std::string FileFactory::LoadModel(const char* szFileName, const YAML::Node& node)
 {
+#ifdef USG_TOOLS_NO_FBX
+	FATAL_RELEASE(false, "%s: this PakFileGen was built without the FBX SDK", szFileName);
+	return "";
+#else
 	std::stringstream command;
 	std::string relativePath = std::string(szFileName).substr(m_rootDir.size());
 	std::string fileNameBase;
@@ -408,7 +416,7 @@ std::string FileFactory::LoadModel(const char* szFileName, const YAML::Node& nod
 	if (ret != 0) {
 		FATAL_RELEASE(false, "Failed to find model %s", szFileName);
 		vdelete pConverter;
-		return false;
+		return "";
 	}
 
 	AddDependenciesFromDepTracker(dependencies);
@@ -490,6 +498,7 @@ std::string FileFactory::LoadModel(const char* szFileName, const YAML::Node& nod
 
 
 	return pModel->GetName();
+#endif
 }
 
 
@@ -569,7 +578,7 @@ std::string FileFactory::LoadYMLLayout(const char* szFileName)
 	if (!pFileOut)
 	{
 		delete pFileEntry;
-		return false;
+		return "";
 	}
 
 	fseek(pFileOut, 0, SEEK_END);
@@ -701,7 +710,7 @@ std::string FileFactory::LoadYMLEntityFile(const char* szFileName)
 	std::string tempFileName = m_tempDir + relativeNameNoExt + ".vent";
 	std::string depFileName = tempFileName + ".d";
 
-	command << "ruby Usagi\\Tools\\ruby\\process_hierarchy.rb" 
+	command << "ruby Usagi/Tools/ruby/process_hierarchy.rb"
 		<< " -IData/Entities" 
 		<< " -RUsagi/_build/ruby -R_build/ruby"
 		<< " -d Data/Components/Defaults.yml " 
@@ -731,7 +740,7 @@ std::string FileFactory::LoadYMLEntityFile(const char* szFileName)
 	if (!pFileOut)
 	{
 		delete pFileEntry;
-		return false;
+		return "";
 	}
 
 	fseek(pFileOut, 0, SEEK_END);
@@ -772,7 +781,7 @@ std::string FileFactory::LoadYMLVPBFile(const char* szFileName)
 	if (!pFileOut)
 	{
 		delete pFileEntry;
-		return false;
+		return "";
 	}
 
 	fseek(pFileOut, 0, SEEK_END);
@@ -802,7 +811,7 @@ std::string FileFactory::LoadYMLAudioFile(const char* szFileName)
 	//std::filesystem::path cwd = std::filesystem::current_path();
 	std::string fullPath = /*cwd.string() + std::string("\\") +*/ RemoveFileName(tempFileName);
 
-	command << "ruby Usagi\\Tools\\ruby\\yml2vpb.rb -o " << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
+	command << "ruby Usagi/Tools/ruby/yml2vpb.rb -o " << tempFileName.c_str() << " --MF " << depFileName.c_str() << " -RUsagi/_build/ruby -R_build/ruby" " -d Data/Components/Defaults.yml " << szFileName;
 
 	memsize pos = 0;
 	do
