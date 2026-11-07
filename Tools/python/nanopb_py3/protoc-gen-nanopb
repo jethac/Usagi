@@ -1,0 +1,6 @@
+#!/bin/sh
+# protoc plugin: nanopb's C generator under Python 3 (see run_plugin.py).
+# The interpreter is $USAGI_PYTHON (a Python 3 with the protobuf package),
+# or python3.
+D=$(dirname "$0")
+exec "${USAGI_PYTHON:-python3}" "$D/run_plugin.py" "$D/../../../Engine/ThirdParty/nanopb/generator/nanopb_generator.py"
