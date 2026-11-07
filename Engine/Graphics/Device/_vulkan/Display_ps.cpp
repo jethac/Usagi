@@ -44,6 +44,15 @@ Display_ps::Display_ps()
 {
 	m_swapChain = VK_NULL_HANDLE;
 	m_uActiveImage = 0;
+	m_uAcquireSlot = 0;
+	for (uint32 i = 0; i < GFX_NUM_DYN_BUFF; i++)
+	{
+		m_imageAcquired[i] = VK_NULL_HANDLE;
+	}
+	for (uint32 i = 0; i < MAX_SWAP_IMAGES; i++)
+	{
+		m_renderComplete[i] = VK_NULL_HANDLE;
+	}
 	m_uSwapChainImageCount = 0;
 	m_bWindowResized = false;
 	m_bRTShouldLoad = false;
@@ -122,7 +131,14 @@ void Display_ps::Cleanup(usg::GFXDevice* pDevice)
 		m_surface = VK_NULL_HANDLE;
 	}
 
-	vkDestroySemaphore(pDevice->GetPlatform().GetVKDevice(), m_imageAcquired, nullptr);
+	for (uint32 i = 0; i < GFX_NUM_DYN_BUFF; i++)
+	{
+		vkDestroySemaphore(pDevice->GetPlatform().GetVKDevice(), m_imageAcquired[i], nullptr);
+	}
+	for (uint32 i = 0; i < MAX_SWAP_IMAGES; i++)
+	{
+		vkDestroySemaphore(pDevice->GetPlatform().GetVKDevice(), m_renderComplete[i], nullptr);
+	}
 }
 
 Display_ps::~Display_ps()
@@ -167,8 +183,17 @@ void Display_ps::Initialise(usg::GFXDevice* pDevice, WindHndl hndl)
 	semaphoreCreateInfo.pNext = NULL;
 	semaphoreCreateInfo.flags = 0;
 
-	res = vkCreateSemaphore(devicePS.GetVKDevice(), &semaphoreCreateInfo, nullptr, &m_imageAcquired);
-	ASSERT(res == VK_SUCCESS);
+	for (uint32 i = 0; i < GFX_NUM_DYN_BUFF; i++)
+	{
+		res = vkCreateSemaphore(devicePS.GetVKDevice(), &semaphoreCreateInfo, nullptr, &m_imageAcquired[i]);
+		ASSERT(res == VK_SUCCESS);
+	}
+	ASSERT(m_uSwapChainImageCount <= MAX_SWAP_IMAGES);
+	for (uint32 i = 0; i < MAX_SWAP_IMAGES; i++)
+	{
+		res = vkCreateSemaphore(devicePS.GetVKDevice(), &semaphoreCreateInfo, nullptr, &m_renderComplete[i]);
+		ASSERT(res == VK_SUCCESS);
+	}
 
 	usg::RenderPassDecl rpDecl;
 	usg::RenderPassDecl::Attachment attach;
@@ -760,12 +785,10 @@ void Display_ps::SwapBuffers(GFXDevice* pDevice)
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &m_swapChain;
 		presentInfo.pImageIndices = &m_uActiveImage;
-		// Check if a wait semaphore has been specified to wait for before presenting the image
-	/*	if (m_presentComplete != VK_NULL_HANDLE)
-		{
-			presentInfo.pWaitSemaphores = &m_presentComplete;
-			presentInfo.waitSemaphoreCount = 1;
-		}*/
+		// The frame drawn to this image may still be on the GPU (frames in
+		// flight); the present waits for its submission to finish
+		presentInfo.pWaitSemaphores = &m_renderComplete[m_uActiveImage];
+		presentInfo.waitSemaphoreCount = 1;
 		VkResult res = vkQueuePresentKHR(pDevice->GetPlatform().GetQueue(), &presentInfo);
 		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || m_bWindowResized)
 		{
@@ -778,7 +801,10 @@ void Display_ps::SwapBuffers(GFXDevice* pDevice)
 	}
 	bFirst = false;
 
-	vkAcquireNextImageKHR(pDevice->GetPlatform().GetVKDevice(), m_swapChain, UINT64_MAX, m_imageAcquired, (VkFence)nullptr, &m_uActiveImage);
+	// The semaphore's last use was by the frame that held this slot, which the
+	// device has waited for
+	m_uAcquireSlot = (m_uAcquireSlot + 1) % GFX_NUM_DYN_BUFF;
+	vkAcquireNextImageKHR(pDevice->GetPlatform().GetVKDevice(), m_swapChain, UINT64_MAX, m_imageAcquired[m_uAcquireSlot], (VkFence)nullptr, &m_uActiveImage);
 }
 
 // The BMP file and DIB headers, laid out as Windows' BITMAPFILEHEADER and

@@ -8,6 +8,7 @@
 #include "Engine/Scene/SceneContext.h"
 #include "Engine/Scene/SceneSearchObject.h"
 #include "Engine/Core/stl/hash_map.h"
+#include "Engine/Core/stl/vector.h"
 #include "Engine/Graphics/Device/DescriptorSet.h"
 
 namespace usg{
@@ -37,8 +38,10 @@ protected:
 		usg::Matrix4x4	CmpLoc;
 	};
 
-	list<RenderNode*>		m_drawList;
-	list<RenderNode*>		m_cmpList;
+	// Vectors kept across frames: rebuilding them allocates nothing once warm
+	vector<RenderNode*>		m_drawList;
+	vector<RenderNode*>		m_cmpList;
+	vector<RenderNode*>		m_scratchList;
 	vector<ComparisonData>	m_prevData;
 	hash_map<uint64, InstancedRenderer*> m_instanceRenders;
 

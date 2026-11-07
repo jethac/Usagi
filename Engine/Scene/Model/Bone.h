@@ -31,10 +31,18 @@ public:
 		m_pTransformNode->SetMatrix(mat);
 		if (bUpdateConsts /*&& m_pRenderGroup*/)
 		{
-			// FIXME: Only do for referenced base nodes
-			SceneConsts::ModelTransform* pTransform = m_boneConstants.Lock<SceneConsts::ModelTransform>();
-			pTransform->mModelMat = mat;
-			m_boneConstants.Unlock();
+			// Static props hand in the same matrix every frame: only re-upload
+			// the constant when it changed
+			const SceneConsts::ModelTransform* pCurrent = (const SceneConsts::ModelTransform*)m_boneConstants.GetCPUData();
+			const Matrix4x3 mNew = mat;
+			if (!m_bConstsSet || memcmp(&pCurrent->mModelMat, &mNew, sizeof(mNew)) != 0)
+			{
+				// FIXME: Only do for referenced base nodes
+				SceneConsts::ModelTransform* pTransform = m_boneConstants.Lock<SceneConsts::ModelTransform>();
+				pTransform->mModelMat = mNew;
+				m_boneConstants.Unlock();
+				m_bConstsSet = true;
+			}
 		}
 	}
 
@@ -88,6 +96,7 @@ private:
 	ConstantSet						m_boneConstants;
 	RenderGroup*					m_pRenderGroup;
 	bool							m_bExternallyDriven = false;
+	bool							m_bConstsSet = false;	// m_boneConstants holds a matrix
 };
 
 } // namespace usg

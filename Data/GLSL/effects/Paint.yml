@@ -7,3 +7,9 @@ Effects:
   - name: Stroke
     vert: paint/stroke
     frag: paint/stroke
+    define_sets:
+      # Paint.Stroke.accumulate: writes the colour as amounts rather than sRGB paint
+      # (linear, premultiplied by coverage), for UNORM data targets such as mark maps
+      # that build up with ONE / ONE_MINUS_SRC_COLOR blending.
+      - name: accumulate
+        defines: ACCUMULATE

@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
 #include "Engine/Graphics/Lights/LightMgr.h"
 #include "Engine/Memory/FastPool.h"
@@ -442,7 +443,11 @@ void Scene::PerformVisibilityTesting(GFXDevice* pDevice)
 	uint32 uContextCount = 0;
 	m_pDevice = pDevice;
 
-	m_pImpl->octree.UpdateTransforms();
+	{
+		static const uint32 s_uOctree = FrameBudget::RegisterDetail("octree");
+		FrameBudget::Scope scope(s_uOctree);
+		m_pImpl->octree.UpdateTransforms();
+	}
 
 	// Primary visibility list
 	for(auto it : m_pImpl->sceneContexts)
@@ -459,11 +464,15 @@ void Scene::PerformVisibilityTesting(GFXDevice* pDevice)
 		}
 	}
 
-	for (auto it : m_pImpl->sceneContexts)
 	{
-		if (it->IsActive())
+		static const uint32 s_uCull = FrameBudget::RegisterDetail("cull");
+		FrameBudget::Scope scope(s_uCull);
+		for (auto it : m_pImpl->sceneContexts)
 		{
-			m_pImpl->octree.GetVisibleList(it->GetSearchObject());
+			if (it->IsActive())
+			{
+				m_pImpl->octree.GetVisibleList(it->GetSearchObject());
+			}
 		}
 	}
 
@@ -472,11 +481,15 @@ void Scene::PerformVisibilityTesting(GFXDevice* pDevice)
 	m_pImpl->profileTimers[TIMER_NODE_UPDATE].ClearAndStart();
 
 
-	for (auto it : m_pImpl->sceneContexts)
 	{
-		if (it->IsActive())
+		static const uint32 s_uGroups = FrameBudget::RegisterDetail("visible-groups");
+		FrameBudget::Scope scope(s_uGroups);
+		for (auto it : m_pImpl->sceneContexts)
 		{
-			it->UpdateVisibleGroups();
+			if (it->IsActive())
+			{
+				it->UpdateVisibleGroups();
+			}
 		}
 	}
 

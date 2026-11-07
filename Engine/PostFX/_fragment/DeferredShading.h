@@ -44,6 +44,10 @@ public:
 	void SetLightingSettings(GFXDevice* pDevice, ResourceMgr* pResource, const LightingSettings& settings);
 	// Inline screen space AO applied to ambient and image based lighting
 	void SetAOSettings(GFXDevice* pDevice, const SSAOSettings& settings);
+	// Last frame's lit scene (HDR, any resolution) for the screen space
+	// reflections (LightingSettings.uSSRSteps)
+	void SetPrevSceneTexture(GFXDevice* pDevice, const TextureHndl& texture);
+	virtual void UpdateBuffer(GFXDevice* pDevice) override;
 
 private:
 	void UpdateParams(GFXDevice* pDevice);
@@ -115,6 +119,10 @@ private:
 
 	VertexBuffer			m_frustumMesh;
 	IndexBuffer				m_frustumIB;
+
+	Matrix4x4				m_prevViewProj;		// The camera of the frame last drawn
+	bool					m_bPrevViewProjValid;
+	bool					m_bPrevSceneValid;
 };
 
 }

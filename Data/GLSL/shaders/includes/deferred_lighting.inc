@@ -53,7 +53,7 @@ void main(void)
 	}
 
 	float fOcclusion = s.fOcclusion * ScreenSpaceAO(vPos, s.vNormal);
-	vColor += EvaluateIBL(s, V, fOcclusion);
+	vColor += EvaluateIBL(s, V, fOcclusion, vPos);
 	vColor += vAmbientLight.rgb * vEnvParams.z * PBR_DiffuseColor(s) * fOcclusion;
 	vColor += GetDeferredEmissive(vo_vTexCoord);
 
@@ -64,7 +64,8 @@ void main(void)
 	if (iDebug == 1) colorOut = vec4(s.vAlbedo, 1.0);
 	else if (iDebug == 2) colorOut = vec4(s.vNormal * 0.5 + 0.5, 1.0);
 	else if (iDebug == 3) colorOut = vec4(s.fRoughness, s.fMetallic, s.fClearCoat, 1.0);
-	else if (iDebug == 4) colorOut = vec4(EvaluateIBL(s, V, s.fOcclusion), 1.0);
+	else if (iDebug == 4) colorOut = vec4(EvaluateIBL(s, V, s.fOcclusion, vPos), 1.0);
+	else if (iDebug == 10) colorOut = vec4(TraceSSR(vPos, s.vNormal, V).aaa, 1.0);
 	else if (iDebug == 5) colorOut = vec4(vec3(iCascadeLightStart >= 0 ? SampleDirShadow(vPos, s.vNormal, lights[iCascadeLightStart].vDirection.xyz, 0) : 1.0), 1.0);
 	else if (iDebug == 6) colorOut = vec4(fract(vPos * 0.1), 1.0);
 	else if (iDebug == 7) colorOut = vec4(vec3(fOcclusion), 1.0);

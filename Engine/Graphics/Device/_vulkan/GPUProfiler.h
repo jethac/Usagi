@@ -9,6 +9,7 @@
 #define _USG_GRAPHICS_VULKAN_GPUPROFILER_H_
 
 #include OS_HEADER(Engine/Graphics/Device, VulkanIncludes.h)
+#include "Engine/Graphics/RenderConsts.h"
 
 namespace usg {
 
@@ -23,8 +24,10 @@ public:
 
 	bool IsEnabled() const { return m_pool != VK_NULL_HANDLE; }
 
-	// Must be called outside of a render pass
-	void BeginFrame(VkCommandBuffer cmd);
+	// Must be called outside of a render pass. uSlot is the frame-in-flight
+	// slot: a slot's queries are read back when it is next begun, after the
+	// device has waited on that slot's fence.
+	void BeginFrame(VkCommandBuffer cmd, uint32 uSlot);
 	void EndFrame(VkCommandBuffer cmd);
 	void Push(VkCommandBuffer cmd, const char* szName);
 	void Pop(VkCommandBuffer cmd);
@@ -58,20 +61,29 @@ private:
 		double		fMaxMs;
 	};
 
-	void ReadBack();
+	void ReadBack(uint32 uSlot);
 	Stat* FindStat(const char* szName, uint32 uDepth);
 	void WriteReport();
 
 	VkDevice		m_device;
 	VkQueryPool		m_pool;
 	float			m_fPeriodNs;
-	Scope			m_scopes[MAX_SCOPES];
-	uint32			m_uScopeCount;
-	uint32			m_uQueryCount;
+	// The queries of each frame in flight, in their own range of the pool
+	struct FrameQueries
+	{
+		Scope		scopes[MAX_SCOPES];
+		uint32		uScopeCount;
+		uint32		uQueryCount;
+		bool		bPending;
+	};
+
+	uint32 QueryIndex(uint32 uLocal) const { return m_uSlot * MAX_QUERIES + uLocal; }
+
+	FrameQueries	m_frames[GFX_NUM_DYN_BUFF];
+	uint32			m_uSlot;
 	uint32			m_stack[MAX_STACK];
 	uint32			m_uStackDepth;
 	bool			m_bFrameOpen;
-	bool			m_bPending;
 	Stat			m_stats[MAX_STATS];
 	uint32			m_uStatCount;
 	uint32			m_uFrames;

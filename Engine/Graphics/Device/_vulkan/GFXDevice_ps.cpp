@@ -13,6 +13,10 @@
 #include "Engine/Graphics/Device/GFXDevice.h" 
 #include "Engine/Graphics/Device/IHeadMountedDisplay.h" 
 #include "Engine/Core/Modules/ModuleManager.h"
+#include "Engine/Core/Timer/FrameBudget.h"
+#include "Engine/Core/OS.h"
+#include "Engine/Maths/MathUtil.h"
+#include OS_HEADER(Engine/Core/Timer, TimeTracker.h)
 #include "Engine/Graphics/Device/GFXContext.h" 
 #include <vulkan/vulkan.h>
 #include "Engine/Core/stl/vector.h"
@@ -248,7 +252,10 @@ void GFXDevice_ps::Cleanup(GFXDevice* pParent)
 	vkDestroyCommandPool(m_vkDevice, m_cmdPool, NULL);
 	vkDeviceWaitIdle(m_vkDevice);
 
-	vkDestroyFence(m_vkDevice, m_drawFence, NULL);
+	for (uint32 i = 0; i < GFX_NUM_DYN_BUFF; i++)
+	{
+		vkDestroyFence(m_vkDevice, m_drawFences[i], NULL);
+	}
 	// Cleanup any requested destroys before destroying the device
 	CleanupDestroyRequests();
 
@@ -958,8 +965,20 @@ void GFXDevice_ps::Init(GFXDevice* pParent)
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.pNext = NULL;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-	res = vkCreateFence(m_vkDevice, &fenceInfo, NULL, &m_drawFence);
-	FATAL_RELEASE(res == VK_SUCCESS, "Failed to create fence");
+	for (uint32 i = 0; i < GFX_NUM_DYN_BUFF; i++)
+	{
+		res = vkCreateFence(m_vkDevice, &fenceInfo, NULL, &m_drawFences[i]);
+		FATAL_RELEASE(res == VK_SUCCESS, "Failed to create fence");
+	}
+	m_uFrameSlot = 0;
+	m_uFramesInFlight = GFX_NUM_DYN_BUFF;
+	{
+		char szEnv[8] = {};
+		if (OS::GetEnvVar("USAGI_FRAMES_IN_FLIGHT", szEnv, sizeof(szEnv)) && szEnv[0] != '\0')
+		{
+			m_uFramesInFlight = Math::Clamp((uint32)atoi(szEnv), 1U, (uint32)GFX_NUM_DYN_BUFF);
+		}
+	}
 
 
 	//ASSERT(false);	// Need to set up the copy command buffer
@@ -1083,19 +1102,31 @@ const DisplaySettings* GFXDevice_ps::GetDisplayInfo(uint32 uIndex)
 
 void GFXDevice_ps::Begin()
 {
-	static bool bFirst = true;
-	if (!bFirst)
+	const bool bBudget = FrameBudget::IsEnabled();
+	uint64 uStart = bBudget ? TimeTracker::GetSystemTime() : 0;
+	// Wait for the frame that last used this slot; with two in flight the
+	// GPU may still be on the previous frame while this one records. The
+	// fences start signalled.
+	m_uFrameSlot = m_pParent->GetFrameCount() % m_uFramesInFlight;
+	VkFence fence = m_drawFences[m_uFrameSlot];
+	VkResult res;
+	do {
+		res = vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, 100000);
+	} while (res == VK_TIMEOUT);
+	vkResetFences(m_vkDevice, 1, &fence);
+	if (bBudget)
 	{
-		VkResult res;
-		do {
-			res = vkWaitForFences(m_vkDevice, 1, &m_drawFence, VK_TRUE, 100000);
-		} while (res == VK_TIMEOUT);
+		uint64 uNow = TimeTracker::GetSystemTime();
+		FrameBudget::AddCPUTime(FrameBudget::CPU_GPU_WAIT, FrameBudget::TicksToMs(uStart, uNow));
+		uStart = uNow;
 	}
-	vkResetFences(m_vkDevice, 1, &m_drawFence);
-	bFirst = false;
 	for (uint32 i = 0; i < m_pParent->GetValidDisplayCount(); i++)
 	{
 		m_pParent->GetDisplay(i)->GetPlatform().SwapBuffers(m_pParent);
+	}
+	if (bBudget)
+	{
+		FrameBudget::AddCPUTime(FrameBudget::CPU_PRESENT, FrameBudget::TicksToMs(uStart, TimeTracker::GetSystemTime()));
 	}
 
 	// Safe to take out resources older than max dynamic buffers
@@ -1110,6 +1141,7 @@ void GFXDevice_ps::Begin()
 void GFXDevice_ps::End(bool bIsLoading)
 {
 	CriticalSection::ScopedLock lock(m_criticalSection);
+	const uint64 uBudgetStart = FrameBudget::IsEnabled() ? TimeTracker::GetSystemTime() : 0;
 	// For now just submit our immediate context
 	VkSubmitInfo submitInfo = {};
 	VkCommandBuffer buffers[] = { m_pParent->GetImmediateCtxt()->GetPlatform().GetVkCmdBuffer() };
@@ -1122,8 +1154,11 @@ void GFXDevice_ps::End(bool bIsLoading)
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = &m_pParent->GetDisplay(0)->GetPlatform().GetImageAcquired();
 	submitInfo.pWaitDstStageMask = &pipe_stage_flags;
+	// The present (next Begin) waits on this rather than on the fence
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &m_pParent->GetDisplay(0)->GetPlatform().GetRenderComplete();
 
-	VkResult res = vkQueueSubmit(m_queue[QUEUE_TYPE_GRAPHICS], 1, &submitInfo, m_drawFence);
+	VkResult res = vkQueueSubmit(m_queue[QUEUE_TYPE_GRAPHICS], 1, &submitInfo, m_drawFences[m_uFrameSlot]);
 	FATAL_RELEASE(res == VK_SUCCESS, "vkQueueSubmit(GFX) returned %d", res);
 
 	memsize uAllocedMem = 0;
@@ -1145,7 +1180,10 @@ void GFXDevice_ps::End(bool bIsLoading)
 	}
 	//DEBUG_PRINT("GPU Memory: %d\n", (uAllocedMem / 1024) / 1024);
 
-
+	if (uBudgetStart)
+	{
+		FrameBudget::AddCPUTime(FrameBudget::CPU_SUBMIT, FrameBudget::TicksToMs(uBudgetStart, TimeTracker::GetSystemTime()));
+	}
 }
 
  

@@ -22,6 +22,10 @@ public:
 	Bloom();
 	~Bloom();
 
+	// The quarter resolution HDR scene the bloom starts from; until the next
+	// frame's bloom it is last frame's scene (deferred reflections read it)
+	const TextureHndl& GetScaledSceneTexture() const { return m_scaledSceneTex.GetTexture(); }
+
 	virtual void Init(GFXDevice* pDevice, ResourceMgr* pResource, PostFXSys* pSys);
 	virtual void Cleanup(GFXDevice* pDevice);
 	virtual void Resize(GFXDevice* pDevice, uint32 uWidth, uint32 uHeight);
@@ -77,7 +81,7 @@ private:
 	ConstantSet		m_constants[PASS_COUNT];
 	DescriptorSet	m_descriptors[PASS_COUNT];
 
-	ColorBuffer		m_scaledSceneTex;
+	ColorBuffer		m_scaledSceneTex;	// Quarter resolution HDR scene (also last frame's scene for reflections)
 	ColorBuffer		m_brightPassTex;
 	ColorBuffer		m_bloomSourceTex;
 	ColorBuffer		m_bloomTex[BLOOM_PASS_TEXTURES];

@@ -2,6 +2,7 @@
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 ****************************************************************************/
 #include "Engine/Common/Common.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include <cstdio>
 #include "Engine/Graphics/GFX.h"
 #include "Engine/Graphics/Device/GFXDevice.h"
@@ -105,6 +106,7 @@ namespace usg {
 			{
 				pVisibleNodes[i].reserve(500);
 			}
+			scratchNodes.reserve(500);
 		}
 		DescriptorSet			globalDescriptors[VIEW_COUNT];
 		DescriptorSet			globalDescriptorsWithDepth[VIEW_COUNT];
@@ -121,6 +123,7 @@ namespace usg {
 		Fog						fog[MAX_FOGS];
 
 		vector<RenderNode*>		pVisibleNodes[RenderLayer::LAYER_COUNT];
+		vector<RenderNode*>		scratchNodes;	// ReplaceInstancedNodes' output, swapped in
 	};
 
 
@@ -283,6 +286,13 @@ namespace usg {
 		const RenderNode* arg2 = *(const RenderNode**)(b);
 		if (*arg1 < *arg2) return -1;
 		if (*arg1 > *arg2) return 1;
+		// Equal material keys: keep each instance set together so it draws as one
+		// batch (qsort isn't stable, so models sharing an effect and texture
+		// would otherwise interleave and split into many small batches)
+		const uint64 uId1 = arg1->GetInstanceId();
+		const uint64 uId2 = arg2->GetInstanceId();
+		if (uId1 < uId2) return -1;
+		if (uId1 > uId2) return 1;
 		return 0;
 	}
 
@@ -300,6 +310,8 @@ namespace usg {
 
 	void ViewContext::Update(GFXDevice* pDevice)
 	{
+		static const uint32 s_uPrep = FrameBudget::RegisterDetail("view-prep");
+		FrameBudget::Scope scope(s_uPrep);
 		const Camera* pCamera = GetCamera();
 		SetRenderMask(pCamera->GetRenderMask());
 		const Scene* pScene = GetScene();
@@ -476,8 +488,14 @@ namespace usg {
 
 	void ViewContext::ReplaceInstancedNodes(usg::GFXDevice* pDevice, uint32 uLayer)
 	{
-		// Now look for instances and build a new list
-		vector<RenderNode*> adjustedNodes;
+		if (m_pImpl->pVisibleNodes[uLayer].empty())
+		{
+			return;
+		}
+		// Now look for instances and build a new list (into a kept buffer, no
+		// per-frame allocation)
+		vector<RenderNode*>& adjustedNodes = m_pImpl->scratchNodes;
+		adjustedNodes.clear();
 		InstancedRenderer* pCurrentInstanceRenderer = nullptr;
 		uint64 uCurrentInstance = USG_INVALID_ID64;
 
@@ -522,7 +540,7 @@ namespace usg {
 			uCurrentInstance = USG_INVALID_ID64;
 		}
 
-		m_pImpl->pVisibleNodes[uLayer] = adjustedNodes;
+		m_pImpl->pVisibleNodes[uLayer].swap(adjustedNodes);
 	}
 
 
@@ -536,6 +554,8 @@ namespace usg {
 
 	void ViewContext::DrawScene(GFXContext* pContext)
 	{
+		static const uint32 s_uRecord = FrameBudget::RegisterDetail("view-record");
+		FrameBudget::Scope scope(s_uRecord);
 		Scene* pScene = GetScene();
 		// We only suport one light for forward rendering, set it now
 		m_pImpl->lightingContext.SetPrimaryShadowDesc(pContext);

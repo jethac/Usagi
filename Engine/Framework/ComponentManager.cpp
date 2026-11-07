@@ -2,6 +2,7 @@
 // Parts that need to be expanded to include component and system information are
 // broken into separate ".bp.erb" files, named after the functionality they implement.
 #include "Engine/Common/Common.h"
+#include "Engine/Core/Timer/FrameBudget.h"
 #include "ComponentManager.h"
 #include "Engine/Physics/PhysicsComponents.pb.h"
 #include "Engine/Network/Network.pb.h"
@@ -178,8 +179,12 @@ namespace usg
 		GetEventManager().Update(bPaused ? 0.0f : fElapsed);
 		GetEventManager().TriggerPreRunEvents(m_systemCoordinator, rootEntity, m_uFrameCounter);
 
-		RunSignal runSignal(fElapsed, bPaused);
-		m_systemCoordinator.TriggerFromRoot(rootEntity, runSignal);
+		{
+			static const uint32 s_uRun = FrameBudget::RegisterDetail("run-systems");
+			FrameBudget::Scope scope(s_uRun);
+			RunSignal runSignal(fElapsed, bPaused);
+			m_systemCoordinator.TriggerFromRoot(rootEntity, runSignal);
+		}
 
 
 		for (GameComponents<usg::PhysicsScene>::Iterator it = GameComponents<usg::PhysicsScene>::GetIterator(); !it.IsEnd(); ++it)
@@ -193,8 +198,12 @@ namespace usg
 
 		GetEventManager().TriggerEvents(m_systemCoordinator, rootEntity, m_uFrameCounter);
 
-		LateUpdateSignal lateUpdateSignal(fElapsed);
-		m_systemCoordinator.TriggerFromRoot(rootEntity, lateUpdateSignal);
+		{
+			static const uint32 s_uLate = FrameBudget::RegisterDetail("late-systems");
+			FrameBudget::Scope scope(s_uLate);
+			LateUpdateSignal lateUpdateSignal(fElapsed);
+			m_systemCoordinator.TriggerFromRoot(rootEntity, lateUpdateSignal);
+		}
 
 		// Second load of events to handle late update signals
 		GetEventManager().TriggerEvents(m_systemCoordinator, rootEntity, m_uFrameCounter);
@@ -205,6 +214,9 @@ namespace usg
 	{
 		Entity rootEntity = ComponentEntity::GetRoot();
 
+		// Includes the scene's culling and view preparation (a GPU system)
+		static const uint32 s_uGPU = FrameBudget::RegisterDetail("gpu-systems");
+		FrameBudget::Scope scope(s_uGPU);
 		GPUHandles handles = { pDevice };
 		GPUUpdateSignal gpuUpdateSignal(&handles);
 		m_systemCoordinator.TriggerFromRoot(rootEntity, gpuUpdateSignal);

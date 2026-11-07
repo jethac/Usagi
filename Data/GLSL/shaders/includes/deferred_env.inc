@@ -6,6 +6,7 @@
 
 SAMPLER_LOC(1, 5) uniform samplerCube sampler5;	// Environment radiance, GGX prefiltered across the mips
 SAMPLER_LOC(1, 6) uniform samplerCube sampler6;	// Environment irradiance (cosine convolved, divided by pi)
+SAMPLER_LOC(1, 7) uniform sampler2D sampler7;	// Last frame's lit scene (HDR, quarter resolution), for reflections
 
 BUFFER_LAYOUT(1, UBO_MATERIAL_ID) uniform DeferredParams
 {
@@ -14,7 +15,83 @@ BUFFER_LAYOUT(1, UBO_MATERIAL_ID) uniform DeferredParams
 	vec4	vContactShadow;		// x = ray length (view units), y = thickness (view units), z = step count, w = strength (0 disables)
 	vec4	vShadowParams;		// x = PCF radius scale, y = normal offset (shadow texels), z = unused, w = debug view
 	vec4	vAOParams;			// x = radius (view units, 0 disables), y = strength, z = power, w = unused
+	vec4	vSSRParams;			// x = ray steps (0 disables), y = ray length (view units), z = thickness (view units), w = max roughness
+	mat4	mPrevViewProj;		// World to last frame's clip space
 };
+
+float InterleavedGradientNoise(in vec2 vPixel);
+
+// Screen space reflection: march the reflected ray through the depth buffer
+// and, where it hits, read last frame's lit scene at that point (reprojected,
+// so a moving camera still lines up). rgb = radiance, a = confidence (0 =
+// keep the environment). Works for perspective and orthographic projections.
+vec4 TraceSSR(in vec3 P, in vec3 N, in vec3 V)
+{
+	int iSteps = int(vSSRParams.x);
+	vec3 R = reflect(-V, N);
+	// Rays back toward the camera soon leave what the depth buffer can see
+	float fFacing = clamp(1.0 - 2.0 * dot(R, V), 0.0, 1.0);
+	if (iSteps <= 0 || fFacing <= 0.0)
+	{
+		return vec4(0.0);
+	}
+
+	float fStep = vSSRParams.y / float(iSteps);
+	float fJitter = InterleavedGradientNoise(gl_FragCoord.xy + 31.0);
+	vec3 vRay = P + N * (vSSRParams.z * 0.1) + R * (fStep * fJitter);
+	vec3 vPrev = vRay;
+	bool bHit = false;
+	int iHit = 0;
+	for (int i = 0; i < iSteps; i++)
+	{
+		vPrev = vRay;
+		vRay += R * fStep;
+		vec4 vClip = vec4(vRay, 1.0) * mProjMat;
+		vec2 vNDC = vClip.xy / vClip.w;
+		if (any(greaterThan(abs(vNDC), vec2(1.0))))
+		{
+			break;
+		}
+		float fSceneZ = GetDeferredLinearDepth(GetRTUV(vNDC * 0.5 + 0.5)) * vNearFar.y;
+		float fDelta = vRay.z - fSceneZ;
+		if (fDelta > 0.0 && fDelta < vSSRParams.z)
+		{
+			bHit = true;
+			iHit = i;
+			break;
+		}
+	}
+	if (!bHit)
+	{
+		return vec4(0.0);
+	}
+
+	// Refine between the last miss and the hit
+	vec3 vA = vPrev;
+	vec3 vB = vRay;
+	for (int j = 0; j < 4; j++)
+	{
+		vec3 vM = (vA + vB) * 0.5;
+		vec4 vClip = vec4(vM, 1.0) * mProjMat;
+		float fSceneZ = GetDeferredLinearDepth(GetRTUV(vClip.xy / vClip.w * 0.5 + 0.5)) * vNearFar.y;
+		if (vM.z > fSceneZ) vB = vM; else vA = vM;
+	}
+
+	// Last frame's scene at the hit
+	vec3 vWorld = (vec4(vB, 1.0) * mInvViewMat).xyz;
+	vec4 vPrevClip = vec4(vWorld, 1.0) * mPrevViewProj;
+	vec2 vPrevNDC = vPrevClip.xy / vPrevClip.w;
+	vec2 vEdge = clamp((1.0 - abs(vPrevNDC)) * 8.0, 0.0, 1.0);
+	float fConfidence = vEdge.x * vEdge.y * fFacing;
+	// Fade out toward the end of the ray
+	fConfidence *= clamp(2.0 * (1.0 - float(iHit) / float(iSteps)), 0.0, 1.0);
+	if (fConfidence <= 0.0)
+	{
+		return vec4(0.0);
+	}
+	vec3 vRadiance = textureLod(sampler7, GetRTUV(vPrevNDC * 0.5 + 0.5), 0.0).rgb;
+	return vec4(vRadiance, fConfidence);
+}
 
 vec3 ViewToEnv(in vec3 vViewDir)
 {
@@ -22,7 +99,7 @@ vec3 ViewToEnv(in vec3 vViewDir)
 	return (vec4(vWorld, 0.0) * mEnvRotation).xyz;
 }
 
-vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion)
+vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion, in vec3 P)
 {
 	vec3 N = s.vNormal;
 	float NoV = max(dot(N, V), 1e-4);
@@ -34,6 +111,18 @@ vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion)
 	float fMaxMip = vEnvParams.y;
 	vec3 vEnvR = ViewToEnv(R);
 	vec3 vPrefiltered = textureLod(sampler5, vEnvR, s.fRoughness * fMaxMip).rgb;
+
+	// Screen space reflections take over from the environment where they hit:
+	// the clearcoat (varnish, car lacquer) and smooth base specular. The scene
+	// is already lit, so it's brought into the environment's units here.
+	vec4 vSSR = vec4(0.0);
+	float fSSRMaxRough = vSSRParams.w;
+	if (vSSRParams.x > 0.0 && (s.fClearCoat > 0.0 || s.fRoughness < fSSRMaxRough))
+	{
+		vSSR = TraceSSR(P, N, V);
+		vSSR.rgb /= max(vEnvParams.x, 1e-3);
+	}
+	vPrefiltered = mix(vPrefiltered, vSSR.rgb, vSSR.a * clamp(1.0 - s.fRoughness / max(fSSRMaxRough, 1e-3), 0.0, 1.0));
 	vec2 vAB = PBR_EnvBRDFApprox(s.fRoughness, NoV);
 	vec3 vSpecular = vPrefiltered * (PBR_F0(s) * vAB.x + vAB.y);
 
@@ -49,6 +138,7 @@ vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion)
 	{
 		float Fc = PBR_F_Schlick(0.04, NoV) * s.fClearCoat;
 		vec3 vCoat = textureLod(sampler5, vEnvR, s.fClearCoatRoughness * fMaxMip).rgb;
+		vCoat = mix(vCoat, vSSR.rgb, vSSR.a * clamp(1.0 - s.fClearCoatRoughness / max(fSSRMaxRough, 1e-3), 0.0, 1.0));
 		float fCoatOcc = PBR_SpecularOcclusion(NoV, fOcclusion, s.fClearCoatRoughness) * fHorizon;
 		vColor = vColor * (1.0 - Fc) + vCoat * (Fc * fCoatOcc);
 	}

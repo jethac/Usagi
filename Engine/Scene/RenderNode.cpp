@@ -53,7 +53,7 @@ void RenderNode::SetLayer(RenderLayer eLayer)
 
 void RenderNode::SetMaterialCmpVal(const EffectHndl& hndl, const Texture* pTexture0)
 {
-	uint64 uMask = (COMPARISON_SHIFT_TEXTURE | COMPARISON_MASK_EFFECT);
+	uint64 uMask = (COMPARISON_MASK_TEXTURE | COMPARISON_MASK_EFFECT);
 	m_uComparisonVal &= ~uMask;
 
 	uint64 uEffectValue = (uint64)hndl.get();

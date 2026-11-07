@@ -399,6 +399,32 @@ void Model::InitDynamics(GFXDevice* pDevice, Scene* pScene, uint32 i)
 	}
 }
 
+void Model::ApplyMaxDrawDistance(uint8 uMaxLod)
+{
+	if (m_fMaxDrawDistance <= 0.0f)
+	{
+		return;
+	}
+
+	// The last LOD gets the limit (the others already step down before it)
+	if (m_bPerBoneCulling)
+	{
+		Skeleton& skeleton = GetSkeleton();
+		for (uint32 uBone = 0; uBone < skeleton.GetBoneCount(); uBone++)
+		{
+			RenderGroup* pGroup = skeleton.GetBone(uBone)->GetRenderGroup();
+			if (pGroup)
+			{
+				pGroup->SetLodMaxDistance(uMaxLod, m_fMaxDrawDistance);
+			}
+		}
+	}
+	else if (m_pRenderGroup)
+	{
+		m_pRenderGroup->SetLodMaxDistance(uMaxLod, m_fMaxDrawDistance);
+	}
+}
+
 bool Model::IsOnScreen()
 {
 	return true;
@@ -497,6 +523,8 @@ void Model::AddToSceneInt(GFXDevice* pDevice)
 					}
 				}
 			}
+
+			ApplyMaxDrawDistance(uMaxLod);
 
 			// FIXME: Replace with artist defines
 			if (uMaxLod == 0 && m_pResource->GetBounds().GetRadius() < 2.f)
@@ -800,14 +828,28 @@ void Model::GPUUpdate(GFXDevice* pDevice, bool bVisible)
 
 		if (m_staticBones.IsValid())
 		{
+			// Static props: the same matrices every frame, so only rewrite and
+			// re-upload the palette when one of them changed
 			const usg::vector<uint32>& rigidIndices = m_pResource->GetRigidBoneIndices();
-			Matrix4x3* pMat = (Matrix4x3*)m_staticBones.Lock((uint32)(sizeof(Matrix4x3)*rigidIndices.size()));
-			for (uint32 uBone = 0; uBone < rigidIndices.size(); uBone++)
+			const Matrix4x3* pCurrent = (const Matrix4x3*)m_staticBones.GetCPUData();
+			bool bChanged = !m_bStaticBonesSet;
+			for (uint32 uBone = 0; uBone < rigidIndices.size() && !bChanged; uBone++)
 			{
 				const Bone* pBone = m_pSkeleton->GetBone(rigidIndices[uBone]);
-				pMat[uBone] = (pBone->GetInverseBindMatrix() * pBone->GetWorldMatrix());
+				const Matrix4x3 mBone = (pBone->GetInverseBindMatrix() * pBone->GetWorldMatrix());
+				bChanged = memcmp(&pCurrent[uBone], &mBone, sizeof(mBone)) != 0;
 			}
-			m_staticBones.Unlock();
+			if (bChanged)
+			{
+				Matrix4x3* pMat = (Matrix4x3*)m_staticBones.Lock((uint32)(sizeof(Matrix4x3)*rigidIndices.size()));
+				for (uint32 uBone = 0; uBone < rigidIndices.size(); uBone++)
+				{
+					const Bone* pBone = m_pSkeleton->GetBone(rigidIndices[uBone]);
+					pMat[uBone] = (pBone->GetInverseBindMatrix() * pBone->GetWorldMatrix());
+				}
+				m_staticBones.Unlock();
+				m_bStaticBonesSet = true;
+			}
 			m_staticBones.UpdateData(pDevice);
 		}
 	}

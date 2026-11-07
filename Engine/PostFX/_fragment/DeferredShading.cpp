@@ -36,6 +36,7 @@ static const DescriptorDeclaration g_descriptorGBuffer[] =
 	DESCRIPTOR_ELEMENT(4,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_ELEMENT(5,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),	// Environment radiance cube
 	DESCRIPTOR_ELEMENT(6,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),	// Environment irradiance cube
+	DESCRIPTOR_ELEMENT(7,	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),	// Last frame's scene, for reflections
 	DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_END()
 };
@@ -48,6 +49,8 @@ struct DeferredParams
 	Vector4f	vContactShadow;
 	Vector4f	vShadowParams;
 	Vector4f	vAOParams;
+	Vector4f	vSSRParams;
+	Matrix4x4	mPrevViewProj;
 };
 
 static const ShaderConstantDecl g_deferredParamsDecl[] =
@@ -57,6 +60,8 @@ static const ShaderConstantDecl g_deferredParamsDecl[] =
 	SHADER_CONSTANT_ELEMENT(DeferredParams, vContactShadow,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(DeferredParams, vShadowParams,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(DeferredParams, vAOParams,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vSSRParams,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, mPrevViewProj,	CT_MATRIX_44, 1),
 	SHADER_CONSTANT_END()
 };
 
@@ -279,6 +284,11 @@ void DeferredShading::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSy
 	m_envSampler = pDevice->GetSampler(envDecl);
 	m_paramsConstants.Init(pDevice, g_deferredParamsDecl);
 	m_readDescriptors.SetConstantSetAtBinding(SHADER_CONSTANT_MATERIAL, &m_paramsConstants);
+	// No reflections until the post chain hands over last frame's scene
+	m_readDescriptors.SetImageSamplerPairAtBinding(7, pRes->GetTexture(pDevice, "black_default"), m_linSamplerHndl);
+	m_bPrevSceneValid = false;
+	m_bPrevViewProjValid = false;
+	m_prevViewProj.LoadIdentity();
 
 	// USAGI_DEFERRED_DEBUG=1..6 shows one lighting term (see deferred_lighting.inc)
 	m_uDebugView = 0;
@@ -337,8 +347,35 @@ void DeferredShading::UpdateParams(GFXDevice* pDevice)
 		(float)Math::Max(m_lighting.uContactShadowSteps, 1U), m_lighting.fContactShadowLength > 0.0f ? m_lighting.fContactShadowStrength : 0.0f);
 	pParams->vShadowParams.Assign(1.0f, m_lighting.fShadowNormalOffset, 0.0f, (float)m_uDebugView);
 	pParams->vAOParams.Assign(m_ao.fRadius, m_ao.fStrength, m_ao.fPower, 0.0f);
+	// Reflections need last frame's scene and where its camera was
+	const bool bSSR = m_lighting.uSSRSteps > 0 && m_bPrevSceneValid && m_bPrevViewProjValid;
+	pParams->vSSRParams.Assign(bSSR ? (float)m_lighting.uSSRSteps : 0.0f, m_lighting.fSSRDistance, m_lighting.fSSRThickness, m_lighting.fSSRMaxRoughness);
+	pParams->mPrevViewProj = m_prevViewProj;
 	m_paramsConstants.Unlock();
 	m_paramsConstants.UpdateData(pDevice);
+}
+
+void DeferredShading::SetPrevSceneTexture(GFXDevice* pDevice, const TextureHndl& texture)
+{
+	m_bPrevSceneValid = texture.get() != nullptr;
+	if (!m_bPrevSceneValid)
+	{
+		return;	// Keeps the black default bound; reflections are off
+	}
+	m_readDescriptors.SetImageSamplerPairAtBinding(7, texture, m_linSamplerHndl);
+	if (m_pDestTarget)
+	{
+		m_readDescriptors.UpdateDescriptors(pDevice);
+	}
+}
+
+void DeferredShading::UpdateBuffer(GFXDevice* pDevice)
+{
+	// The matrices change every frame with the camera
+	if (m_lighting.uSSRSteps > 0)
+	{
+		UpdateParams(pDevice);
+	}
 }
 
 void DeferredShading::Cleanup(GFXDevice* pDevice)
@@ -434,6 +471,13 @@ bool DeferredShading::Draw(GFXContext* pContext, RenderContext& renderContext)
 	pContext->SetRenderTarget(m_pDestTarget);
 	// Set the textures for the G buffer to be read from
 	pContext->SetDescriptorSet(&m_readDescriptors, 1);
+
+	// Next frame's reflections reproject into this frame's scene
+	if (const Camera* pCamera = pSceneCtxt->GetCamera())
+	{
+		m_prevViewProj = pCamera->GetViewMatrix() * pCamera->GetProjection();
+		m_bPrevViewProjValid = true;
+	}
 
 	pContext->BeginGPUTag("DirLights", Color::Green);
 	//if(uLightCount > 0)

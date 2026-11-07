@@ -23,6 +23,10 @@ message ModelComponent
 	required uint32 uPreloadCount = 4 [default = 1];
 	required bool bShadowCast = 5 [default = true];
 	required string pakName = 6[(nanopb).max_size = 64];
+	// Beyond this distance from the camera the model isn't drawn (0 = no
+	// limit). For small set dressing that is sub-pixel far down a chase view.
+	// Scaled by the view's LOD bias (ViewContext::SetLODBias) like the LODs.
+	required float fMaxDrawDistance = 7 [default = 0.0];
 }
 
 message BoneComponent

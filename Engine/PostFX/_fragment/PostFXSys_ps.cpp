@@ -130,6 +130,13 @@ void PostFXSys_ps::PreViewUpdate(GFXDevice* pDevice)
 			break;
 		}
 	}
+
+	// The deferred lighting's per-frame constants (the reflections' last-frame
+	// camera). Nothing calls UpdateGPU each frame, so it's done here.
+	if (m_pDeferredShading && m_pDeferredShading->GetEnabled())
+	{
+		m_pDeferredShading->UpdateBuffer(pDevice);
+	}
 }
 
 void PostFXSys_ps::UpdateGPU(GFXDevice* pDevice)
@@ -744,6 +751,13 @@ void PostFXSys_ps::EnableEffects(GFXDevice* pDevice, uint32 uEffectFlags)
 	}
 
 	m_renderPasses.SetDeferredEnabled(m_pDeferredShading && (uEffectFlags & PostFXSys::EFFECT_DEFERRED_SHADING) != 0);
+
+	// Screen space reflections read last frame's scene from the bloom's downscale
+	if (m_pDeferredShading)
+	{
+		const bool bBloom = m_pBloom && (uEffectFlags & PostFXSys::EFFECT_BLOOM) != 0;
+		m_pDeferredShading->SetPrevSceneTexture(pDevice, bBloom ? m_pBloom->GetScaledSceneTexture() : TextureHndl());
+	}
 
 	EnableEffectsInt(pDevice, uEffectFlags);
 	

@@ -27,6 +27,8 @@ namespace usg {
 	GFXContext_ps::GFXContext_ps()
 	{
 		m_pParent = NULL;
+		m_pDevice = NULL;
+		m_cmdBuff = VK_NULL_HANDLE;
 	}
 
 	GFXContext_ps::~GFXContext_ps()
@@ -45,15 +47,17 @@ namespace usg {
 		cmd.pNext = NULL;
 		cmd.commandPool = m_cmdPool;
 		cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		cmd.commandBufferCount = 1;
+		cmd.commandBufferCount = GFX_NUM_DYN_BUFF;	// One per frame in flight
 
 		m_pfnCmdDebugMarkerBegin = (PFN_vkCmdDebugMarkerBeginEXT)vkGetDeviceProcAddr(pDevice->GetPlatform().GetVKDevice(), "vkCmdDebugMarkerBeginEXT");
 		m_pfnCmdDebugMarkerEnd = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(pDevice->GetPlatform().GetVKDevice(), "vkCmdDebugMarkerEndEXT");
 
-		err = vkAllocateCommandBuffers(pDevice->GetPlatform().GetVKDevice(), &cmd, &m_cmdBuff);
+		err = vkAllocateCommandBuffers(pDevice->GetPlatform().GetVKDevice(), &cmd, m_cmdBuffs);
 		FATAL_RELEASE(err == VK_SUCCESS, "vkAllocateCommandBuffers returned %d", err);
+		m_cmdBuff = m_cmdBuffs[0];
 
 		m_pParent = pParent;
+		m_pDevice = pDevice;
 
 		// Only the immediate context is submitted each frame (see GFXDevice_ps::End)
 		if (!bDeferred)
@@ -66,7 +70,7 @@ namespace usg {
 	void GFXContext_ps::Cleanup(GFXDevice* pDevice)
 	{
 		m_profiler.Cleanup(pDevice->GetPlatform().GetVKDevice());
-		vkFreeCommandBuffers(pDevice->GetPlatform().GetVKDevice(), m_cmdPool, 1, &m_cmdBuff);
+		vkFreeCommandBuffers(pDevice->GetPlatform().GetVKDevice(), m_cmdPool, GFX_NUM_DYN_BUFF, m_cmdBuffs);
 		vkDestroyCommandPool(pDevice->GetPlatform().GetVKDevice(), m_cmdPool, NULL);
 	}
 
@@ -91,13 +95,17 @@ namespace usg {
 		cmd_buf_info.pInheritanceInfo = &cmd_buf_hinfo;
 
 		// Reset the command buffer to re-use it. Later we should just have pregenerated buffers per 
+		// The device has waited on the fence of the frame that last used this
+		// slot's buffer, so it can be reset and re-recorded
+		const uint32 uSlot = m_pDevice->GetPlatform().GetFrameSlot();
+		m_cmdBuff = m_cmdBuffs[uSlot];
 		err = vkResetCommandBuffer(m_cmdBuff, 0);
 		FATAL_RELEASE(err == VK_SUCCESS, "vkResetCommandBuffer returned %d", err);
 
 		err = vkBeginCommandBuffer(m_cmdBuff, &cmd_buf_info);
 		FATAL_RELEASE(err == VK_SUCCESS, "vkBeginCommandBuffer returned %d", err);
 
-		m_profiler.BeginFrame(m_cmdBuff);
+		m_profiler.BeginFrame(m_cmdBuff, uSlot);
 	}
 
 	void GFXContext_ps::End()
