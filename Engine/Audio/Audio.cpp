@@ -332,6 +332,25 @@ void Audio::UnloadArchive(const char* pszArchiveName)
 	if (uIndex != USG_INVALID_ID)
 	{
 		Archive& archive = m_archives[uIndex];
+		// Release every live sound still using one of the archive's files first. A
+		// stopped sound stays in m_sounds until the next Update, which would then mix
+		// it with a deleted SoundFile (unloading an archive on a mode change).
+		for (FastPool<SoundData>::DynamicIterator it = m_sounds.BeginDynamic(); !it.IsEnd(); ++it)
+		{
+			const SoundFile* pFile = (*it)->object.GetSoundFile();
+			bool bInArchive = false;
+			for (uint32 i = 0; i < archive.uFiles && !bInArchive; i++)
+			{
+				bInArchive = archive.ppSoundFiles[i] == pFile;
+			}
+			if (bInArchive)
+			{
+				(*it)->hndl.Destroy(&(*it)->object);
+				(*it)->object.Reset();
+				it.RemoveElement();
+			}
+		}
+
 		for (uint32 i = 0; i < archive.uFiles; i++)
 		{
 			m_soundHashes.erase(archive.ppSoundFiles[i]->GetCRC());
