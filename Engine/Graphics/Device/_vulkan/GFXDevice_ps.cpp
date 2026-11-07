@@ -1138,6 +1138,28 @@ void GFXDevice_ps::Begin()
 	// TODO: Update GPU time
 }
 
+void GFXDevice_ps::WaitForPreviousFrames()
+{
+	const bool bBudget = FrameBudget::IsEnabled();
+	const uint64 uStart = bBudget ? TimeTracker::GetSystemTime() : 0;
+	for (uint32 uSlot = 0; uSlot < m_uFramesInFlight; uSlot++)
+	{
+		// This frame's own fence was reset in Begin and is signalled by its submit;
+		// the others are signalled already or pending on an earlier submission
+		if (uSlot == m_uFrameSlot)
+			continue;
+		VkFence fence = m_drawFences[uSlot];
+		VkResult res;
+		do {
+			res = vkWaitForFences(m_vkDevice, 1, &fence, VK_TRUE, 100000);
+		} while (res == VK_TIMEOUT);
+	}
+	if (bBudget)
+	{
+		FrameBudget::AddCPUTime(FrameBudget::CPU_GPU_WAIT, FrameBudget::TicksToMs(uStart, TimeTracker::GetSystemTime()));
+	}
+}
+
 void GFXDevice_ps::End(bool bIsLoading)
 {
 	CriticalSection::ScopedLock lock(m_criticalSection);

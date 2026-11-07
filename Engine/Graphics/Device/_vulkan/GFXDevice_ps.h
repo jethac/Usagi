@@ -53,6 +53,12 @@ namespace usg {
 		// per-frame fence, command buffer and query range.
 		uint32 GetFrameSlot() const { return m_uFrameSlot; }
 		uint32 GetFramesInFlight() const { return m_uFramesInFlight; }
+		// Blocks until every earlier frame still on the GPU has finished. For code
+		// that writes host-visible memory the previous frame may still be reading
+		// and doesn't buffer it per frame slot (an external renderer recording into
+		// our command buffer, for example). Call it as late in the frame as possible
+		// to keep most of the CPU/GPU overlap; a no-op with one frame in flight.
+		void WaitForPreviousFrames();
 		float GetGPUTime() const { return m_fGPUTime; }
 
 		GFXContext* CreateDeferredContext(uint32 uSizeMul) { ASSERT(false); return NULL; }
