@@ -283,7 +283,8 @@ int main(int argc, char *argv[])
 			if (def.customFXName.size() > 0)
 			{
 				CustomFXEntry entry;
-				entry.materialDef.Load(customFX[def.customFXName], def.sets[i].defines);
+				YAML::Node customFXNode = customFX[def.customFXName];
+				entry.materialDef.Load(customFXNode, def.sets[i].defines);
 				entry.materialDef.InitBinaryData();
 				entry.materialDef.InitAutomatedCode();
 				uint64 uCustomFXCRC = entry.materialDef.GetCRC();

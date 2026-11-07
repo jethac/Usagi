@@ -279,13 +279,18 @@ static void CorrectDistanceSigns(const Shape& shape, Bitmap<FloatRGB>& msdf, Bit
 	}
 }
 
+// Decodes the code point of the UTF-8 sequence at utf8 (letter lists are
+// Basic Multilingual Plane characters, so at most three bytes)
 int ConvertUTF8ToUnicode(const char* utf8)
 {
-	wchar_t uni;
-	int cc = 0;
-	// get length (cc) of the new widechar excluding the \0 terminator first
-	MultiByteToWideChar(CP_UTF8, 0, utf8, -1, &uni, 1);
-	return (int)uni;
+	const uint8* p = (const uint8*)utf8;
+	if (p[0] < 0x80)
+		return p[0];
+	if ((p[0] & 0xE0) == 0xC0)
+		return ((p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+	if ((p[0] & 0xF0) == 0xE0)
+		return ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+	return ((p[0] & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
 }
 
 

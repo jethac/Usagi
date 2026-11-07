@@ -1,6 +1,5 @@
 #include "Engine/Common/Common.h"
 #include "OpenGLShaderCompiler.h"
-#include "Parser.h"
 
 
 OpenGLShaderCompiler::OpenGLShaderCompiler()
