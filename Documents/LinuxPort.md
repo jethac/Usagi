@@ -344,7 +344,7 @@ All five milestones are done, and audio plays.
   and still build on Windows with MSBuild.
 - `Tools/Tests/LinuxClear` opens an SDL3/Wayland window on the GTX 1070
   and clears and presents at 1920×1080.
-- UsagiGP (develop with the Cameraman, Effekseer, Livingroom and UXML
+- UsagiGP (develop with the Cameraman, Effekseer, Wakuwaku and UXML
   modules) builds and renders correctly with `_romfiles/win` cooked on
   Windows: the scene, Effekseer, the UXML HUD and the debug overlays.
 - The black 3D scene was Display_ps::TransferRect transitioning images
