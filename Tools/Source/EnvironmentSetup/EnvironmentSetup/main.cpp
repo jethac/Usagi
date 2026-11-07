@@ -18,19 +18,13 @@ struct RegistryEnvironmentPair
 int main(int argc, const char* argv[])
 {
 	printf("Usagi Registry tool. Please be sure to run as administrator\n");
-	const int EntryCounts = 2;
+	const int EntryCounts = 1;
 	RegistryEnvironmentPair RegistryPairs[EntryCounts] =
 	{
 		{
 			"SOFTWARE\\Microsoft\\MSBuild\\ToolsVersions\\4.0",
 			"MSBuildToolsPath",
 			"MSBUILD_DIR",
-			""
-		},
-		{
-			"SOFTWARE\\Autodesk FBX SDK 2020.3.1",
-			"Install_Dir",
-			"FBXSDK_DIR",
 			""
 		},
 

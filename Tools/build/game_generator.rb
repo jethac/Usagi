@@ -21,7 +21,7 @@ def build_pc_data(config, n, platform)
   data_deps.merge game_textures
   data_deps.merge engine_textures
 
-  # The PakFileGen model path is not yet stable; convert models with Ayataka
+  # Models are converted with fbx-to-vmdf (BuildConfig#cmdl_converter)
   # into loose .vmdf files (this also emits the _build/skel skeleton XMLs the
   # entity hierarchy converter depends on)
   models = build_pc_models(config, n)
@@ -406,14 +406,9 @@ def build_pc_models(config, n)
   FileUtils.mkdir_p(config.skeleton_out_dir)
   FileUtils.mkdir_p(config.effects_out_dir)
 
-  # The Linux Ayataka needs the Autodesk FBX SDK, which isn't redistributable
-  # (Documents/LinuxPort.md, "Data tools"). Without it the models aren't
-  # converted here, so that everything else still cooks; the .vmdf files and
-  # _build/skel skeletons then have to come from a cook that has it.
-  if !Gem.win_platform? && !File.exist?(config.cmdl_converter)
-    puts "WARNING: #{config.cmdl_converter} isn't built (no FBX SDK): models are not converted"
-    return []
-  end
+  # Models are converted by fbx-to-vmdf (see BuildConfig#cmdl_converter),
+  # which Tools/Source/build_linux_tools.sh builds before ninja runs; the
+  # model rules depend on it, so a missing converter fails the build.
 
   models = FileList["#{config.model_dir}/**/*.{fbx}"].exclude do |f|
     File.directory?(f) || f.include?("/collision")

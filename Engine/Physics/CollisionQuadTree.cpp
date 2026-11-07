@@ -174,13 +174,13 @@ void CollisionQuadTree::Node::AddIndex(uint32 uIndex)
 
 void CollisionQuadTree::Load(const char* szFileName, const AABB& worldBounds)
 {
-	static const uint32 AyatakaMagicNumber = utl::CRC32("AyatakaCollisionModel");
+	static const uint32 AyatakaMagicNumber = utl::CRC32("AyatakaCollisionModel"); // format magic, named after the original converter; keep
 
 	File dataFile(szFileName);
 
 	uint32 uMagicNumber, uFileVersion;
 	dataFile.Read(sizeof(uMagicNumber), &uMagicNumber);
-	ASSERT(uMagicNumber == AyatakaMagicNumber && "Not a proper Ayataka-generated collision model file");
+	ASSERT(uMagicNumber == AyatakaMagicNumber && "Not a proper collision model file");
 	dataFile.Read(sizeof(uMagicNumber), &uFileVersion);
 	ASSERT(uFileVersion >= 1);
 

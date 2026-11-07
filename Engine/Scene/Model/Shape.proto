@@ -36,7 +36,7 @@ message VertexStreamInfo
 {
 	required uint32 refIndex = 1 [default = 0];
 	required uint32 columns = 2 [default = 0];
-	// Had to set these to uint32s as ayataka is dumping binaries and enum sizes don't match across platforms
+	// Had to set these to uint32s as the model converter dumps binaries and enum sizes don't match across platforms
 	required uint32 attribute = 3 [default = 0]; // VertexAttribute [default=NONE]
 	required uint32 elementType = 4; // VertexElementType
 	required float scaling = 5 [default = 1.0];

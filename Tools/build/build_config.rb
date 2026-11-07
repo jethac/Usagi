@@ -447,8 +447,14 @@ class BuildConfig
     data_tool('FontCreator')
   end
 
+  # FBX -> .vmdf models (and effect .yml -> .cfx): fbx-to-vmdf, the
+  # Tools/Source/fbx-to-vmdf submodule (https://github.com/jethac/fbx-to-vmdf).
+  # Tools/Source/build_linux_tools.sh builds it into
+  # _build/tools/linux/bin/fbx-to-vmdf; on Windows build it with its CMake
+  # into Tools/bin/fbx-to-vmdf.exe (Documents/LinuxPort.md, "Data tools").
+  # USAGI_FBX_TO_VMDF overrides the path.
   def cmdl_converter
-    data_tool('Ayataka')
+    ENV['USAGI_FBX_TO_VMDF'] || data_tool('fbx-to-vmdf')
   end
 
   def shader_pack

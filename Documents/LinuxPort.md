@@ -257,7 +257,7 @@ message naming that step if they're missing.
   `ruby-protocol-buffers` and `matrix` gems, protoc 2.5.0, and a Python
   venv with `protobuf` 3.20 and the `libclang` bindings. Then
   `. Tools/linux/usagi_env.sh` sets `USAGI_PROTOC`, `USAGI_PYTHON`,
-  `FBXSDK_DIR` and `PATH`.
+  and `PATH`.
 - Physics (Box3D) is vendored source, built with the engine; nothing to
   install.
 
@@ -278,11 +278,12 @@ Windows build.
 ### Data tools
 
 The tools in `Tools/Source` build natively with clang:
-`Tools/Source/build_linux_tools.sh` writes a small `build.ninja` and puts
-Ayataka, PakFileGen, ShaderPackage and FontCreator in
-`_build/tools/linux/bin`, where the generator looks for them on Linux
-(`BuildConfig#data_tool`). They link the engine's Linux libraries, so the
-engine is built first (`ENGINE_BUILD`, release by default).
+`Tools/Source/build_linux_tools.sh` puts fbx-to-vmdf, PakFileGen,
+ShaderPackage and FontCreator in `_build/tools/linux/bin`, where the
+generator looks for them on Linux (`BuildConfig#data_tool`). PakFileGen,
+ShaderPackage and FontCreator are built from a small `build.ninja` and link
+the engine's Linux libraries, so the engine is built first (`ENGINE_BUILD`,
+release by default).
 
 - `Tools/Source/ToolsPosix.h` is forced into the Linux builds only. It
   provides the Win32 and CRT calls the tools use (`fopen_s`,
@@ -293,16 +294,23 @@ engine is built first (`ENGINE_BUILD`, release by default).
 - Compressonator (PakFileGen's texture compression) is fetched once at
   the submodule's pinned commit into `_build/tools/linux/src` when the
   submodule isn't checked out, and built with CMake.
-- Ayataka needs the Autodesk FBX SDK for Linux (2020.3.9, the version the
-  Windows build uses):
-  `https://damassets.autodesk.net/content/dam/autodesk/www/files/fbx202039_fbxsdk_gcc_linux.tar.gz`.
-  Its installer asks you to accept Autodesk's licence, so it isn't
-  installed automatically. Unpack it and run
-  `./fbx202039_fbxsdk_linux ~/.local/opt/fbxsdk` (no root needed), then
-  rerun the build script. Without the SDK the script skips Ayataka and
-  builds PakFileGen without FBX support, and the generator leaves the
-  models out (their `.vmdf` and `_build/skel` files must then come from a
-  cook that has the SDK).
+- Models (FBX -> `.vmdf`, the `_build/skel` bone hierarchies and effect
+  `.yml` -> `.cfx`) are converted by fbx-to-vmdf, the
+  `Tools/Source/fbx-to-vmdf` submodule (https://github.com/jethac/fbx-to-vmdf).
+  It replaced Ayataka: it reads FBX with ufbx, so neither the Autodesk FBX
+  SDK nor libxml2 is needed on any platform. The script builds it with its
+  own CMake (it doesn't link the engine) and copies the binary to
+  `_build/tools/linux/bin/fbx-to-vmdf`; `USAGI_FBX_TO_VMDF` overrides the
+  path the generator uses. Its output matches Ayataka's on every byte
+  Ayataka initialised, apart from known, documented differences (see its
+  README); it is byte-identical across hosts and compilers.
+- On Windows, build fbx-to-vmdf with CMake and copy it to `Tools/bin`:
+
+      cmake -S Tools\Source\fbx-to-vmdf -B _build\tools\win\fbx-to-vmdf -G "Visual Studio 17 2022" -A x64
+      cmake --build _build\tools\win\fbx-to-vmdf --config Release --target fbx-to-vmdf
+      copy _build\tools\win\fbx-to-vmdf\Release\fbx-to-vmdf.exe Tools\bin\
+
+  (from a VS developer prompt, at the engine root).
 
 Against the Windows cook of UsagiGP, the Linux tools give:
 

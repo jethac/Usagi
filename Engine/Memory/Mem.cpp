@@ -274,7 +274,7 @@ void* operator new[](size_t size)
 #if defined (PLATFORM_PC) || defined(PLATFORM_POSIX) || defined(PLATFORM_SWITCH)
 	//if (usg::mem::s_bConventionalMemManagement)
 	{
-		// Only for External programs(e.g. Ayataka, ...) use
+		// Only for External programs (e.g. the data tools) use
 		return usg::mem::Alloc(usg::MEMTYPE_STANDARD, usg::ALLOC_OBJECT, size, USG_DEFAULT_NEW_ALIGNMENT);
 	}
 #else

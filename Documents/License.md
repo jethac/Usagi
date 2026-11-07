@@ -7,7 +7,7 @@ The license can be found [here](../LICENSE), and it grants permission to use Usa
 Third party licences
 ----------------------
 
-Usagi makes use of a number of third party libraries. Those such as the FBX SDK which do not have licenses which allow re-distribution must be installed seperately.  
+Usagi makes use of a number of third party libraries. Those which do not have licenses which allow re-distribution must be installed seperately.  
 Below is a list for reference of the third party software included either as part of the distribution or as a submodule. In those cases the corresponding license files are included. The Usagi MIT license does not superceed any of these liceneses. Submodules are forked from the original repositories, please see their history for details of modifications. We have tried to avoid omissions to this list but always check source files and their parent directories to confirm the license of code within this repository.      
 
 **Box3D**  (source)  
@@ -21,10 +21,11 @@ Original Authors: Unicode Inc
 Source Location: Engine/ThirdParty/utf.h and utf.cpp  
 Licensed Under: Unicode License  
 
-**pugixml parser** (source)  
-Original Authors: Arseny Kapoulkine  
-Source Location: Tools\Source\Ayataka\lib  
-Licensed Under: MIT License
+**fbx-to-vmdf** (submodule)  
+Original Authors: Jetha Chan, adapting Ayataka (Vitei Inc.)  
+Website: https://github.com/jethac/fbx-to-vmdf  
+Source Location: Tools\Source\fbx-to-vmdf  
+Licensed Under: MIT License (vendors ufbx, meshoptimizer, pugixml and yaml-cpp under their own licences)
 
 **SMAA** (modified source)  
 Original Authors: Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro, Diego Gutierrez  

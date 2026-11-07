@@ -145,16 +145,13 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(USAGI_DIR)\Engine\ThirdParty\compressonator\Build\$(Configuration)\$(Platform)\;$(UsagiLibDir);$(FBXSDK_DIR)\lib\vs2019\x64\debug;$(USAGI_DIR)\Engine\ThirdParty\FBX SDK\lib\vs2015\x64\debug;$(USAGI_DIR)\Engine\ThirdParty\msdfgen\lib;$(USAGI_DIR)\Engine\ThirdParty\EASTL\vitei\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>CMP_Framework_MTd.lib;shlwapi.lib;libfbxsdk.lib;freetype28d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(USAGI_DIR)\Engine\ThirdParty\compressonator\Build\$(Configuration)\$(Platform)\;$(UsagiLibDir);$(USAGI_DIR)\Engine\ThirdParty\msdfgen\lib;$(USAGI_DIR)\Engine\ThirdParty\EASTL\vitei\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>CMP_Framework_MTd.lib;shlwapi.lib;freetype28d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(TargetPath) $(USAGI_DIR)\Tools\bin\ /y
 </Command>
     </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>copy "$(FBXSDK_DIR)\lib\vs2019\x64\debug\libfbxsdk.dll" "$(OutDir)\libfbxsdk.dll" /Y</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -196,15 +193,12 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(USAGI_DIR)\Engine\ThirdParty\compressonator\Build\$(Configuration)\$(Platform)\;$(UsagiLibDir);$(FBXSDK_DIR)\lib\vs2019\x64\release;$(USAGI_DIR)\Engine\ThirdParty\FBX SDK\lib\vs2015\x64\debug;$(USAGI_DIR)\Engine\ThirdParty\msdfgen\lib;$(USAGI_DIR)\Engine\ThirdParty\EASTL\vitei\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>CMP_Framework_MT.lib;shlwapi.lib;libfbxsdk.lib;freetype28.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(USAGI_DIR)\Engine\ThirdParty\compressonator\Build\$(Configuration)\$(Platform)\;$(UsagiLibDir);$(USAGI_DIR)\Engine\ThirdParty\msdfgen\lib;$(USAGI_DIR)\Engine\ThirdParty\EASTL\vitei\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>CMP_Framework_MT.lib;shlwapi.lib;freetype28.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(TargetPath) $(USAGI_DIR)\Tools\bin\ /y</Command>
     </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>copy "$(FBXSDK_DIR)\lib\vs2019\x64\release\libfbxsdk.dll" "$(OutDir)\libfbxsdk.dll" /Y</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Final|x64'">
     <ClCompile>
@@ -220,15 +214,12 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(USAGI_DIR)\Engine\ThirdParty\compressonator\Build\$(Configuration)\$(Platform)\;$(UsagiLibDir);$(FBXSDK_DIR)\lib\vs2019\x64\release;$(USAGI_DIR)\Engine\ThirdParty\FBX SDK\lib\vs2015\x64\debug;$(USAGI_DIR)\Engine\ThirdParty\msdfgen\lib;$(USAGI_DIR)\Engine\ThirdParty\EASTL\vitei\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>CMP_Framework_MT.lib;shlwapi.lib;libfbxsdk.lib;freetype28.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(USAGI_DIR)\Engine\ThirdParty\compressonator\Build\$(Configuration)\$(Platform)\;$(UsagiLibDir);$(USAGI_DIR)\Engine\ThirdParty\msdfgen\lib;$(USAGI_DIR)\Engine\ThirdParty\EASTL\vitei\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>CMP_Framework_MT.lib;shlwapi.lib;freetype28.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(TargetPath) $(USAGI_DIR)\Tools\bin\ /y</Command>
     </PostBuildEvent>
-    <PreBuildEvent>
-      <Command>copy "$(FBXSDK_DIR)\lib\vs2019\x64\release\libfbxsdk.dll" "$(OutDir)\libfbxsdk.dll" /Y</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="FileFactory.cpp" />
@@ -279,9 +270,6 @@
     </ProjectReference>
     <ProjectReference Include="..\..\..\_build\projects\Engine\ThirdParty\ThirdParty.vcxproj">
       <Project>{491fe2ef-d449-4fdd-a3ce-9a1102aa2af4}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\Ayataka\AyatakaLib.vcxproj">
-      <Project>{688218e8-b33e-47a4-b8da-a54913a077e6}</Project>
     </ProjectReference>
     <ProjectReference Include="..\ResourceLib\ResourceLib.vcxproj">
       <Project>{5d046ed5-cc03-4e84-9bb6-292c0ffbe2fe}</Project>

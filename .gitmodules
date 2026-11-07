@@ -29,3 +29,6 @@
 [submodule "Engine/ThirdParty/compressonator"]
 	path = Engine/ThirdParty/compressonator
 	url = https://github.com/GPUOpen-Tools/compressonator.git
+[submodule "Tools/Source/fbx-to-vmdf"]
+	path = Tools/Source/fbx-to-vmdf
+	url = https://github.com/jethac/fbx-to-vmdf.git

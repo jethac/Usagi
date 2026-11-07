@@ -37,9 +37,6 @@ dist
 /Tools/python/Engine/
 Tools/python/**/*.pyc
 .vs/config/applicationhost.config
-Tools/Source/Ayataka/x64/
-Tools/Source/Ayataka/.vs/
-Tools/Source/Ayataka/Ayataka/.d
 Tools/Source/FontCreator/.vs/
 Tools/Source/FontCreator/x64/
 Tools/Source/EnvironmentSetup/Release/

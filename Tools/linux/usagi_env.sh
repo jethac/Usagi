@@ -12,15 +12,13 @@
 #   USAGI_PYTHON     Python 3 with protobuf and the libclang bindings, for
 #                    the nanopb plugins and the systems scanner
 #   USAGI_LIBCLANG   optional: the libclang the systems scanner loads
-#   FBXSDK_DIR       Autodesk FBX SDK, for building Ayataka
 #   VULKAN_SDK       optional prefix with include/vulkan (else the system's)
 
 : "${USAGI_TOOLCHAIN:=$HOME/.local/opt}"
 export USAGI_TOOLCHAIN
 export USAGI_PROTOC="${USAGI_PROTOC:-$USAGI_TOOLCHAIN/protoc-2.5/bin/protoc}"
 export USAGI_PYTHON="${USAGI_PYTHON:-$USAGI_TOOLCHAIN/usagi-py/bin/python}"
-export FBXSDK_DIR="${FBXSDK_DIR:-$USAGI_TOOLCHAIN/fbxsdk}"
-# cmake (for Compressonator, in Tools/Source/build_linux_tools.sh): the
+# cmake (for Compressonator and fbx-to-vmdf, in Tools/Source/build_linux_tools.sh): the
 # system's, else the one bootstrap.sh puts in the venv
 if [ -z "${CMAKE:-}" ] && ! command -v cmake >/dev/null 2>&1 &&
    [ -x "$(dirname "$USAGI_PYTHON")/cmake" ]; then
