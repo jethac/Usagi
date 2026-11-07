@@ -100,11 +100,22 @@ bool CompressionCallback(CMP_FLOAT fProgress, CMP_DWORD_PTR pUser1, CMP_DWORD_PT
 }
 
 // We don't send these through compressonator as we assume it's been formatted/ had mips set
+// The pak name of a texture: its path under Data/ without the extension, unless the pak
+// definition gives the entry a Name (main.cpp passes it in the entry's Data node).
+static std::string TextureResourceName(const std::string& relativeNameNoExt, const YAML::Node& node)
+{
+	if (node && node.IsMap() && node["Name"])
+	{
+		return node["Name"].as<std::string>() + ".vtx";
+	}
+	return relativeNameNoExt + ".vtx";
+}
+
 std::string FileFactoryWin::LoadDDS(const char* szFileName, YAML::Node node)
 {
 	std::string relativePath = std::string(szFileName).substr(m_rootDir.size());
 	std::string relativeNameNoExt = RemoveExtension(relativePath);
-	std::string outName = relativeNameNoExt + ".vtx";
+	std::string outName = TextureResourceName(relativeNameNoExt, node);
 	
 	// Already references
 	if (HasDestResource(outName))
@@ -305,7 +316,7 @@ std::string FileFactoryWin::LoadTexture(const char* szFileName, YAML::Node node)
 {
 	std::string relativePath = std::string(szFileName).substr(m_rootDir.size());
 	std::string relativeNameNoExt = RemoveExtension(relativePath);
-	std::string outName = relativeNameNoExt + ".vtx";
+	std::string outName = TextureResourceName(relativeNameNoExt, node);
 	std::string tmpFileName = m_tempDir + relativeNameNoExt + ".dds";
 
 	// Already references

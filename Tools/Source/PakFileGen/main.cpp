@@ -175,6 +175,16 @@ int main(int argc, char *argv[])
 		{
 			YAML::Node file = (*it)["File"];
 			YAML::Node data = (*it)["Data"];
+			// Optional resource name override (textures only): the name the resource is stored
+			// under in the pak, without extension, instead of its path under Data/. A model looks
+			// a texture up as "<model dir>/<name>" and then as plain "<name>", so a texture shared
+			// by models in many folders (a prop atlas) is stored under its bare name.
+			YAML::Node name = (*it)["Name"];
+			if (name)
+			{
+				data = data ? YAML::Clone(data) : YAML::Node(YAML::NodeType::Map);
+				data["Name"] = name.as<std::string>();
+			}
 
 			if (file)
 			{
