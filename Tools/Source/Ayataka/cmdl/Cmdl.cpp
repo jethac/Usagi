@@ -194,27 +194,31 @@ void Cmdl::ReverseCoordinateInt(::exchange::Shape* pShape)
 	uint32_t attrIndex = 0;
 	if( ( attrIndex = pShape->SearchSingleAttribute( usg::exchange::VertexAttribute_NORMAL ) ) != UINT32_MAX ) {
 		usg::exchange::SingleAttribute& attr = pShape->pb().singleAttributes[attrIndex];
-		attr.value.z *= -1.0f;
+		attr.value.x *= -1.0f;
 	}
 	if( ( attrIndex = pShape->SearchSingleAttribute( usg::exchange::VertexAttribute_TANGENT ) ) != UINT32_MAX ) {
 		usg::exchange::SingleAttribute& attr = pShape->pb().singleAttributes[attrIndex];
-		attr.value.z *= -1.0f;
+		attr.value.x *= -1.0f;
 	}
 	if ((attrIndex = pShape->SearchSingleAttribute(usg::exchange::VertexAttribute_BINORMAL)) != UINT32_MAX) {
 		usg::exchange::SingleAttribute& attr = pShape->pb().singleAttributes[attrIndex];
-		attr.value.z *= -1.0f;
+		attr.value.x *= -1.0f;
 	}
 
-	// switch direction and exchange each other
+	// The vertex streams above are mirrored in X (ReverseCoordinateInt(Stream&) negates
+	// column 0), so mirror the bounds the same way: negate X and exchange min and max.
+	// (This used to flip Z without negating, leaving the model header's bounding sphere,
+	// built from these AABBs in CmdlBinaryStore, on the wrong side of X for any mesh
+	// whose geometry isn't centred on its origin, which culled it when visible.)
 	Vector3 min = pShape->GetAABBMin();
 	Vector3 max = pShape->GetAABBMax();
-	float newMaxZ = min.z;
-	float newMinZ = max.z;
-	min.z = newMaxZ;
-	max.z = newMinZ;
+	float newMinX = -max.x;
+	float newMaxX = -min.x;
+	min.x = newMinX;
+	max.x = newMaxX;
 	pShape->SetAABB( min, max );
 
-	pShape->pb().boundingSphere.center.z *= -1.0f;
+	pShape->pb().boundingSphere.center.x *= -1.0f;
 }
 
 void Cmdl::ReverseCoordinateInt(::exchange::Stream& stream)
