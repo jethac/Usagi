@@ -9,6 +9,7 @@
 #include "Engine/Resource/CustomEffectResource.h"
 #include "Engine/Resource/ResourceMgr.h"
 #include "Engine/Graphics/Effects/ConstantSet.h"
+#include "Engine/Maths/MathUtil.h"
 #include "Engine/Scene/Common/CustomEffectRuntime.h"
 
 namespace usg {
@@ -105,9 +106,19 @@ void CustomEffectRuntime::Cleanup(GFXDevice* pDevice)
 
 void CustomEffectRuntime::SetSetData(uint32 uSet, void* pData, uint32 uSize)
 {
-	void* pDst = m_pConstantSets[uSet].Lock(uSize);
-	usg::MemCpy(pDst, pData, uSize);
-	m_pConstantSets[uSet].Unlock();
+	// Cooked data (a model's material constants) can be from an older layout
+	// of the effect: variables are only ever appended to a custom effect's
+	// constant sets, so take the part the cook has and keep the defaults (set
+	// in Init) for the rest, rather than asserting on the size.
+	ConstantSet& set = m_pConstantSets[uSet];
+	const uint32 uSetSize = set.GetSize();
+	if (uSize != uSetSize)
+	{
+		DEBUG_PRINT("CustomEffectRuntime: constant set %u data is %u bytes, the effect's layout is %u; recook to update\n", uSet, uSize, uSetSize);
+	}
+	void* pDst = set.Lock(uSetSize);
+	usg::MemCpy(pDst, pData, Math::Min(uSize, uSetSize));
+	set.Unlock();
 }
 
 uint32 CustomEffectRuntime::GetVariableCount(const char* szName) const
