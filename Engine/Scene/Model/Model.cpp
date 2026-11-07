@@ -399,6 +399,32 @@ void Model::InitDynamics(GFXDevice* pDevice, Scene* pScene, uint32 i)
 	}
 }
 
+void Model::ApplyMaxDrawDistance(uint8 uMaxLod)
+{
+	if (m_fMaxDrawDistance <= 0.0f)
+	{
+		return;
+	}
+
+	// The last LOD gets the limit (the others already step down before it)
+	if (m_bPerBoneCulling)
+	{
+		Skeleton& skeleton = GetSkeleton();
+		for (uint32 uBone = 0; uBone < skeleton.GetBoneCount(); uBone++)
+		{
+			RenderGroup* pGroup = skeleton.GetBone(uBone)->GetRenderGroup();
+			if (pGroup)
+			{
+				pGroup->SetLodMaxDistance(uMaxLod, m_fMaxDrawDistance);
+			}
+		}
+	}
+	else if (m_pRenderGroup)
+	{
+		m_pRenderGroup->SetLodMaxDistance(uMaxLod, m_fMaxDrawDistance);
+	}
+}
+
 bool Model::IsOnScreen()
 {
 	return true;
@@ -497,6 +523,8 @@ void Model::AddToSceneInt(GFXDevice* pDevice)
 					}
 				}
 			}
+
+			ApplyMaxDrawDistance(uMaxLod);
 
 			// FIXME: Replace with artist defines
 			if (uMaxLod == 0 && m_pResource->GetBounds().GetRadius() < 2.f)

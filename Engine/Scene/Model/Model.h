@@ -102,8 +102,12 @@ public:
 	const ConstantSet& GetSkinnedBones() const { return m_skinnedBones; }
 	const ConstantSet& GetRigidBones() const { return m_staticBones;  }
 	bool IsDynamic() const { return m_bDynamic; }
-		
+	// Not drawn beyond this distance from the camera (0 = no limit); call
+	// before AddToScene
+	void SetMaxDrawDistance(float fDistance) { m_fMaxDrawDistance = fDistance; }
+
 private:
+	void ApplyMaxDrawDistance(uint8 uMaxLod);
 	void AddToSceneInt(GFXDevice* pDevice);
 	void AddDepthMesh(GFXDevice* pDevice, bool bAdd);
 	void UpdateRenderMaskInt();
@@ -134,6 +138,7 @@ private:
 	float					m_fScale;
 
 	MaterialInfo*			m_pOverrideMaterials;
+	float					m_fMaxDrawDistance = 0.0f;
 	bool					m_bDynamic;
 	uint32					m_uMeshCount;
 

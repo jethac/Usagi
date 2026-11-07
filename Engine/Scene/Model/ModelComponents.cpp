@@ -36,6 +36,7 @@ namespace usg
 		LoadModelPak(handles, p->pakName, p->name);
 
 		p.GetRuntimeData().pModel = pModelMgr->GetModel(handles.pResourceMgr, p->name, p->bDynamic, p->bPerBoneCulling);
+		p.GetRuntimeData().pModel->SetMaxDrawDistance(p->fMaxDrawDistance);
 		Optional<VisibilityComponent> visibility;
 		handles.GetComponent(p.GetEntity(), visibility);
 		p.GetRuntimeData().pModel->AddToScene(!visibility.Exists() || visibility.Force()->bVisible);
