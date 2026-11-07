@@ -224,7 +224,7 @@ static const EnumTable g_wrapTable[]
 		const char* szUsagiPath = getenv("USAGI_DIR");
 		std::string emuPath = szUsagiPath;
 		// FIXME: Hunt for a matching material setting file
-		emuPath += "\\Data\\GLSL\\effects\\";
+		emuPath += "/Data/GLSL/effects/";
 		emuPath += effectSet;
 		emuPath += ".yml";
 		FILE* pFile = nullptr;
@@ -232,7 +232,7 @@ static const EnumTable g_wrapTable[]
 		{
 			emuPath = szUsagiPath;
 			emuPath = emuPath.substr(0, emuPath.find("Usagi"));
-			emuPath += "\\Data\\GLSL\\effects\\";
+			emuPath += "/Data/GLSL/effects/";
 			emuPath += effectSet;
 			emuPath += ".yml";
 			int ret = 0;

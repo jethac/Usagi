@@ -846,7 +846,7 @@ void FbxLoad::SetRenderState(::exchange::Material* pNewMaterial, FbxSurfaceMater
 	const char* szUsagiPath = getenv("USAGI_DIR");
 	std::string emuPath = szUsagiPath;
 	// FIXME: Hunt for a matching material setting file
-	emuPath += "\\Data\\GLSL\\effects\\Model.yml";
+	emuPath += "/Data/GLSL/effects/Model.yml";
 	pNewMaterial->SetIsCustomFX(false);
 
 	std::vector<std::string> defines;
