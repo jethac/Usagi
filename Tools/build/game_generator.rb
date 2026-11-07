@@ -46,13 +46,15 @@ end
 def process_data(config, platform, n)
   data_deps = Set.new
 
-  # The data tools only run on Windows; Linux uses the data cooked for 'win'
-  return data_deps if config.compiles_with_ninja?
+  # The data tools run on Windows and Linux hosts. A Linux build cooks the
+  # same 'win' data the Windows build does (see BuildConfig#data_platform);
+  # other hosts use data cooked elsewhere.
+  return data_deps if config.compiles_with_ninja? && !config.can_cook_data?
 
 
   # Do this first to ensure we have the hierarchy information
   # Convert models
-  if config.target_platform == 'win'
+  if config.data_platform == 'win'
     pc_data = build_pc_data(config, n, platform)
     data_deps.merge pc_data
   end
@@ -194,7 +196,7 @@ def build_shader_pak_for_dir(config, n, effect_dir, shader_dir, api, includes)
     defines = ""
     n.build('shaderpack', {output => [input]},
         { :implicit_deps => [config.shader_pack],
-          :variables => {'out' => to_windows_path(output),
+          :variables => {'out' => BuildConfig.native_path(output),
         'in' => input,
         'shader_dir' => shader_dir,
         'api' => api,
@@ -250,9 +252,9 @@ def build_paks_for_audio(config, n, platform)
     defines = ""
     n.build('pak_file', {output => [input]},
         { :implicit_deps => [config.resource_packer],
-          :variables => {'out' => to_windows_path(output),
+          :variables => {'out' => BuildConfig.native_path(output),
         'in' => input,
-        'platform' => config.target_platform } } )
+        'platform' => config.data_platform } } )
 
     output
   end
@@ -266,9 +268,9 @@ def build_paks_for_models(config, n, platform)
     defines = ""
     n.build('pak_file_def', {output => [input]},
         { :implicit_deps => [config.resource_packer],
-          :variables => {'out' => to_windows_path(output),
+          :variables => {'out' => BuildConfig.native_path(output),
         'in' => input,
-        'platform' => config.target_platform } } )
+        'platform' => config.data_platform } } )
 
     output
   end
@@ -281,9 +283,9 @@ def build_paks_for_terrain(config, n, platform)
     defines = ""
     n.build('pak_file_def', {output => [input]},
         { :implicit_deps => [config.resource_packer],
-          :variables => {'out' => to_windows_path(output),
+          :variables => {'out' => BuildConfig.native_path(output),
         'in' => input,
-        'platform' => config.target_platform } } )
+        'platform' => config.data_platform } } )
 
     output
   end
@@ -296,9 +298,9 @@ def build_paks_for_layouts(config, n, platform)
     defines = ""
     n.build('pak_file', {output => [input]},
         { :implicit_deps => [config.resource_packer],
-          :variables => {'out' => to_windows_path(output),
+          :variables => {'out' => BuildConfig.native_path(output),
         'in' => input,
-        'platform' => config.target_platform } } )
+        'platform' => config.data_platform } } )
 
     output
   end
@@ -325,7 +327,7 @@ def build_paks_for_directory_non_recursive(config, n, platform, input_dir, out_d
         { :implicit_deps => [config.resource_packer],
           :variables => {'out' => output,
         'in' => input,
-        'platform' => config.target_platform } } )
+        'platform' => config.data_platform } } )
 
   output
   end
@@ -343,7 +345,7 @@ def build_paks_for_directory(config, n, platform, textures_dir, out_dir)
         { :implicit_deps => [config.resource_packer],
           :variables => {'out' => output,
         'in' => input,
-        'platform' => config.target_platform } } )
+        'platform' => config.data_platform } } )
 
   output
   end
@@ -392,7 +394,7 @@ def build_fonts(config, n)
     output = "#{out_stub}.vpb"
 
     n.build('font', {output => [input]},
-        :variables => {'out_stub' => to_windows_path(out_stub),
+        :variables => {'out_stub' => BuildConfig.native_path(out_stub),
         'in' => input})
 
     output
@@ -403,6 +405,15 @@ def build_pc_models(config, n)
   FileUtils.mkdir_p(config.shader_out_dir)
   FileUtils.mkdir_p(config.skeleton_out_dir)
   FileUtils.mkdir_p(config.effects_out_dir)
+
+  # The Linux Ayataka needs the Autodesk FBX SDK, which isn't redistributable
+  # (Documents/LinuxPort.md, "Data tools"). Without it the models aren't
+  # converted here, so that everything else still cooks; the .vmdf files and
+  # _build/skel skeletons then have to come from a cook that has it.
+  if !Gem.win_platform? && !File.exist?(config.cmdl_converter)
+    puts "WARNING: #{config.cmdl_converter} isn't built (no FBX SDK): models are not converted"
+    return []
+  end
 
   models = FileList["#{config.model_dir}/**/*.{fbx}"].exclude do |f|
     File.directory?(f) || f.include?("/collision")
@@ -640,10 +651,15 @@ def project_code(config, platform, n, order_only_deps, codegen_outputs = [])
   pbs.concat pb_cpp
   pb_lua = GeneratorUtil.lua_protobuf(config, n, proto_files)
   pbs.concat pb_lua
-  codegen_outputs.concat GeneratorUtil.windows_protobuf_outputs(config, proto_files)
+  codegen_outputs.concat GeneratorUtil.codegen_protobuf_outputs(config, proto_files)
 
   if config.compiles_with_ninja?
     GeneratorUtil.compile_source(config, n, targets, order_only_deps)
+    # The entity cooker needs the Ruby classes wherever data is cooked
+    if config.can_cook_data?
+      pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
+      pbs.concat pb_rb
+    end
   else
     # Only the Windows data tools use these
     pb_rb = GeneratorUtil.ruby_protobuf(config, n, proto_files)
@@ -800,7 +816,7 @@ end
 
 def boilerplate(config, n, generated_code, win_bp_cpp, codegen_outputs = [])
   system_sources = grep(["namespace.Systems"], [config.project], ["*.h", "*.cpp"])
-  codegen_outputs.concat GeneratorUtil.windows_system_scan_outputs(config, system_sources)
+  codegen_outputs.concat GeneratorUtil.codegen_system_scan_outputs(config, system_sources)
   project_systems = system_sources.map{ |h| "#{(h + ".bp.cpp").gsub("\\", "/")}" }
 
   project_system_ymls = project_systems.map{ |s| "#{config.code_working_dir}/#{s.sub(/\.bp\.cpp$/, ".yml")}" }

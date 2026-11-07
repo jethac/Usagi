@@ -17,10 +17,9 @@ piece.
 - The preprocessor symbol is `PLATFORM_LINUX`. `PLATFORM_PC` keeps
   meaning "Windows desktop", since that is how the code uses it (Win32
   headers, `WINUTIL`, DirectInput, and so on).
-- **Data and generated code are produced on Windows** and copied over.
-  The engine's tools (Ayataka, ShaderPackage, PakFileGen, FontCreator,
-  `systems-scanner`, `protoc` 2.5 with the nanopb plugin batch files) are
-  Windows binaries. Porting them is out of scope for the first pass.
+- **Data and generated code** were produced on Windows and copied over
+  in the first pass. A Linux host now generates the code and cooks the
+  data itself (see "Generated code" and "Data tools" below).
 
 ## Layout after the shared platform layers
 
@@ -207,32 +206,58 @@ the game sources and link the executable.
 
 ### Generated code
 
-Some generated code depends on Windows-only tools:
+Code generation runs natively on a Linux host and produces the same files
+as on Windows, byte for byte, apart from the generators' timestamp
+comments (`BuildConfig#can_run_codegen?`):
 
-- `.pb.h/.pb.cpp` and `.lua.h/.lua.cpp` from `protoc.exe` 2.5 with the
-  nanopb plugin `.bat` wrappers
-- per-system `.yml` from `systems-scanner.exe`, a libclang tool whose
-  source is not in this repo
+- `.pb.h/.pb.cpp` (nanopb) and `.lua.h/.lua.cpp` (Lua bindings) come
+  from protoc 2.5.0, built from Google's release tarball by
+  `Tools/linux/bootstrap.sh` and found through `$USAGI_PROTOC`. A newer
+  protoc isn't used: its built-in `--ruby_out` shadows the
+  `protoc-gen-ruby` plugin, and the generated code was written against
+  2.5.
+- The two plugins run under Python 3 through
+  `Tools/python/nanopb_py3/protoc-gen-nanopb[lua]`. protoc 2.5's Python
+  output (nanopb's `proto/nanopb_pb2.py`) is Python 2 only, so
+  `nanopb_py3/run_plugin.py` puts a `proto` package of its own first on
+  the path: `nanopb_pb2` is built from a descriptor set of `nanopb.proto`
+  that the build writes to `_build/proto/nanopb.desc`, and `plugin_pb2` is
+  the protobuf runtime's. nanopb's generator itself runs unmodified (the
+  one call it makes that Python 3 rejects, `zlib.crc32` on a `str`, is
+  adapted in `run_plugin.py`). `Tools/python/nanopb_lua_generator.py` is
+  ported to Python 3. Where its Python 2 version emitted dict or set
+  iteration order, it reproduces CPython 2.7's order
+  (`py2_table_order`), so the output doesn't change.
+- `.pb.rb` (for the entity and data cookers) comes from the
+  `ruby-protocol-buffers` gem's `protoc-gen-ruby`.
+- Per-system `.yml` comes from `Tools/python/systems_scanner.py`, a
+  Python replacement for `systems-scanner.exe` built on libclang's Python
+  bindings, run by `Tools/ruby/boilerplate_scan.rb`.
 
-These are produced on Windows with `rake platform=linux codegen` and
-copied over with the data. When the generator runs on a Linux host it
-treats those files as inputs and leaves out their rules. Everything else
-(header copies into `_includes`, `BuildID.h`, YAML combining, and the
-ERB boilerplate templates) is plain Ruby and runs on Linux.
+The only differences from the Windows output are float defaults that
+protoc formats through the C runtime: `1e+006` on Windows, `1e+06` on
+Linux (`PhysicsStructs`), the same value.
 
-The generator checks that the Windows-produced files exist and stops
-with a message naming the missing step if they don't.
+A Linux game build should reach the engine through the game's `Usagi`
+link (`USAGI_DIR=<game>/Usagi`), as on Windows, so game-side paths in the
+generated code are spelled `Usagi/...`. The engine's own build recognises
+itself through the link.
 
-Making codegen native later means two changes. First, run the nanopb
-generator under Python 3 against the system `protoc`. Second, build
-`systems-scanner` against the system libclang, or replace it.
+macOS hosts still need these outputs from Windows or Linux
+(`rake platform=macos build=<b> codegen`); the generator stops with a
+message naming that step if they're missing.
 
 ### Host requirements
 
-- Linux: clang, ninja, Ruby with the `ninja-gen` gem, pkg-config, the
-  SDL3 and Vulkan loader development files, and Vulkan headers. Ruby
-  gems install with `--user-install`. Vulkan headers come from the
-  distro package, or from `VULKAN_SDK` as on Windows.
+- Linux: clang, ninja, Ruby, Python 3, pkg-config, the SDL3 and Vulkan
+  loader development files, Vulkan headers and shaderc. Vulkan headers
+  come from the distro package, or from `VULKAN_SDK` as on Windows.
+- Everything else installs user-locally (no root) with
+  `Tools/linux/bootstrap.sh`: the `ninja-gen`, `nokogiri`,
+  `ruby-protocol-buffers` and `matrix` gems, protoc 2.5.0, and a Python
+  venv with `protobuf` 3.20 and the `libclang` bindings. Then
+  `. Tools/linux/usagi_env.sh` sets `USAGI_PROTOC`, `USAGI_PYTHON`,
+  `FBXSDK_DIR` and `PATH`.
 - Physics (Box3D) is vendored source, built with the engine; nothing to
   install.
 
@@ -243,8 +268,56 @@ cooked effects are API-portable and run unchanged on the Linux Vulkan
 driver. All cooked data (`_romfiles/win`) is little-endian and has no
 OS-specific contents. Linux uses it as-is. Since the runtime opens
 resources relative to the working directory, the game runs from the
-copied romfiles directory, just as the Visual Studio debugger runs it
-from `_romfiles\win`.
+romfiles directory, just as the Visual Studio debugger runs it from
+`_romfiles\win`.
+
+A Linux build therefore cooks the Windows data format, into
+`_romfiles/win` (`BuildConfig#data_platform`), with the same rules as a
+Windows build.
+
+### Data tools
+
+The tools in `Tools/Source` build natively with clang:
+`Tools/Source/build_linux_tools.sh` writes a small `build.ninja` and puts
+Ayataka, PakFileGen, ShaderPackage and FontCreator in
+`_build/tools/linux/bin`, where the generator looks for them on Linux
+(`BuildConfig#data_tool`). They link the engine's Linux libraries, so the
+engine is built first (`ENGINE_BUILD`, release by default).
+
+- `Tools/Source/ToolsPosix.h` is forced into the Linux builds only. It
+  provides the Win32 and CRT calls the tools use (`fopen_s`,
+  `sprintf_s`, `CreateDirectory`, `GetModuleFileName` and so on), so the
+  sources keep their Windows spelling. Like the Debug runtime the Windows
+  tools were built with, it fills the unused tail of fixed-size names
+  with `0xFE`, which keeps the paks byte-identical.
+- Compressonator (PakFileGen's texture compression) is fetched once at
+  the submodule's pinned commit into `_build/tools/linux/src` when the
+  submodule isn't checked out, and built with CMake.
+- Ayataka needs the Autodesk FBX SDK for Linux (2020.3.9, the version the
+  Windows build uses):
+  `https://damassets.autodesk.net/content/dam/autodesk/www/files/fbx202039_fbxsdk_gcc_linux.tar.gz`.
+  Its installer asks you to accept Autodesk's licence, so it isn't
+  installed automatically. Unpack it and run
+  `./fbx202039_fbxsdk_linux ~/.local/opt/fbxsdk` (no root needed), then
+  rerun the build script. Without the SDK the script skips Ayataka and
+  builds PakFileGen without FBX support, and the generator leaves the
+  models out (their `.vmdf` and `_build/skel` files must then come from a
+  cook that has the SDK).
+
+Against the Windows cook of UsagiGP, the Linux tools give:
+
+- PakFileGen: every texture pak (BC7 car paints included) and the audio
+  pak are byte-identical.
+- FontCreator: the font texture and `.vpb` are byte-identical.
+- ShaderPackage: the SPIR-V is identical. Three effect paks differ in
+  bytes that carry no data. Entries used to be sorted with a comparison
+  that isn't a strict ordering, so their order depended on the C++
+  library; they now follow a fixed dependency order (the game looks
+  entries up by CRC). And uninitialised padding in attribute defaults,
+  which the Windows Debug build left as `0xCC` or stack garbage, is now
+  zeroed. (It also feeds the duplicate-entry check: left as garbage, a
+  Linux build of `Model.pak` came out with 542 entries instead of 444.)
+
 
 ## Milestones
 
@@ -287,21 +360,26 @@ with `SDL_VIDEO_DRIVER=x11` (XWayland) under `renderdoccmd capture`.
 
 ### Building and running
 
-On Windows (pinned toolchain), in the engine checkout, then in the game:
+Everything happens on the Linux machine. Once per machine:
 
-    rake platform=linux build=debug codegen
+    sh Tools/linux/bootstrap.sh             # gems, protoc 2.5, Python venv
 
-Copy the tree, `_build/proto`, `_build/linux/<build>` and
-`_romfiles/win` to the Linux machine. Then, with `USAGI_DIR`,
-`VULKAN_SDK` (a prefix containing `include/vulkan`) set:
+Then, with the game checkout holding the engine as `Usagi` (a directory
+or a link):
 
-    rake platform=linux build=debug         # engine: generate + build libs
-    Tools/Tests/LinuxClear/build.sh debug   # bring-up test
-    rake platform=linux build=debug         # in the game directory
-                                            # (after the engine libs: the
-                                            # game rake only regenerates
-                                            # the engine's ninja file)
-    cd _romfiles/win && ../../_rom/linux/debug/UsagiGP [--fullscreen]
+    . Usagi/Tools/linux/usagi_env.sh
+    export USAGI_DIR=$PWD/Usagi
+    rake platform=linux build=release ninja # generates the engine's and
+                                            # the game's ninja files
+    (cd Usagi && ninja -f _build/linux/release/build.ninja libs pb)
+    (cd Usagi && sh Tools/Source/build_linux_tools.sh)  # the data tools
+    ninja -f _build/linux/release/build.ninja  # codegen, the executable
+                                               # and _romfiles/win
+    cd _romfiles/win && ../../_rom/linux/release/UsagiGP [--fullscreen]
+
+The game's `rake` only generates the engine's ninja file, so the engine
+libraries are built first, and the data tools link them.
+`Tools/Tests/LinuxClear/build.sh <build>` builds the bring-up test.
 
 Add-on modules (Engine/<Name>) build like engine libraries. Modules that
 need extra include paths or defines declare them in `usagi_module.yml`

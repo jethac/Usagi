@@ -107,6 +107,12 @@ module GeneratorUtil
            '$protoc --nanopblua_out=$outdir $protoc_includes -I$nanopb_proto_dir --plugin=protoc-gen-nanopblua="$protoc_gen_lua" $in',
            {:description => 'PROTOCOL_LUA $out'})
 
+    # A descriptor set, for the Python 3 nanopb plugins (see
+    # BuildConfig#nanopb_protocols)
+    n.rule('protoc_desc',
+           '$protoc -o$out -I$nanopb_proto_dir $in',
+           {:description => 'PROTOCOL_DESC $out'})
+
     n.rule('cp',
            "$ruby -e \"FileUtils.cp_r('$in', '$out')\" -r'fileutils'",
            {:description => 'CP $out'})
@@ -200,10 +206,13 @@ module GeneratorUtil
 
   end
 
+  # Rules for the PC ('win') data, which a Linux build cooks too
   def GeneratorUtil.define_pc_rules(config, platform, n)
-    n.rule('msbuild',
-           "#{config.msbuild} $csproj /p:Configuration=$configuration,Platform=AnyCPU,OutputPath=$outpath /v:quiet /nologo",
-           {:description => 'VS BUILD $out'})
+    unless config.compiles_with_ninja?
+      n.rule('msbuild',
+             "#{config.msbuild} $csproj /p:Configuration=$configuration,Platform=AnyCPU,OutputPath=$outpath /v:quiet /nologo",
+             {:description => 'VS BUILD $out'})
+    end
 
     n.rule('cmdl',
            "#{config.cmdl_converter} -a16 -o$out -sk$skanimdir -lh #{config.cmdl_converter_dep_opts} -h$skel $in",
@@ -237,6 +246,12 @@ module GeneratorUtil
   #####################################################################
 
   def GeneratorUtil.nanopb_protocols(config, n)
+    if !Gem.win_platform?
+      FileUtils.mkdir_p(File.dirname(config.nanopb_descriptor_set))
+      n.build('protoc_desc', {config.nanopb_descriptor_set => ["#{config.nanopb_proto_dir}/nanopb.proto"]})
+      return
+    end
+
     config.nanopb_protocols.each do |py|
       proto = py.sub('_pb2.py', '.proto')
       n.build('protoc_py', {py => [proto]}, {:variables => {'outdir' => config.usagi_dir}})
@@ -259,7 +274,7 @@ module GeneratorUtil
 
     proto_files.zip(lua_h, lua_cpp, lua_o, include_lua_h).each do |proto, h, cpp, o, include_h|
       FileUtils.mkdir_p(File.dirname(cpp))
-      if config.can_run_windows_codegen?
+      if config.can_run_codegen?
         n.build('protoc_lua', {cpp => [proto]}, protoc_options(config, config.protocol_output_dir(false), config.nanopb_lua_generator))
       end
       n.alias(h, cpp)
@@ -331,7 +346,7 @@ module GeneratorUtil
 
     proto_files.zip(pb_h, pb_cpp, pb_o, include_pb_h).each do |proto, h, cpp, o, include_h|
       FileUtils.mkdir_p(File.dirname(cpp))
-      if config.can_run_windows_codegen?
+      if config.can_run_codegen?
         n.build('protoc_cpp', {cpp => [proto]}, protoc_options(config, config.protocol_output_dir(false), config.nanopb_generator))
       end
       n.alias(h, cpp)
@@ -343,9 +358,9 @@ module GeneratorUtil
     pb_h
   end
 
-  # Files produced by protoc 2.5 and the nanopb plugins, which only run
-  # on Windows (see BuildConfig#can_run_windows_codegen?)
-  def GeneratorUtil.windows_protobuf_outputs(config, proto_files)
+  # Files produced by protoc 2.5 and the nanopb plugins, which run on
+  # Windows and Linux hosts (see BuildConfig#can_run_codegen?)
+  def GeneratorUtil.codegen_protobuf_outputs(config, proto_files)
     proto_files.flat_map do |p|
       ['.pb', '.lua'].flat_map do |ext|
         base = File.join(config.protocol_output_dir(false), p.sub(/\.proto$/, ext))
@@ -354,27 +369,29 @@ module GeneratorUtil
     end
   end
 
-  # Files produced by systems-scanner.exe, which only runs on Windows
-  def GeneratorUtil.windows_system_scan_outputs(config, system_sources)
+  # Files produced by the systems scanner (systems-scanner.exe on Windows,
+  # Tools/python/systems_scanner.py on Linux)
+  def GeneratorUtil.codegen_system_scan_outputs(config, system_sources)
     system_sources.map { |src| "#{config.code_working_dir}/#{src.tr('\\', '/')}.yml" }
   end
 
-  # For platforms that ninja compiles. On Windows, 'codegen' builds the
-  # files that need the Windows-only generators, so they can be copied
-  # to the target machine. Elsewhere those files must already exist.
-  def GeneratorUtil.windows_codegen_targets(config, n, outputs, default_target = 'libs')
-    if config.can_run_windows_codegen?
+  # For platforms that ninja compiles. Where codegen runs (Windows and
+  # Linux hosts), 'codegen' builds the generated sources; on Windows it
+  # is the default, so they can be copied to a host that can't generate
+  # them. Elsewhere those files must already exist.
+  def GeneratorUtil.codegen_targets(config, n, outputs, default_target = 'libs')
+    if config.can_run_codegen?
       n.alias('codegen', outputs)
-      n.defaults('codegen')
+      n.defaults(Gem.win_platform? ? 'codegen' : default_target)
       return
     end
 
     missing = outputs.reject { |f| File.exist?(f) }
     if !missing.empty?
       abort("#{missing.length} generated files are missing, starting with " \
-            "#{missing.first}. They come from Windows-only tools: run " \
+            "#{missing.first}. They come from protoc 2.5 and the systems scanner: run " \
             "'rake platform=#{config.target_platform} build=#{config.build} codegen' " \
-            "on Windows and copy _build/proto and #{config.code_working_dir} here.")
+            "on Windows or Linux and copy _build/proto and #{config.code_working_dir} here.")
     end
 
     n.defaults(default_target)
@@ -592,7 +609,7 @@ module GeneratorUtil
       o = cpp.sub(/\.cpp$/, ".o")
 
       FileUtils.mkdir_p(File.dirname yml)
-      if config.can_run_windows_codegen?
+      if config.can_run_codegen?
         n.build('boilerplate', {yml => [src]},
                 {:implicit_deps => [config.boilerplate_scan, config.boilerplate_tool],
                 :order_only_deps => order_only_deps})
