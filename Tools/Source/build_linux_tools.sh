@@ -62,6 +62,14 @@ if [ -f "$FBXSDK_DIR/include/fbxsdk.h" ]; then
   FBX_LIBDIR=$FBXSDK_DIR/lib/release
   [ -d "$FBX_LIBDIR" ] || FBX_LIBDIR=$(ls -d "$FBXSDK_DIR"/lib/*/x64/release "$FBXSDK_DIR"/lib/*/release 2>/dev/null | head -1)
   [ -f "$FBX_LIBDIR/libfbxsdk.so" ] || die "FBX SDK at $FBXSDK_DIR has no lib/.../release/libfbxsdk.so"
+  # libfbxsdk.so 2020.3.9 links libxml2.so.2 with versioned symbols (LIBXML2_2.x),
+  # which libxml2 2.14+ (soname .so.16) dropped. Arch etc. no longer ship .so.2, so
+  # build libxml2 2.13 into LIBXML2_LEGACY_DIR (no root) and link against that.
+  LIBXML2_LEGACY_DIR=${LIBXML2_LEGACY_DIR:-$HOME/.local/opt/libxml2-legacy}
+  XML2_LIBS="-lxml2"
+  if [ -f "$LIBXML2_LEGACY_DIR/lib/libxml2.so.2" ]; then
+    XML2_LIBS="-L$LIBXML2_LEGACY_DIR/lib -Wl,-rpath,$LIBXML2_LEGACY_DIR/lib -lxml2"
+  fi
 fi
 
 mkdir -p "$OUT/bin" "$OUT/obj"
@@ -209,7 +217,7 @@ for tool in $TOOLS; do
       continue
     fi
     objs="$(obj $S/Ayataka/Ayataka.cpp $AYA_FLAGS) $AYA_OBJS $RES_OBJS"
-    libs="-L$FBX_LIBDIR -Wl,-rpath,$FBX_LIBDIR -lfbxsdk -lxml2 -lz $ENGINE_LIBS $SYSLIBS"
+    libs="-L$FBX_LIBDIR -Wl,-rpath,$FBX_LIBDIR -lfbxsdk $XML2_LIBS -lz $ENGINE_LIBS $SYSLIBS"
     ;;
   PakFileGen)
     CMPS=$COMPRESSONATOR_DIR
@@ -217,8 +225,8 @@ for tool in $TOOLS; do
     pak_flags="-I$S/ResourceLib -iquote $S/Ayataka -I$CMPS/cmp_compressonatorlib -I/usr/include/glslang/Public -D_LINUX"
     if [ -n "$HAVE_FBX" ]; then
       pak_flags="$pak_flags -I$FBXSDK_DIR/include -DFBXSDK_SHARED"
-      fbx_objs="$AYA_OBJS"
-      fbx_libs="-L$FBX_LIBDIR -Wl,-rpath,$FBX_LIBDIR -lfbxsdk -lxml2 -lz"
+      fbx_objs="$AYA_OBJS $RES_OBJS"
+      fbx_libs="-L$FBX_LIBDIR -Wl,-rpath,$FBX_LIBDIR -lfbxsdk $XML2_LIBS -lz"
     else
       pak_flags="$pak_flags -DUSG_TOOLS_NO_FBX"
       fbx_objs="$(obj $S/Ayataka/Dependencies/DependencyTracker.cpp $AYA_FLAGS)"
