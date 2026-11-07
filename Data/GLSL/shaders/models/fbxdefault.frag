@@ -80,6 +80,25 @@ void main(void)
 
 	vec3 vNormal = vo_vNormal;
 
+#ifndef OMNI_DEPTH
+	// Materials draw without face culling by default, so the side of a surface we
+	// see may be the one its normal points away from: a mesh whose winding or
+	// normals came out mirrored from the exporter, or the back of a card. Light
+	// the visible side: orient the shading normal toward the camera using the
+	// surface's geometric normal (screen space derivatives, so smoothed vertex
+	// normals near a silhouette are left alone). Without this, inverted props are
+	// lit from below: black from the top-down table camera, and only lit by the
+	// horizon of the environment from the couch camera.
+	vec3 vGeoNormal = cross(dFdx(vo_vViewDir), dFdy(vo_vViewDir));
+	// Toward the eye: -view position for a perspective camera, -Z for an orthographic one
+	vec3 vToEye = mProjMat[3][3] > 0.5 ? vec3(0.0, 0.0, -1.0) : vo_vViewDir;
+	float fFacing = dot(vGeoNormal, vToEye) * dot(vGeoNormal, vo_vNormal);
+	float fSideSign = fFacing < 0.0 ? -1.0 : 1.0;
+	vNormal *= fSideSign;
+#else
+	float fSideSign = 1.0;
+#endif
+
 #ifdef HAS_BUMP
 	if(uMaterial.bBumpMap)
 	{
@@ -91,8 +110,9 @@ void main(void)
         {
             nrm_l.y = -nrm_l.y;
         }
-        vec3 tan_v = normalize(vo_vTangent);
-        vec3 binrm_v = normalize(vo_vBinormal);
+        // The whole tangent frame turns with the visible side (see above)
+        vec3 tan_v = normalize(vo_vTangent) * fSideSign;
+        vec3 binrm_v = normalize(vo_vBinormal) * fSideSign;
         vNormal = normalize(nrm_l.x * tan_v + nrm_l.y * binrm_v + nrm_l.z * vNormal);
     }
 #endif
