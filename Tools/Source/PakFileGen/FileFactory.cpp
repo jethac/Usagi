@@ -6,12 +6,6 @@
 #include "Engine/Particles/Scripted/EffectGroup.pb.h"
 #include "Engine/Audio/AudioBank.pb.h"
 #include "Engine/Layout/UI.pb.h"
-// USG_TOOLS_NO_FBX: built without the FBX SDK (Linux hosts without it), so
-// model paks are unavailable and say so
-#ifndef USG_TOOLS_NO_FBX
-#include "../Ayataka/common/ModelConverterBase.h"
-#include "../Ayataka/fbx/FbxConverter.h"
-#endif
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
@@ -374,131 +368,10 @@ void FileFactory::AddDependency(const char* szFileName)
 
 std::string FileFactory::LoadModel(const char* szFileName, const YAML::Node& node)
 {
-#ifdef USG_TOOLS_NO_FBX
-	FATAL_RELEASE(false, "%s: this PakFileGen was built without the FBX SDK", szFileName);
+	// Models are converted to loose .vmdf files by fbx-to-vmdf
+	// (Tools/Source/fbx-to-vmdf), not packed from .fbx here
+	FATAL_RELEASE(false, "%s: .fbx files can't go in a pak; models are converted by fbx-to-vmdf", szFileName);
 	return "";
-#else
-	std::stringstream command;
-	std::string relativePath = std::string(szFileName).substr(m_rootDir.size());
-	std::string fileNameBase;
-
-	if (node && node["NameInPak"])
-	{
-		std::string nameOverride = node["NameInPak"].as<std::string>();
-		fileNameBase = RemoveFileName(relativePath) + "/" + nameOverride;
-	}
-	else
-	{
-		fileNameBase = RemoveExtension(relativePath);
-	}
-
-	relativePath = RemoveFileName(fileNameBase) + "/";
-	std::string skelDir = m_tempDir + "skel/";
-	std::string skelName = fileNameBase;
-	memsize pos = skelName.find_first_of("Models");
-	if (pos != std::string::npos)
-	{
-		skelName = skelName.substr(pos + 7);
-	}
-	skelName = skelDir + skelName;
-	skelName = RemoveExtension(skelName);
-	skelName += ".vmdf.xml";
-
-	bool bAsCollision = false;
-	if (node && node["IsCollision"])
-	{
-		bAsCollision = node["IsCollision"].as<bool>();
-	}
-	
-	DependencyTracker dependencies;
-	ModelConverterBase* pConverter = vnew(usg::ALLOC_OBJECT) FbxConverter;
-	int ret = pConverter->Load(szFileName, bAsCollision, false, &dependencies, &node);
-	if (ret != 0) {
-		FATAL_RELEASE(false, "Failed to find model %s", szFileName);
-		vdelete pConverter;
-		return "";
-	}
-
-	AddDependenciesFromDepTracker(dependencies);
-
-	if (bAsCollision) {
-		pConverter->CalculatePolygonNormal();
-	}
-
-	pConverter->ReverseCoordinate();
-
-	pConverter->Process();
-
-	// FIXME: Endian options
-	if (bAsCollision) {
-		pConverter->StoreCollisionBinary(false);
-	}
-	else {
-		pConverter->Store(16U, false);
-	}
-
-	PureBinaryEntry* pModel = new PureBinaryEntry;
-	pModel->srcName = szFileName;
-	if (bAsCollision)
-	{
-		pModel->SetName(fileNameBase + ".coll", usg::ResourceType::COLLISION);
-	}
-	else
-	{
-		pModel->SetName(fileNameBase + ".vmdf", usg::ResourceType::MODEL);
-	}
-	pModel->binarySize = (uint32)pConverter->GetBinarySize();
-	pModel->binary = new uint8[pModel->binarySize];
-
-
-	pConverter->ExportStoredBinary(pModel->binary, (memsize)pModel->binarySize);
-
-	if (!bAsCollision)
-	{
-		for (uint32 i = 0; i < pConverter->GetAnimationCount(); i++)
-		{
-			PureBinaryEntry* pAnim = new PureBinaryEntry;
-			pAnim->srcName = szFileName;
-			pAnim->SetName(fileNameBase + "." + pConverter->GetAnimName(i), usg::ResourceType::SKEL_ANIM);
-			pAnim->binarySize = (uint32)pConverter->GetAnimBinarySize(i);
-			pAnim->binary = new uint8[pModel->binarySize];
-			pConverter->ExportAnimation(i, pAnim->binary, (size_t)pAnim->binarySize);
-
-			m_resources.push_back(pAnim);
-		}
-
-		skelDir = RemoveFileName(skelName);
-		do
-		{
-			pos = skelDir.find_first_of("\\/", pos + 1);
-			CreateDirectory(skelDir.substr(0, pos).c_str(), NULL);
-		} while (pos != std::string::npos);
-
-		pConverter->ExportBoneHierarchy(skelName.c_str());
-
-
-		std::vector<std::string> textureList = pConverter->GetTextureNames();
-		for (auto itr : textureList)
-		{
-			YAML::Node out;
-			out.force_insert("format", pConverter->GetTextureFormat(itr));
-			out.force_insert("mips", true);
-			if(str::Find(pConverter->GetTextureFormat(itr), "srgb") != nullptr)
-			{
-				out.force_insert("sRGB", true);
-			}
-
-			std::string fullDir = relativePath + itr;
-			AddTextureDependecy(fullDir.c_str(), pModel, out);
-		}
-	}
-
-
-	m_resources.push_back(pModel); 
-
-
-	return pModel->GetName();
-#endif
 }
 
 
@@ -877,15 +750,6 @@ std::string FileFactory::LoadYMLAudioFile(const char* szFileName)
 	return pFileEntry->GetName();
 }
 
-
-void FileFactory::AddDependenciesFromDepTracker(DependencyTracker& tracker)
-{
-	const std::vector<std::string>& deps = tracker.GetDependencies();
-	for (auto itr : deps)
-	{
-		AddDependency(itr.c_str());
-	}
-}
 
 
 void FileFactory::AddDependenciesFromDepFile(const char* szDepFileName, ResourceEntry* pEntry)

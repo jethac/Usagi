@@ -234,12 +234,12 @@ namespace usg{
 
 	void CollisionModelResource::Init(const uint32* pData)
 	{
-		static const uint32 AyatakaMagicNumber = utl::CRC32("AyatakaCollisionModel");
+		static const uint32 AyatakaMagicNumber = utl::CRC32("AyatakaCollisionModel"); // format magic, named after the original converter; keep
 
 		const uint32 uMagicNumber = pData[0];
 		const uint32 uFileVersion = pData[1];
 		const uint32 uSubmeshCount = pData[2];
-		ASSERT(uMagicNumber == AyatakaMagicNumber && "Not a proper Ayataka-generated collision model file");
+		ASSERT(uMagicNumber == AyatakaMagicNumber && "Not a proper collision model file");
 		ASSERT(uFileVersion >= 2);
 
 		uint32 uBegin = 0;

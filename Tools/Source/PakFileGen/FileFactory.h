@@ -2,7 +2,6 @@
 
 #include "Engine/Core/Utility.h"
 #include "../ResourceLib/ResourcePakExporter.h"
-#include "../Ayataka/Dependencies/DependencyTracker.h"
 #include <yaml-cpp/yaml.h>
 #include <sstream>
 #include <algorithm>
@@ -82,7 +81,6 @@ protected:
 	virtual std::string LoadHeightmap(const char* szFileName, const YAML::Node& node) { return ""; };
 	void AddDependency(const char* szFileName);
 	void AddDependenciesFromDepFile(const char* szDepFileName, ResourceEntry* pEntry);
-	void AddDependenciesFromDepTracker(DependencyTracker& tracker);
 	std::string LoadRawFile(const char* szFileName, usg::ResourceType eType = usg::ResourceType::UNDEFINED);
 	std::string LoadYMLVPBFile(const char* szFileName);
 	std::string LoadYMLEntityFile(const char* szFileName);

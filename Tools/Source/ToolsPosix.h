@@ -1,7 +1,7 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 //	Description: POSIX stand-ins for the MSVC CRT and Win32 calls used by the
-//	data tools (Ayataka, PakFileGen, ShaderPackage, FontCreator).
+//	data tools (PakFileGen, ShaderPackage, FontCreator).
 //
 //	build_linux_tools.sh force-includes this (-include) after the engine's
 //	Common.h has been made available, so the tool sources keep their Windows
