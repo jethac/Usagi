@@ -147,8 +147,8 @@ private:
 
 	::exchange::Shape* NewShape(Cmdl& cmdl, FbxNode* pShapeNode);
 	::exchange::Mesh* NewMesh(Cmdl& cmdl, FbxNode* pShapeNode);
-	::exchange::Animation* FbxLoad::NewAnimation(Cmdl& cmdl, FbxAnimStack* layerNode);
-	::exchange::MaterialAnimation* FbxLoad::NewMaterialAnimation(Cmdl& cmdl, FbxAnimStack* layerNode);
+	::exchange::Animation* NewAnimation(Cmdl& cmdl, FbxAnimStack* layerNode);
+	::exchange::MaterialAnimation* NewMaterialAnimation(Cmdl& cmdl, FbxAnimStack* layerNode);
 	::exchange::Material* NewMaterial(FbxSurfaceMaterial* pFBXMaterial, bool bSkin);
 	::exchange::Material* DummyMaterial(bool bSkinned);
 	::exchange::Skeleton* NewSkeleton();
