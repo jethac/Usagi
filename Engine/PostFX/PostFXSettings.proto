@@ -17,6 +17,23 @@ message ToneMapSettings
 	// Colour grading LUT: a 256x16 strip of 16 16x16 slices (red across, green
 	// down, blue by slice), applied in display (sRGB) space. Empty = no LUT.
 	required string lutName = 6 [(nanopb).max_size = 64];
+	// White balance: a linear gain per channel before the tone curve (a warm grade).
+	required float fWhiteR = 7 [default = 1.0];
+	required float fWhiteG = 8 [default = 1.0];
+	required float fWhiteB = 9 [default = 1.0];
+	// Aerial perspective: the scene fades towards the haze colour (linear HDR, like the
+	// lighting) with horizontal distance from the camera beyond fHazeStart, at fHazeDensity
+	// per world unit, up to fHazeMax; thinning with height above fHazeBase at fHazeFalloff
+	// per unit (0 = the same at every height). fHazeDensity 0 turns it off. Horizontal
+	// distance, so a camera looking straight down sees no haze over what it frames.
+	required float fHazeDensity = 10 [default = 0.0];
+	required float fHazeStart = 11 [default = 0.0];
+	required float fHazeMax = 12 [default = 1.0];
+	required float fHazeR = 13 [default = 1.0];
+	required float fHazeG = 14 [default = 1.0];
+	required float fHazeB = 15 [default = 1.0];
+	required float fHazeBase = 16 [default = 0.0];
+	required float fHazeFalloff = 17 [default = 0.0];
 }
 
 message LightingSettings

@@ -17,12 +17,18 @@ struct ToneMapConstants
 {
 	Vector4f	vParams;	// exposure, saturation, contrast, vignette
 	Vector4f	vLUT;		// strength, enabled, aspect, unused
+	Vector4f	vWhite;		// white balance gain (rgb), unused
+	Vector4f	vHaze;		// density, start, max, height falloff
+	Vector4f	vHazeColor;	// colour (rgb), base height
 };
 
 static const ShaderConstantDecl g_toneMapConstantDef[] =
 {
 	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vParams,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vLUT,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vWhite,	CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vHaze,	CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vHazeColor, CT_VECTOR_4, 1),
 	SHADER_CONSTANT_END()
 };
 
@@ -30,6 +36,7 @@ static const DescriptorDeclaration g_toneMapDescriptorDecl[] =
 {
 	DESCRIPTOR_ELEMENT(0,						 DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_ELEMENT(1,						 DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),
+	DESCRIPTOR_ELEMENT(2,						 DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, SHADER_FLAG_PIXEL),	// linear depth (haze)
 	DESCRIPTOR_ELEMENT(SHADER_CONSTANT_MATERIAL, DESCRIPTOR_TYPE_CONSTANT_BUFFER, 1, SHADER_FLAG_PIXEL),
 	DESCRIPTOR_END()
 };
@@ -96,6 +103,9 @@ void ToneMap::UpdateConstants(GFXDevice* pDevice)
 	pConsts->vParams.Assign(m_settings.fExposure, m_settings.fSaturation, m_settings.fContrast, m_settings.fVignette);
 	const float fAspect = (float)m_pSys->GetFinalTargetWidth() / (float)Math::Max(m_pSys->GetFinalTargetHeight(), 1U);
 	pConsts->vLUT.Assign(m_settings.fLUTStrength, m_settings.lutName[0] != '\0' ? 1.0f : 0.0f, fAspect, 0.0f);
+	pConsts->vWhite.Assign(m_settings.fWhiteR, m_settings.fWhiteG, m_settings.fWhiteB, 0.0f);
+	pConsts->vHaze.Assign(m_settings.fHazeDensity, m_settings.fHazeStart, m_settings.fHazeMax, m_settings.fHazeFalloff);
+	pConsts->vHazeColor.Assign(m_settings.fHazeR, m_settings.fHazeG, m_settings.fHazeB, m_settings.fHazeBase);
 	m_constantSet.Unlock();
 	m_constantSet.UpdateData(pDevice);
 }
@@ -120,6 +130,11 @@ void ToneMap::SetTexture(GFXDevice* pDevice, Input eInput, const TextureHndl& te
 	if (eInput == Input::Color)
 	{
 		m_material.SetTexture(0, texture, m_pointSampler);
+		m_material.UpdateDescriptors(pDevice);
+	}
+	else if (eInput == Input::LinearDepth)
+	{
+		m_material.SetTexture(2, texture, m_pointSampler);
 		m_material.UpdateDescriptors(pDevice);
 	}
 }

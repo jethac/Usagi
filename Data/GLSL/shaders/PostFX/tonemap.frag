@@ -1,4 +1,5 @@
 #include "../includes/platformdefines.inc"
+#include "../includes/global_3d.inc"
 
 // HDR -> display. Writes linear values to an sRGB target.
 
@@ -6,12 +7,40 @@ BUFFER_LAYOUT(1, UBO_MATERIAL_ID) uniform Material
 {
 	vec4	vParams;	// exposure, saturation, contrast, vignette
 	vec4	vLUT;		// strength, enabled, aspect, unused
+	vec4	vWhite;		// white balance gain (rgb), unused
+	vec4	vHaze;		// density, start, max, height falloff
+	vec4	vHazeColor;	// colour (rgb, linear HDR), base height
 };
 
 ATTRIB_LOC(0) in vec2 vo_vTexCoord;
 
 SAMPLER_LOC(1, 0) uniform sampler2D sampler0;	// HDR scene
 SAMPLER_LOC(1, 1) uniform sampler2D sampler1;	// 256x16 grading LUT (sRGB values)
+SAMPLER_LOC(1, 2) uniform sampler2D sampler2;	// linear depth (0..1 of the far plane)
+
+// Aerial perspective: fade towards the haze colour with the pixel's horizontal
+// distance from the eye, thinning with height. View space from the depth
+// along the pixel's ray (perspective and orthographic alike).
+vec3 ApplyHaze(vec3 vColor)
+{
+	if (vHaze.x <= 0.0)
+		return vColor;
+	float fLin = texture(sampler2, vo_vTexCoord).x;
+	vec2 vNDC = vec2(vo_vTexCoord.x * 2.0 - 1.0, vo_vTexCoord.y * 2.0 - 1.0);
+	vec4 vA = vec4(vNDC, 0.0, 1.0) * mInvProjMat;
+	vec4 vB = vec4(vNDC, 1.0, 1.0) * mInvProjMat;
+	vec3 vNear = vA.xyz / vA.w;
+	vec3 vFar = vB.xyz / vB.w;
+	float fViewZ = fLin * vNearFar.y;
+	float fT = (fViewZ - vNear.z) / max(vFar.z - vNear.z, 1e-4);
+	vec3 vView = mix(vNear, vFar, fT);
+	vec3 vWorld = (vec4(vView, 1.0) * mInvViewMat).xyz;
+	float fDist = max(length(vWorld.xz - vEyePos.xz) - vHaze.y, 0.0);
+	float fAmount = 1.0 - exp(-fDist * vHaze.x);
+	if (vHaze.w > 0.0)
+		fAmount *= exp(-max(vWorld.y - vHazeColor.w, 0.0) * vHaze.w);
+	return mix(vColor, vHazeColor.rgb, min(fAmount, vHaze.z));
+}
 
 layout(location = 0) out vec4 colorOut;
 
@@ -65,7 +94,7 @@ vec3 ApplyLUT(vec3 c)
 
 void main(void)
 {
-	vec3 vColor = texture(sampler0, vo_vTexCoord).rgb * vParams.x;
+	vec3 vColor = ApplyHaze(texture(sampler0, vo_vTexCoord).rgb) * vWhite.rgb * vParams.x;
 	vColor = ACESFitted(vColor);
 
 	float fLuma = dot(vColor, vec3(0.2126, 0.7152, 0.0722));

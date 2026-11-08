@@ -1,7 +1,8 @@
 /****************************************************************************
 //	Usagi Engine, Copyright © Vitei, Inc. 2013
 //	Description: HDR to display: exposure, filmic tone curve (ACES fit),
-//	saturation/contrast, LUT colour grading and vignette
+//	saturation/contrast, LUT colour grading and vignette; white balance and
+//	aerial perspective (distance haze from the linear depth)
 *****************************************************************************/
 #ifndef _USG_POSTFX_TONEMAP_H_
 #define _USG_POSTFX_TONEMAP_H_
@@ -28,7 +29,7 @@ public:
 	virtual bool Draw(GFXContext* pContext, RenderContext& renderContext) override;
 
 	virtual bool RequiresHDR() const override { return true; }
-	virtual bool ReadsTexture(Input eInput) const override { return eInput == Input::Color; }
+	virtual bool ReadsTexture(Input eInput) const override { return eInput == Input::Color || eInput == Input::LinearDepth; }
 	virtual bool LoadsTexture(Input eInput) const override { return false; }
 	virtual void SetTexture(GFXDevice* pDevice, Input eInput, const TextureHndl& texture) override;
 
