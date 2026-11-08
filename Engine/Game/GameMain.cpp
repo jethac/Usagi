@@ -160,6 +160,20 @@ static void ReportFrameRate(float fDelta, float fUpdateMs, float fDrawMs)
 	{
 		s_recordedFrameMs[s_uRecordedFrames++] = fDelta * 1000.0f;
 	}
+	// USAGI_FPS_LOG=2: also log each frame over 16.7 ms as it happens (when and
+	// in which part of the frame a hitch is), with the CPU update and draw times
+	{
+		static int s_iSlowLog = -1;
+		if (s_iSlowLog < 0)
+		{
+			char szEnv[8] = {};
+			s_iSlowLog = (OS::GetEnvVar("USAGI_FPS_LOG", szEnv, sizeof(szEnv)) && szEnv[0] == '2') ? 1 : 0;
+		}
+		if (s_iSlowLog == 1 && fDelta * 1000.0f > 1000.0f / 60.0f)
+		{
+			RELEASE_WARNING("Slow frame %u: %.2f ms (update %.2f, draw %.2f)\n", s_uRecordedFrames, fDelta * 1000.0f, fUpdateMs, fDrawMs);
+		}
+	}
 
 	static const float s_fInterval = 5.0f;
 	static float s_fElapsed = 0.0f;
