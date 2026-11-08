@@ -28,11 +28,22 @@ float GetShadowValueSoft(vec4 shadowPos, in int shadowIdx, int index)
     tc.w = float( (CASCADE_COUNT*shadowIdx) + index );
 
     float d = 0.0;
-    vec2 vDiskRadius = cascades[shadowIdx].vSampleRange[index] * cascades[shadowIdx].vInvShadowDim.xy;
+    float fRadius = cascades[shadowIdx].vSampleRange[index];
+    vec2 vDiskRadius = fRadius * cascades[shadowIdx].vInvShadowDim.xy;
+    // A wide (soft) filter would show the 12 taps as ghost copies of the shadow edge: turn the
+    // disk per pixel (interleaved gradient noise) so the penumbra is a fine dither instead.
+    mat2 mDiskRot = mat2(1.0, 0.0, 0.0, 1.0);
+    if (fRadius > 6.0)
+    {
+        float fAngle = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        float fSin = sin(fAngle);
+        float fCos = cos(fAngle);
+        mDiskRot = mat2(fCos, fSin, -fSin, fCos);
+    }
     for(int i=0; i<12; i++)
     {
         tc.xyz = (shadowPos.xyz / shadowPos.w);
-        tc.xy += (poissonDisk12[i] * vDiskRadius);
+        tc.xy += ((mDiskRot * poissonDisk12[i]) * vDiskRadius);
         tc.z += (bias * length(poissonDisk12[i]));
         d += texture(sampler15, tc.xywz);
     }
