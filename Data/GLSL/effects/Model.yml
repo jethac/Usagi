@@ -86,6 +86,11 @@ CustomEffects:
           - { type: bool,   name: bMarkMap,           default: false }
           - { type: vec4,   name: markRect,           count: 1, default: [0.0, 0.0, 1.0, 1.0] }  # x, z of the map's corner; 1 / width, 1 / depth (world units)
           - { type: vec4,   name: markParams,         count: 1, default: [0.8, 0.55, 0.7, 0.0] }  # x = darkening, y = deposit roughness, z = clearcoat loss
+          # Foliage (PBR, deferred), 0..1: thin alpha-tested cards (grass, flowers). The deferred
+          # lighting skips the screen space AO and contact shadows on them (which read the cards'
+          # depth edges as occluders and stipple them dark) and lets a little sunlight through
+          # them seen against the sun. 0 = an ordinary surface.
+          - { type: float,  name: foliage,            count: 1, default: 0.0 }
       - binding: Custom0
         shaderType: VS 
         defines: "!INSTANCED !HAS_SKELETON"        

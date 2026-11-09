@@ -263,6 +263,7 @@ void main(void)
 		float fClearcoat = uMaterial.clearcoat * (1.0 - fMarkCover * uMaterial.markParams.z);
 		OutputDeferredPBR(-vo_vViewDir.z, vNormal, vDiffuse.rgb, vEmissive, fRoughness, fMetallic, uMaterial.reflectance,
 			fClearcoat, uMaterial.clearcoatRoughness, fOcclusion);
+		po_vEmissive.a = uMaterial.foliage;
 	}
 	else
 	{

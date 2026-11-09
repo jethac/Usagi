@@ -75,6 +75,12 @@ vec3 GetDeferredEmissive(in vec2 texCoord)
 	return texture(sampler3, texCoord).rgb;
 }
 
+// Foliage (thin alpha-tested cards: grass, flowers), 0..1 (see deferred.inc)
+float GetDeferredFoliage(in vec2 texCoord)
+{
+	return texture(sampler3, texCoord).a;
+}
+
 vec3 GetDeferredViewPos3D(in vec2 texCoord, in vec3 vVSValue)
 {
 	vec3 vViewRay = vec3(vVSValue.xy * (vNearFar.y / vVSValue.z), vNearFar.y);

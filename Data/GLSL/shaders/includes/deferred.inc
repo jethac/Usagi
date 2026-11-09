@@ -2,7 +2,8 @@
 // G-buffer layout (metal/roughness PBR)
 //  Diffuse  (sRGB RGBA8) : base colour rgb, a = material ambient occlusion
 //  Normal   (RGBA16 snorm): view space normal xyz, w = perceptual roughness
-//  Emissive (sRGB RGBA8) : emissive rgb
+//  Emissive (sRGB RGBA8) : emissive rgb, a = foliage (0..1: no screen space AO or contact
+//                          shadow, and a little sunlight through it; 0 for everything else)
 //  Specular (RGBA8)      : metallic, reflectance (0.5 = 4% F0), clear coat, clear coat roughness
 layout(location = 0) out vec4 po_vDiffuse;
 layout(location = 2) out vec4 po_vNormal;

@@ -14,7 +14,7 @@ ATTRIB_LOC(3) in vec3 vo_vRayFar;
 
 layout(location = 0) out vec4 colorOut;
 
-float SampleDirShadow(in vec3 vPos, in vec3 vNormal, in vec3 L, in int iCascadeSet)
+float SampleDirShadow(in vec3 vPos, in vec3 vNormal, in vec3 L, in int iCascadeSet, in float fFoliage)
 {
 	float fShadow = 1.0;
 	if (vPos.z < cascades[iCascadeSet].vSplitDistance.w)
@@ -22,7 +22,11 @@ float SampleDirShadow(in vec3 vPos, in vec3 vNormal, in vec3 L, in int iCascadeS
 		vec3 vWorldPos = (vec4(vPos + vNormal * vShadowParams.y, 1.0) * mInvViewMat).xyz;
 		fShadow = SampleShadowmap(vPos.z, vWorldPos.xyz, iCascadeSet);
 	}
-	return min(fShadow, ContactShadow(vPos, vNormal, L));
+	if (fFoliage >= 1.0)
+	{
+		return fShadow;		// no contact shadow on foliage cards
+	}
+	return min(fShadow, mix(ContactShadow(vPos, vNormal, L), 1.0, fFoliage));
 }
 
 void main(void)
@@ -41,7 +45,9 @@ void main(void)
 		iLastLight = iCascadeLightStart;
 	}
 
-	float fSSAO = ScreenSpaceAO(vPos, s.vNormal);
+	// Foliage cards (G-buffer emissive alpha) skip the screen space AO and contact shadows
+	float fFoliage = GetDeferredFoliage(vo_vTexCoord);
+	float fSSAO = fFoliage >= 1.0 ? 1.0 : mix(ScreenSpaceAO(vPos, s.vNormal), 1.0, fFoliage);
 	for (int i = 0; i <= iLastLight; i++)
 	{
 		vec3 L = lights[i].vDirection.xyz;
@@ -50,8 +56,10 @@ void main(void)
 		{
 			// The key light: its shadow (tinted by what scatters into it) and a
 			// share of the screen space occlusion in its contact corners
-			float fShadow = SampleDirShadow(vPos, s.vNormal, L, 0);
+			float fShadow = SampleDirShadow(vPos, s.vNormal, L, 0, fFoliage);
 			vLit = PBR_DirectLightShadowed(s, V, L, fShadow, vShadowTint.rgb, vShadowTint.w);
+			// sunlight through foliage seen against the sun (a cheap translucency)
+			vLit += PBR_DiffuseColor(s) * (0.35 * fFoliage * fShadow) * pow(max(dot(-V, L), 0.0), 3.0);
 			vLit *= lights[i].vDiffuse.rgb * mix(1.0, fSSAO, vAOParams.w);
 		}
 		else
@@ -76,7 +84,8 @@ void main(void)
 	else if (iDebug == 3) colorOut = vec4(s.fRoughness, s.fMetallic, s.fClearCoat, 1.0);
 	else if (iDebug == 4) colorOut = vec4(EvaluateIBL(s, V, s.fOcclusion, vPos), 1.0);
 	else if (iDebug == 10) colorOut = vec4(TraceSSR(vPos, s.vNormal, V).aaa, 1.0);
-	else if (iDebug == 5) colorOut = vec4(vec3(iCascadeLightStart >= 0 ? SampleDirShadow(vPos, s.vNormal, lights[iCascadeLightStart].vDirection.xyz, 0) : 1.0), 1.0);
+	else if (iDebug == 5) colorOut = vec4(vec3(iCascadeLightStart >= 0 ? SampleDirShadow(vPos, s.vNormal, lights[iCascadeLightStart].vDirection.xyz, 0, fFoliage) : 1.0), 1.0);
+	else if (iDebug == 12) colorOut = vec4(vec3(fFoliage), 1.0);
 	else if (iDebug == 6) colorOut = vec4(fract(vPos * 0.1), 1.0);
 	else if (iDebug == 7) colorOut = vec4(vec3(fOcclusion), 1.0);
 	else if (iDebug == 11) colorOut = vec4(HemisphereLight(s.vNormal, 1.0), 1.0);
