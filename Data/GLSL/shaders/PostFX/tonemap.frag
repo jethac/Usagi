@@ -10,6 +10,8 @@ BUFFER_LAYOUT(1, UBO_MATERIAL_ID) uniform Material
 	vec4	vWhite;		// white balance gain (rgb), unused
 	vec4	vHaze;		// density, start, max, height falloff
 	vec4	vHazeColor;	// colour (rgb, linear HDR), base height
+	vec4	vSunGlow;	// sun glow colour (rgb, linear HDR; black = off), lobe power
+	vec4	vSunDir;	// towards the sun (world, unit), ambient share of the glow
 };
 
 ATTRIB_LOC(0) in vec2 vo_vTexCoord;
@@ -39,7 +41,15 @@ vec3 ApplyHaze(vec3 vColor)
 	float fAmount = 1.0 - exp(-fDist * vHaze.x);
 	if (vHaze.w > 0.0)
 		fAmount *= exp(-max(vWorld.y - vHazeColor.w, 0.0) * vHaze.w);
-	return mix(vColor, vHazeColor.rgb, min(fAmount, vHaze.z));
+	vColor = mix(vColor, vHazeColor.rgb, min(fAmount, vHaze.z));
+	if (dot(vSunGlow.rgb, vSunGlow.rgb) > 0.0)
+	{
+		// sun glow: in-scattered light, more of it looking towards the sun
+		vec3 vRay = normalize(vWorld - vEyePos.xyz);
+		float fLobe = pow(max(dot(vRay, vSunDir.xyz), 0.0), vSunGlow.w);
+		vColor += vSunGlow.rgb * fAmount * (fLobe + vSunDir.w);
+	}
+	return vColor;
 }
 
 layout(location = 0) out vec4 colorOut;

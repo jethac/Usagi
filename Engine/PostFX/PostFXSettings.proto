@@ -34,6 +34,19 @@ message ToneMapSettings
 	required float fHazeB = 15 [default = 1.0];
 	required float fHazeBase = 16 [default = 0.0];
 	required float fHazeFalloff = 17 [default = 0.0];
+	// Sun glow in the haze: light scattered towards the eye by the air between it and what it sees,
+	// strongest looking towards the sun (a golden-hour sun haze). Adds fSunGlow (linear HDR, per
+	// channel; black is off) times the haze's own distance term (uncapped by fHazeMax), shaped by a
+	// forward-scattering lobe pow(cos, fSunGlowPower) round the sun direction fSunDir (the way the
+	// light travels, world space, as a directional light's), plus fSunGlowAmbient of it everywhere.
+	required float fSunGlowR = 18 [default = 0.0];
+	required float fSunGlowG = 19 [default = 0.0];
+	required float fSunGlowB = 20 [default = 0.0];
+	required float fSunGlowPower = 21 [default = 6.0];
+	required float fSunGlowAmbient = 22 [default = 0.15];
+	required float fSunDirX = 23 [default = 0.0];
+	required float fSunDirY = 24 [default = -1.0];
+	required float fSunDirZ = 25 [default = 0.0];
 }
 
 message LightingSettings

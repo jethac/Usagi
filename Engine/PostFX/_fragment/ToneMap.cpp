@@ -20,6 +20,8 @@ struct ToneMapConstants
 	Vector4f	vWhite;		// white balance gain (rgb), unused
 	Vector4f	vHaze;		// density, start, max, height falloff
 	Vector4f	vHazeColor;	// colour (rgb), base height
+	Vector4f	vSunGlow;	// colour (rgb, linear HDR; black = off), lobe power
+	Vector4f	vSunDir;	// towards the sun (world, unit), ambient share of the glow
 };
 
 static const ShaderConstantDecl g_toneMapConstantDef[] =
@@ -29,6 +31,8 @@ static const ShaderConstantDecl g_toneMapConstantDef[] =
 	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vWhite,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vHaze,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vHazeColor, CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vSunGlow,	CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(ToneMapConstants, vSunDir,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_END()
 };
 
@@ -106,6 +110,10 @@ void ToneMap::UpdateConstants(GFXDevice* pDevice)
 	pConsts->vWhite.Assign(m_settings.fWhiteR, m_settings.fWhiteG, m_settings.fWhiteB, 0.0f);
 	pConsts->vHaze.Assign(m_settings.fHazeDensity, m_settings.fHazeStart, m_settings.fHazeMax, m_settings.fHazeFalloff);
 	pConsts->vHazeColor.Assign(m_settings.fHazeR, m_settings.fHazeG, m_settings.fHazeB, m_settings.fHazeBase);
+	pConsts->vSunGlow.Assign(m_settings.fSunGlowR, m_settings.fSunGlowG, m_settings.fSunGlowB, m_settings.fSunGlowPower);
+	Vector3f vToSun(-m_settings.fSunDirX, -m_settings.fSunDirY, -m_settings.fSunDirZ);
+	vToSun = vToSun.GetNormalisedIfNZero(Vector3f(0.0f, 1.0f, 0.0f));
+	pConsts->vSunDir.Assign(vToSun.x, vToSun.y, vToSun.z, m_settings.fSunGlowAmbient);
 	m_constantSet.Unlock();
 	m_constantSet.UpdateData(pDevice);
 }
