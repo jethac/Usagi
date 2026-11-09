@@ -50,6 +50,9 @@ struct DeferredParams
 	Vector4f	vShadowParams;
 	Vector4f	vAOParams;
 	Vector4f	vSSRParams;
+	Vector4f	vSkyColor;
+	Vector4f	vGroundColor;
+	Vector4f	vShadowTint;
 	Matrix4x4	mPrevViewProj;
 };
 
@@ -61,6 +64,9 @@ static const ShaderConstantDecl g_deferredParamsDecl[] =
 	SHADER_CONSTANT_ELEMENT(DeferredParams, vShadowParams,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(DeferredParams, vAOParams,		CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(DeferredParams, vSSRParams,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vSkyColor,		CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vGroundColor,	CT_VECTOR_4, 1),
+	SHADER_CONSTANT_ELEMENT(DeferredParams, vShadowTint,	CT_VECTOR_4, 1),
 	SHADER_CONSTANT_ELEMENT(DeferredParams, mPrevViewProj,	CT_MATRIX_44, 1),
 	SHADER_CONSTANT_END()
 };
@@ -290,7 +296,7 @@ void DeferredShading::Init(GFXDevice* pDevice, ResourceMgr* pRes, PostFXSys* pSy
 	m_bPrevViewProjValid = false;
 	m_prevViewProj.LoadIdentity();
 
-	// USAGI_DEFERRED_DEBUG=1..6 shows one lighting term (see deferred_lighting.inc)
+	// USAGI_DEFERRED_DEBUG=<n> shows one lighting term (see deferred_lighting.inc)
 	m_uDebugView = 0;
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -346,10 +352,13 @@ void DeferredShading::UpdateParams(GFXDevice* pDevice)
 	pParams->vContactShadow.Assign(m_lighting.fContactShadowLength, m_lighting.fContactShadowThickness,
 		(float)Math::Max(m_lighting.uContactShadowSteps, 1U), m_lighting.fContactShadowLength > 0.0f ? m_lighting.fContactShadowStrength : 0.0f);
 	pParams->vShadowParams.Assign(1.0f, m_lighting.fShadowNormalOffset, 0.0f, (float)m_uDebugView);
-	pParams->vAOParams.Assign(m_ao.fRadius, m_ao.fStrength, m_ao.fPower, 0.0f);
+	pParams->vAOParams.Assign(m_ao.fRadius, m_ao.fStrength, m_ao.fPower, m_ao.fDirectStrength);
 	// Reflections need last frame's scene and where its camera was
 	const bool bSSR = m_lighting.uSSRSteps > 0 && m_bPrevSceneValid && m_bPrevViewProjValid;
 	pParams->vSSRParams.Assign(bSSR ? (float)m_lighting.uSSRSteps : 0.0f, m_lighting.fSSRDistance, m_lighting.fSSRThickness, m_lighting.fSSRMaxRoughness);
+	pParams->vSkyColor.Assign(m_lighting.fSkyR, m_lighting.fSkyG, m_lighting.fSkyB, m_lighting.fSkyReflection);
+	pParams->vGroundColor.Assign(m_lighting.fGroundR, m_lighting.fGroundG, m_lighting.fGroundB, 0.0f);
+	pParams->vShadowTint.Assign(m_lighting.fShadowTintR, m_lighting.fShadowTintG, m_lighting.fShadowTintB, m_lighting.fLightWrap);
 	pParams->mPrevViewProj = m_prevViewProj;
 	m_paramsConstants.Unlock();
 	m_paramsConstants.UpdateData(pDevice);

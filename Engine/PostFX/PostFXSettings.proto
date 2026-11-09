@@ -64,6 +64,27 @@ message LightingSettings
 	required float fSSRDistance = 13 [default = 12.0];		// Ray length, view units
 	required float fSSRThickness = 14 [default = 0.6];		// Depth a hit may be behind the surface, view units
 	required float fSSRMaxRoughness = 15 [default = 0.55];	// Rougher specular keeps the environment
+
+	// Hemisphere ambient: sky light from above and light bounced off the ground
+	// from below, blended by the world space normal and added to the image based
+	// diffuse (linear HDR, not scaled by fIBLIntensity). Black (the default) is off.
+	required float fSkyR = 16 [default = 0.0];
+	required float fSkyG = 17 [default = 0.0];
+	required float fSkyB = 18 [default = 0.0];
+	required float fGroundR = 19 [default = 0.0];
+	required float fGroundG = 20 [default = 0.0];
+	required float fGroundB = 21 [default = 0.0];
+	// Share of the environment reflection replaced by that sky and ground
+	// gradient, so water and glossy surfaces pick up the same sky (0 = off)
+	required float fSkyReflection = 22 [default = 0.0];
+	// The primary shadowed directional light's diffuse in its own shadow and past
+	// its terminator: the share of the light that still arrives there, per channel
+	// (scattered sky and bounce light; 0 = black, Lambert). fLightWrap carries it
+	// round the form: (N.L + wrap) / (1 + wrap) instead of N.L.
+	required float fShadowTintR = 23 [default = 0.0];
+	required float fShadowTintG = 24 [default = 0.0];
+	required float fShadowTintB = 25 [default = 0.0];
+	required float fLightWrap = 26 [default = 0.0];
 }
 
 message BloomSettings
@@ -79,6 +100,9 @@ message SSAOSettings
 	required float fPower = 3 [default = 1.5];
 	required float fFadeOutFrom = 4 [default = 50.0];		// View distance where AO starts to fade
 	required float fFadeOutTo = 5 [default = 300.0];
+	// Share of the occlusion that also darkens the primary directional light
+	// (contact darkening in sunlit corners; 0 = ambient only)
+	required float fDirectStrength = 6 [default = 0.0];
 }
 
 message TiltShiftSettings

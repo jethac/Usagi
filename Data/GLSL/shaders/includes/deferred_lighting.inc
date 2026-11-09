@@ -41,20 +41,30 @@ void main(void)
 		iLastLight = iCascadeLightStart;
 	}
 
+	float fSSAO = ScreenSpaceAO(vPos, s.vNormal);
 	for (int i = 0; i <= iLastLight; i++)
 	{
 		vec3 L = lights[i].vDirection.xyz;
-		vec3 vLit = PBR_DirectLight(s, V, L) * lights[i].vDiffuse.rgb;
+		vec3 vLit;
 		if (i == iCascadeLightStart)
 		{
-			vLit *= SampleDirShadow(vPos, s.vNormal, L, 0);
+			// The key light: its shadow (tinted by what scatters into it) and a
+			// share of the screen space occlusion in its contact corners
+			float fShadow = SampleDirShadow(vPos, s.vNormal, L, 0);
+			vLit = PBR_DirectLightShadowed(s, V, L, fShadow, vShadowTint.rgb, vShadowTint.w);
+			vLit *= lights[i].vDiffuse.rgb * mix(1.0, fSSAO, vAOParams.w);
+		}
+		else
+		{
+			vLit = PBR_DirectLight(s, V, L) * lights[i].vDiffuse.rgb;
 		}
 		vColor += vLit;
 	}
 
-	float fOcclusion = s.fOcclusion * ScreenSpaceAO(vPos, s.vNormal);
+	float fOcclusion = s.fOcclusion * fSSAO;
 	vColor += EvaluateIBL(s, V, fOcclusion, vPos);
 	vColor += vAmbientLight.rgb * vEnvParams.z * PBR_DiffuseColor(s) * fOcclusion;
+	vColor += HemisphereLight(s.vNormal, 1.0) * PBR_DiffuseColor(s) * fOcclusion;
 	vColor += GetDeferredEmissive(vo_vTexCoord);
 
 	colorOut = vec4(vColor, 1.0);
@@ -69,6 +79,7 @@ void main(void)
 	else if (iDebug == 5) colorOut = vec4(vec3(iCascadeLightStart >= 0 ? SampleDirShadow(vPos, s.vNormal, lights[iCascadeLightStart].vDirection.xyz, 0) : 1.0), 1.0);
 	else if (iDebug == 6) colorOut = vec4(fract(vPos * 0.1), 1.0);
 	else if (iDebug == 7) colorOut = vec4(vec3(fOcclusion), 1.0);
+	else if (iDebug == 11) colorOut = vec4(HemisphereLight(s.vNormal, 1.0), 1.0);
 	else if (iDebug == 8) colorOut = vec4(vec3(SampleShadowmap(vPos.z, (vec4(vPos, 1.0) * mInvViewMat).xyz, 0)), 1.0);
 	else if (iDebug == 9)
 	{

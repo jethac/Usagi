@@ -99,6 +99,19 @@ vec3 PBR_DirectLight(in PBRSurface s, in vec3 V, in vec3 L)
 	return vColor * NoL;
 }
 
+// A directional light with its visibility (fShadow, 0 = in shadow), where a
+// share of it (vTint, per channel) still reaches the shadowed side as diffuse:
+// light scattered and bounced around the form. fWrap carries that share past
+// the terminator, (N.L + wrap) / (1 + wrap). vTint 0 is PBR_DirectLight * fShadow.
+vec3 PBR_DirectLightShadowed(in PBRSurface s, in vec3 V, in vec3 L, in float fShadow, in vec3 vTint, in float fWrap)
+{
+	vec3 vColor = PBR_DirectLight(s, V, L) * fShadow;
+	float fNoL = dot(s.vNormal, L);
+	float fWrapped = clamp((fNoL + fWrap) / (1.0 + fWrap), 0.0, 1.0);
+	float fScattered = max(fWrapped - clamp(fNoL, 0.0, 1.0) * fShadow, 0.0);
+	return vColor + PBR_DiffuseColor(s) * (1.0 / PBR_PI) * vTint * fScattered;
+}
+
 // Split-sum environment BRDF, analytic fit (Karis, "Physically Based Shading
 // on Mobile"), so no LUT texture is needed.
 vec2 PBR_EnvBRDFApprox(float fRoughness, float NoV)

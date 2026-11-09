@@ -16,6 +16,9 @@ BUFFER_LAYOUT(1, UBO_MATERIAL_ID) uniform DeferredParams
 	vec4	vShadowParams;		// x = PCF radius scale, y = normal offset (shadow texels), z = unused, w = debug view
 	vec4	vAOParams;			// x = radius (view units, 0 disables), y = strength, z = power, w = unused
 	vec4	vSSRParams;			// x = ray steps (0 disables), y = ray length (view units), z = thickness (view units), w = max roughness
+	vec4	vSkyColor;			// rgb = hemisphere ambient from above (linear HDR, black = off), w = share of reflections taken from the hemisphere
+	vec4	vGroundColor;		// rgb = hemisphere ambient from below, w = unused
+	vec4	vShadowTint;		// rgb = share of the primary directional light that reaches its shadow, w = light wrap
 	mat4	mPrevViewProj;		// World to last frame's clip space
 };
 
@@ -99,6 +102,17 @@ vec3 ViewToEnv(in vec3 vViewDir)
 	return (vec4(vWorld, 0.0) * mEnvRotation).xyz;
 }
 
+// Hemisphere ambient: the sky colour from above, the ground's bounce from
+// below, along a world space direction. fSharpness narrows the blend toward
+// the horizon (1 = the cosine weighted blend for diffuse; larger for mirror
+// like reflections).
+vec3 HemisphereLight(in vec3 vViewDir, in float fSharpness)
+{
+	float fUp = (vec4(vViewDir, 0.0) * mInvViewMat).y;
+	float t = clamp(0.5 + 0.5 * fUp * fSharpness, 0.0, 1.0);
+	return mix(vGroundColor.rgb, vSkyColor.rgb, t);
+}
+
 vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion, in vec3 P)
 {
 	vec3 N = s.vNormal;
@@ -111,6 +125,14 @@ vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion, in vec3 P)
 	float fMaxMip = vEnvParams.y;
 	vec3 vEnvR = ViewToEnv(R);
 	vec3 vPrefiltered = textureLod(sampler5, vEnvR, s.fRoughness * fMaxMip).rgb;
+	// The hemisphere's sky in reflections (in the environment's units), sharper
+	// for smoother surfaces
+	float fSkyRefl = vSkyColor.w;
+	if (fSkyRefl > 0.0)
+	{
+		vec3 vSky = HemisphereLight(R, 1.0 / max(s.fRoughness, 0.08)) / max(vEnvParams.x, 1e-3);
+		vPrefiltered = mix(vPrefiltered, vSky, fSkyRefl);
+	}
 
 	// Screen space reflections take over from the environment where they hit:
 	// the clearcoat (varnish, car lacquer) and smooth base specular. The scene
@@ -138,6 +160,10 @@ vec3 EvaluateIBL(in PBRSurface s, in vec3 V, in float fOcclusion, in vec3 P)
 	{
 		float Fc = PBR_F_Schlick(0.04, NoV) * s.fClearCoat;
 		vec3 vCoat = textureLod(sampler5, vEnvR, s.fClearCoatRoughness * fMaxMip).rgb;
+		if (fSkyRefl > 0.0)
+		{
+			vCoat = mix(vCoat, HemisphereLight(R, 1.0 / max(s.fClearCoatRoughness, 0.08)) / max(vEnvParams.x, 1e-3), fSkyRefl);
+		}
 		vCoat = mix(vCoat, vSSR.rgb, vSSR.a * clamp(1.0 - s.fClearCoatRoughness / max(fSSRMaxRough, 1e-3), 0.0, 1.0));
 		float fCoatOcc = PBR_SpecularOcclusion(NoV, fOcclusion, s.fClearCoatRoughness) * fHorizon;
 		vColor = vColor * (1.0 - Fc) + vCoat * (Fc * fCoatOcc);
