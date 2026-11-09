@@ -210,6 +210,10 @@ float ScreenSpaceAO(in vec3 P, in vec3 N)
 
 	float fAngle = InterleavedGradientNoise(gl_FragCoord.xy) * 6.2831853;
 	float fJitter = InterleavedGradientNoise(gl_FragCoord.yx + 17.0);
+	// The linear depth is half float: ignore occluders less than a couple of its
+	// steps above the surface, or a surface facing the camera (a board seen from
+	// straight above) darkens along the lines where its depth steps
+	float fDepthBias = abs(P.z) * (1.0 / 512.0);
 	float fOcclusion = 0.0;
 	for (int i = 0; i < SSAO_TAPS; i++)
 	{
@@ -221,7 +225,7 @@ float ScreenSpaceAO(in vec3 P, in vec3 N)
 		vec3 vS = ViewPosAtNDC(vNDC, fSceneZ) - P;
 		float fLen = length(vS);
 		float fFalloff = clamp(1.0 - fLen / (fRadius * 1.5), 0.0, 1.0);
-		fOcclusion += max(dot(vS / max(fLen, 1e-4), N) - 0.15, 0.0) * fFalloff;
+		fOcclusion += max((dot(vS, N) - fDepthBias) / max(fLen, 1e-4) - 0.15, 0.0) * fFalloff;
 	}
 	float fAO = clamp(1.0 - vAOParams.y * fOcclusion * (1.0 / float(SSAO_TAPS)) * 1.6, 0.0, 1.0);
 	return pow(fAO, vAOParams.z);
@@ -240,8 +244,11 @@ float ContactShadow(in vec3 vViewPos, in vec3 vViewNormal, in vec3 L)
 	int iSteps = int(vContactShadow.z);
 	float fStep = vContactShadow.x / vContactShadow.z;
 	float fJitter = InterleavedGradientNoise(gl_FragCoord.xy);
-	// Start slightly off the surface to avoid self shadowing
-	vec3 vRayPos = vViewPos + vViewNormal * (vContactShadow.y * 0.25) + L * (fStep * fJitter);
+	// Start slightly off the surface to avoid self shadowing, and at least a
+	// couple of the half float linear depth's steps off it: a surface facing the
+	// camera would otherwise shadow itself along the lines where its depth steps
+	float fDepthBias = abs(vViewPos.z) * (1.0 / 512.0);
+	vec3 vRayPos = vViewPos + vViewNormal * max(vContactShadow.y * 0.25, fDepthBias) + L * (fStep * fJitter);
 	float fOccluded = 0.0;
 	for (int i = 0; i < iSteps; i++)
 	{
@@ -255,7 +262,7 @@ float ContactShadow(in vec3 vViewPos, in vec3 vViewNormal, in vec3 L)
 		vec2 vUV = GetRTUV(vNDC * 0.5 + 0.5);
 		float fSceneZ = GetDeferredLinearDepth(vUV) * vNearFar.y;
 		float fDelta = vRayPos.z - fSceneZ;
-		if (fDelta > 0.0 && fDelta < vContactShadow.y)
+		if (fDelta > 0.0 && fDelta < vContactShadow.y + fDepthBias)
 		{
 			// Fade the occlusion out toward the end of the ray
 			fOccluded = 1.0 - (float(i) / float(iSteps));
